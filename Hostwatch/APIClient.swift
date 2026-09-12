@@ -1,0 +1,151 @@
+import Foundation
+
+enum APIError: LocalizedError {
+    case invalidURL
+    case server(String)
+    case invalidResponse
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidURL: "The control-plane URL is invalid."
+        case .server(let message): message
+        case .invalidResponse: "The server returned an invalid response."
+        }
+    }
+}
+
+actor APIClient {
+    private var baseURL: URL
+    private var csrf = ""
+    private var selectedNode = ""
+    private let session: URLSession
+    private let decoder = JSONDecoder()
+
+    init(baseURL: URL) {
+        self.baseURL = baseURL
+        let configuration = URLSessionConfiguration.default
+        configuration.timeoutIntervalForRequest = 60
+        configuration.httpCookieStorage = .shared
+        configuration.httpShouldSetCookies = true
+        session = URLSession(configuration: configuration)
+    }
+
+    func configure(baseURL: URL) { self.baseURL = baseURL }
+    func select(node: String) { selectedNode = node }
+
+    private func call<T: Decodable>(_ path: String, method: String = "GET", body: Encodable? = nil) async throws -> T {
+        guard let url = URL(string: path, relativeTo: baseURL)?.absoluteURL else { throw APIError.invalidURL }
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        if path.hasPrefix("/api/v1/"), !selectedNode.isEmpty { request.setValue(selectedNode, forHTTPHeaderField: "X-Hostwatch-Node") }
+        if !csrf.isEmpty, !["GET", "HEAD"].contains(method) { request.setValue(csrf, forHTTPHeaderField: "X-Hostwatch-CSRF") }
+        if let body {
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try JSONEncoder().encode(AnyEncodable(body))
+        }
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
+        guard (200..<300).contains(http.statusCode) else {
+            let server = try? decoder.decode(ServerError.self, from: data)
+            throw APIError.server(server?.error ?? "Request failed (HTTP \(http.statusCode)).")
+        }
+        return try decoder.decode(T.self, from: data)
+    }
+
+    private func empty(_ path: String, method: String, body: Encodable? = nil) async throws {
+        let _: EmptyResponse = try await call(path, method: method, body: body)
+    }
+
+    func sessionState() async throws -> SessionState {
+        let value: SessionState = try await call("/api/session")
+        csrf = value.csrf ?? ""
+        return value
+    }
+
+    func signIn(email: String, password: String) async throws -> SessionState {
+        let value: SessionState = try await call("/api/session", method: "POST", body: Credentials(email: email, password: password))
+        csrf = value.csrf ?? ""
+        return value
+    }
+
+    func verify(otp: String) async throws -> SessionState {
+        let value: SessionState = try await call("/api/session/totp", method: "POST", body: OTP(otp: otp))
+        csrf = value.csrf ?? ""
+        return value
+    }
+
+    func signOut() async throws -> SessionState {
+        let value: SessionState = try await call("/api/session", method: "DELETE")
+        csrf = ""
+        return value
+    }
+
+    func nodes() async throws -> [ManagedNode] { try await call("/api/control/nodes") }
+    func overview() async throws -> Overview { try await call("/api/v1/overview") }
+    func sites() async throws -> [Site] { try await call("/api/v1/sites") }
+    func history(hours: Int) async throws -> [SystemPoint] { try await call("/api/v1/system-history?hours=\(hours)") }
+    func traffic(site: String, hours: Int) async throws -> [TrafficPoint] { try await call("/api/v1/traffic?\(scope(site: site, hours: hours))") }
+    func sources(site: String, hours: Int) async throws -> Sources { try await call("/api/v1/sources?\(scope(site: site, hours: hours))") }
+    func requests(site: String) async throws -> [RequestSample] {
+        let query = site.isEmpty ? "" : "?site=\(site.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? site)"
+        return try await call("/api/v1/requests\(query)")
+    }
+    func errors(site: String, hours: Int) async throws -> ErrorEvidence { try await call("/api/v1/error-requests?\(scope(site: site, hours: hours))") }
+    func paths(site: String, hours: Int) async throws -> RequestPaths { try await call("/api/v1/paths?\(scope(site: site, hours: hours))") }
+    func storage(path: String? = nil, refresh: Bool = false) async throws -> StorageResponse {
+        var items: [URLQueryItem] = []
+        if let path { items.append(.init(name: "path", value: path)) }
+        if refresh { items.append(.init(name: "refresh", value: "1")) }
+        var components = URLComponents(); components.queryItems = items
+        return try await call("/api/v1/storage\(components.percentEncodedQuery.map { "?\($0)" } ?? "")")
+    }
+    func projects() async throws -> [ProjectHealth] { try await call("/api/v1/projects") }
+    func jobs() async throws -> [JobState] { try await call("/api/v1/jobs") }
+    func license() async throws -> LicenseStatus { try await call("/api/control/license") }
+    func members() async throws -> [Member] { try await call("/api/control/members") }
+    func createUser(name: String, email: String, password: String, role: String) async throws {
+        try await empty("/api/control/users", method: "POST", body: NewUser(name: name, email: email, password: password, role: role))
+    }
+    func installLicense(_ value: String) async throws -> LicenseStatus { try await call("/api/control/license", method: "PUT", body: LicenseValue(license: value)) }
+    func environment(site: String) async throws -> EnvironmentState { try await call("/api/v1/sites/\(site)/environment") }
+    func setEnvironment(site: String, name: String, value: String) async throws -> EnvironmentState { try await call("/api/v1/sites/\(site)/environment/\(name.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? name)", method: "PUT", body: EnvironmentValue(value: value)) }
+    func deleteEnvironment(site: String, name: String) async throws -> EnvironmentState { try await call("/api/v1/sites/\(site)/environment/\(name.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? name)", method: "DELETE") }
+    func accessRules(site: String) async throws -> AccessRuleState {
+        let value = site.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? site
+        return try await call("/api/v1/access-rules?site=\(value)")
+    }
+    func removeAccessRule(id: String) async throws -> AccessRuleState { try await call("/api/v1/access-rules/\(id)", method: "DELETE") }
+    func trafficGuard() async throws -> TrafficGuardState { try await call("/api/v1/traffic-guard") }
+    func updateTrafficGuard(_ policy: TrafficGuardPolicy) async throws -> TrafficGuardState { try await call("/api/v1/traffic-guard", method: "PUT", body: policy) }
+
+    func siteAction(_ id: String, action: String) async throws {
+        try await empty("/api/v1/sites/\(id)/\(action)", method: "POST")
+    }
+    func addAccessRule(site: String, kind: String, value: String, label: String) async throws {
+        try await empty("/api/v1/access-rules", method: "POST", body: Rule(site: site, kind: kind, value: value, label: label))
+    }
+    func runJob(_ id: String) async throws { try await empty("/api/v1/jobs/\(id)/run", method: "POST") }
+
+    private func scope(site: String, hours: Int) -> String {
+        var components = URLComponents()
+        components.queryItems = [.init(name: "hours", value: String(hours))]
+        if !site.isEmpty { components.queryItems?.append(.init(name: "site", value: site)) }
+        return components.percentEncodedQuery ?? "hours=\(hours)"
+    }
+}
+
+private struct Credentials: Encodable { let email: String; let password: String }
+private struct OTP: Encodable { let otp: String }
+private struct Rule: Encodable { let site: String; let kind: String; let value: String; let label: String }
+private struct EnvironmentValue: Encodable { let value: String }
+private struct NewUser: Encodable { let name: String; let email: String; let password: String; let role: String }
+private struct LicenseValue: Encodable { let license: String }
+private struct ServerError: Decodable { let error: String? }
+private struct EmptyResponse: Decodable {}
+
+private struct AnyEncodable: Encodable {
+    private let encodeValue: (Encoder) throws -> Void
+    init(_ value: Encodable) { encodeValue = value.encode }
+    func encode(to encoder: Encoder) throws { try encodeValue(encoder) }
+}
