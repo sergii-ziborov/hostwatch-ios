@@ -45,79 +45,39 @@ struct VulnerabilityDetail: View {
 
 struct TopologyView: View {
     @EnvironmentObject private var model: AppModel
-    @State private var mode = "Towers"
-    @State private var zoom = 1.0
-    @State private var selected: ProjectHealth?
-    @State private var elevated: ProjectHealth?
 
-    var filtered: [ProjectHealth] {
-        model.selectedSite.isEmpty ? model.projects : model.projects.filter { $0.id == model.selectedSite }
+    private var sites: [Site] {
+        model.selectedSite.isEmpty ? model.sites : model.sites.filter { $0.id == model.selectedSite }
+    }
+
+    private var projects: [ProjectHealth] {
+        let ids = Set(sites.map(\.id))
+        return model.projects.filter { ids.contains($0.id) }
+    }
+
+    private var node: ManagedNode {
+        model.nodes.first(where: { $0.id == model.selectedNode })
+            ?? ManagedNode(id: "primary", name: "Primary node", url: "", local: true, createdAt: "")
     }
 
     var body: some View {
-        VStack(spacing: 12) {
-            HStack {
-                Picker("Topology mode", selection: $mode) { Text("Towers").tag("Towers"); Text("Connections").tag("Connections") }.pickerStyle(.segmented).frame(maxWidth: 330)
-                Spacer()
-                Button { zoom = max(0.6, zoom - 0.2) } label: { Image(systemName: "minus.magnifyingglass") }.buttonStyle(.bordered)
-                Button { zoom = min(2.2, zoom + 0.2) } label: { Image(systemName: "plus.magnifyingglass") }.buttonStyle(.bordered)
-                Button("Fit") { zoom = 1 }.buttonStyle(.bordered)
-            }
-            ZStack(alignment: .topLeading) {
-                LinearGradient(colors: [HW.background, HW.panel], startPoint: .top, endPoint: .bottom).ignoresSafeArea()
-                TopologyGrid().opacity(0.55)
-                if mode == "Connections" { connections }
-                else { towers }
-                VStack(alignment: .leading, spacing: 4) { Label("LIVE DATA", systemImage: "dot.radiowaves.left.and.right").foregroundStyle(HW.teal); Text("Tap a tower to inspect · double tap for layers · pinch controls remain available").foregroundStyle(HW.secondary) }.font(.caption.bold()).padding(12).background(.ultraThinMaterial).clipShape(RoundedRectangle(cornerRadius: 10)).padding(12)
-            }
-            .frame(minHeight: 500).panel().clipped()
-            .simultaneousGesture(MagnifyGesture().onChanged { value in zoom = min(2.2, max(0.6, value.magnification)) })
-            if let selected { topologyInspector(selected) }
-        }
-        .sheet(item: $elevated) { project in TowerLayersView(project: project) }
-    }
-
-    private var towers: some View {
-        GeometryReader { proxy in
-            ForEach(Array(filtered.enumerated()), id: \.element.id) { index, project in
-                let cols = max(1, min(3, filtered.count)); let row = index / cols; let col = index % cols
-                let x = proxy.size.width * (Double(col + 1) / Double(cols + 1)); let y = 150 + Double(row) * 190
-                Button { selected = project } label: {
-                    VStack(spacing: 7) {
-                        ZStack(alignment: .bottom) {
-                            Ellipse().stroke(HW.teal.opacity(0.65), lineWidth: 8).frame(width: 130 * zoom, height: 45 * zoom)
-                            RoundedRectangle(cornerRadius: 18).fill(towerColor(project)).frame(width: 72 * zoom, height: CGFloat(80 + min(130, (project.graph?.nodes ?? 0) / 50)) * zoom).overlay(alignment: .top) { Capsule().fill(.white.opacity(0.24)).frame(height: 2).padding(.top, 8) }
-                        }
-                        Text(project.name).font(.system(.caption, design: .monospaced, weight: .bold)).foregroundStyle(.white)
-                    }
-                }.buttonStyle(.plain).position(x: x, y: y).onTapGesture(count: 2) { elevated = project }
+        Group {
+            if let overview = model.overview, !sites.isEmpty {
+                TopologyWebView(snapshot: .init(node: node, overview: overview, sites: sites, projects: projects, jobs: model.jobs))
+                    .accessibilityLabel("Interactive runtime topology")
+            } else {
+                EmptyState(
+                    icon: "point.3.connected.trianglepath.dotted",
+                    title: "Topology is unavailable",
+                    detail: "Host metrics and workload data are required to build the runtime scene."
+                )
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(HW.background)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(HW.border))
     }
-
-    private var connections: some View {
-        GeometryReader { proxy in
-            Canvas { context, size in
-                let count = max(1, filtered.count)
-                for index in 0..<max(0, count - 1) {
-                    let a = CGPoint(x: size.width * Double(index + 1) / Double(count + 1), y: size.height * (index.isMultiple(of: 2) ? 0.42 : 0.62))
-                    let b = CGPoint(x: size.width * Double(index + 2) / Double(count + 1), y: size.height * ((index + 1).isMultiple(of: 2) ? 0.42 : 0.62))
-                    var line = Path(); line.move(to: a); line.addLine(to: b); context.stroke(line, with: .color(index.isMultiple(of: 2) ? HW.teal : HW.amber), lineWidth: 5 * zoom)
-                }
-            }
-            ForEach(Array(filtered.enumerated()), id: \.element.id) { index, project in
-                Button { selected = project } label: { VStack { Circle().fill(towerColor(project)).frame(width: 74 * zoom, height: 74 * zoom).overlay(Image(systemName: "server.rack").foregroundStyle(HW.background)); Text(project.name).font(.caption.bold()) } }.buttonStyle(.plain)
-                    .position(x: proxy.size.width * Double(index + 1) / Double(max(1, filtered.count) + 1), y: proxy.size.height * (index.isMultiple(of: 2) ? 0.42 : 0.62))
-            }
-        }
-    }
-
-    private func towerColor(_ project: ProjectHealth) -> Color { (project.vulnerabilities ?? []).contains { $0.severity.lowercased() == "critical" } ? HW.red : project.completeness == "CURRENT" ? HW.teal : HW.amber }
-    private func topologyInspector(_ project: ProjectHealth) -> some View { HStack { VStack(alignment: .leading) { Eyebrow(text: "Selected workload"); Text(project.name).font(.headline); Text("\(project.graph?.nodes ?? 0) nodes · \(project.graph?.edges ?? 0) links · \((project.vulnerabilities ?? []).count) vulnerabilities").font(.caption).foregroundStyle(HW.secondary) }; Spacer(); NavigationLink("Open details") { CodeProjectDetail(project: project) }.buttonStyle(.borderedProminent); Button("Layers") { elevated = project }.buttonStyle(.bordered) }.padding(16).panel() }
-}
-
-struct TopologyGrid: View {
-    var body: some View { Canvas { context, size in for x in stride(from: 0.0, through: size.width, by: 44) { var path = Path(); path.move(to: CGPoint(x: x, y: 0)); path.addLine(to: CGPoint(x: x, y: size.height)); context.stroke(path, with: .color(HW.border.opacity(0.35)), lineWidth: 0.5) }; for y in stride(from: 0.0, through: size.height, by: 44) { var path = Path(); path.move(to: CGPoint(x: 0, y: y)); path.addLine(to: CGPoint(x: size.width, y: y)); context.stroke(path, with: .color(HW.border.opacity(0.35)), lineWidth: 0.5) } } }
 }
 
 struct TowerLayersView: View {

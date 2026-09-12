@@ -74,19 +74,30 @@ struct PageContainer: View {
     let page: SidebarPage
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                PageHeader(page: page)
-                ScopeBar(page: page)
-                if let error = model.errorMessage {
-                    Label(error, systemImage: "exclamationmark.triangle.fill")
-                        .font(.footnote).foregroundStyle(HW.red).padding(12).frame(maxWidth: .infinity, alignment: .leading).panel()
+        Group {
+            if page == .topology {
+                VStack(alignment: .leading, spacing: 12) {
+                    PageHeader(page: page)
+                    ScopeBar(page: page)
+                    errorBanner
+                    pageContent
+                        .opacity(model.loading ? 0.64 : 1)
                 }
-                pageContent
-                .opacity(model.loading ? 0.64 : 1)
+                .padding(20)
+                .frame(maxWidth: 1500, maxHeight: .infinity, alignment: .topLeading)
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 18) {
+                        PageHeader(page: page)
+                        ScopeBar(page: page)
+                        errorBanner
+                        pageContent
+                            .opacity(model.loading ? 0.64 : 1)
+                    }
+                    .padding(20)
+                    .frame(maxWidth: 1500, alignment: .leading)
+                }
             }
-            .padding(20)
-            .frame(maxWidth: 1500, alignment: .leading)
         }
         .background(HW.background)
         .navigationTitle(page.title)
@@ -95,6 +106,13 @@ struct PageContainer: View {
         .task(id: page) {
             await model.reload(page: page)
             if model.live { model.setLive(true, page: page) }
+        }
+    }
+
+    @ViewBuilder private var errorBanner: some View {
+        if let error = model.errorMessage {
+            Label(error, systemImage: "exclamationmark.triangle.fill")
+                .font(.footnote).foregroundStyle(HW.red).padding(12).frame(maxWidth: .infinity, alignment: .leading).panel()
         }
     }
 

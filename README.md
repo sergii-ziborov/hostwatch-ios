@@ -7,7 +7,7 @@ Native SwiftUI control-plane client for Hostwatch. It uses the same signed-in se
 - **Overview** — host resources and capacity with resource drilldowns.
 - **Traffic** — requests, errors, destinations, sources, locations and retained evidence.
 - **Incidents & risks** — operational incidents, anomaly signals and vulnerabilities in separate tabs.
-- **Runtime topology** — tower and connection views of running workloads.
+- **Runtime topology** — the complete Repo Lens Cyberboard adapted to live workloads: orbit, tilt, pinch/scroll zoom, top/isometric views, layer elevation, connection tracing, animated request/response packets and detailed inspectors.
 - **Workloads** — project traffic, processes, storage, limits and controls.
 - **Traffic policies** — bandwidth, anomaly and IP/country access rules.
 - **Environment** — per-project environment variable management.
@@ -19,6 +19,7 @@ The app supports the hosted control plane and licensed enterprise installations.
 ## Build
 
 ```bash
+./scripts/sync-topology-renderer.sh
 xcodegen generate
 xcodebuild -project Hostwatch.xcodeproj -scheme Hostwatch \
   -sdk iphonesimulator -configuration Debug CODE_SIGNING_ALLOWED=NO build
@@ -34,4 +35,4 @@ No CI/CD workflow is included. Release signing and distribution are intentionall
 | --- | --- |
 | ![iPhone traffic](docs/screenshots/iphone-traffic.png) | ![iPad runtime topology](docs/screenshots/ipad-topology.png) |
 
-Additional checked states are stored in `docs/screenshots`: sign in, iPhone overview and iPad overview.
+Additional checked states are stored in `docs/screenshots`: sign in, iPhone overview, iPhone topology and iPad overview.
