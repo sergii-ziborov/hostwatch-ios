@@ -29,6 +29,19 @@ final class HostwatchTests: XCTestCase {
         XCTAssertNil(QRPayload.id(from: "https://control.example.com/#approve=bad", server: "https://control.example.com"))
     }
 
+    func testWebsiteDeviceSignInQRContainsOnlyExpectedOriginAndTicket() {
+        let id = "ABCDEFGHIJKLMNOPQRSTUVWX"
+        let secret = String(repeating: "a", count: 43)
+        let value = "https://gethostwatch.com/#device-login=\(id).\(secret)"
+        let ticket = QRPayload.deviceTicket(from: value)
+        XCTAssertEqual(ticket?.server, "https://gethostwatch.com/")
+        XCTAssertEqual(ticket?.id, id)
+        XCTAssertEqual(ticket?.secret, secret)
+        XCTAssertNil(QRPayload.deviceTicket(from: "http://evil.example/#device-login=\(id).\(secret)"))
+        XCTAssertNil(QRPayload.deviceTicket(from: "https://gethostwatch.com/#approve=\(id)"))
+        XCTAssertNil(QRPayload.deviceTicket(from: "https://gethostwatch.com/#device-login=bad.\(secret)"))
+    }
+
     func testAuthenticatorQRHasExpectedIssuerAndSecret() {
         let setup = TOTPSetup(totpSecret: "ABCDEFGHIJKLMNOP", issuer: "HOSTWATCH", account: "owner@example.com")
         let parts = URLComponents(string: setup.uri)

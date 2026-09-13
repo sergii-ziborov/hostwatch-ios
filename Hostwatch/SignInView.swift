@@ -6,8 +6,7 @@ struct SignInView: View {
     @State private var password = ""
     @State private var otp = ""
     @State private var showServer = false
-    @State private var useQR = false
-    @State private var approveInApp = false
+    @State private var useQR = true
 
     var body: some View {
         ZStack {
@@ -18,20 +17,15 @@ struct SignInView: View {
                     brand
                     VStack(spacing: 16) {
                         if model.session.requiresOtp == true {
-                            Picker("Verification", selection: $approveInApp) {
-                                Text("Authenticator").tag(false)
-                                Text("Signed-in app").tag(true)
-                            }.pickerStyle(.segmented)
-                            if approveInApp { QRSignInView(kind: "second-factor") }
-                            else { otpForm }
-                            Button("Use another account") { Task { await model.signOut(); otp = ""; approveInApp = false } }
+                            otpForm
+                            Button("Use another account") { Task { await model.signOut(); otp = "" } }
                                 .font(.footnote).disabled(model.loading)
                         } else {
                             Picker("Sign-in method", selection: $useQR) {
                                 Text("Password").tag(false)
-                                Text("QR code").tag(true)
+                                Text("Scan website QR").tag(true)
                             }.pickerStyle(.segmented)
-                            if useQR { QRSignInView(kind: "sign-in") }
+                            if useQR { DeviceQRSignInView() }
                             else { credentialsForm }
                         }
                         DisclosureGroup("Control-plane address", isExpanded: $showServer) {

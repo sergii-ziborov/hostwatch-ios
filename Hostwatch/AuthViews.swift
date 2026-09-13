@@ -1,6 +1,7 @@
 import AVFoundation
 import CoreImage.CIFilterBuiltins
 import LocalAuthentication
+import Security
 import SwiftUI
 
 enum QRPayload {
@@ -23,6 +24,29 @@ enum QRPayload {
         let allowed = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_")
         return id.count == 24 && id.unicodeScalars.allSatisfy(allowed.contains) ? id : nil
     }
+
+    static func deviceTicket(from value: String) -> DeviceQRTicket? {
+        guard let parts = URLComponents(string: value), let scheme = parts.scheme?.lowercased(),
+              let host = parts.host, !host.isEmpty, parts.user == nil, parts.password == nil,
+              scheme == "https" || (scheme == "http" && ["localhost", "127.0.0.1"].contains(host.lowercased())),
+              let fragment = parts.fragment, fragment.hasPrefix("device-login=") else { return nil }
+        let pair = String(fragment.dropFirst("device-login=".count)).split(separator: ".", omittingEmptySubsequences: false)
+        guard pair.count == 2 else { return nil }
+        let id = String(pair[0]), secret = String(pair[1])
+        let allowed = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_")
+        guard id.count == 24, secret.count == 43,
+              id.unicodeScalars.allSatisfy(allowed.contains), secret.unicodeScalars.allSatisfy(allowed.contains) else { return nil }
+        var origin = parts
+        origin.path = "/"; origin.query = nil; origin.fragment = nil
+        guard let server = origin.url?.absoluteString else { return nil }
+        return DeviceQRTicket(server: server, id: id, secret: secret)
+    }
+}
+
+struct DeviceQRTicket {
+    let server: String
+    let id: String
+    let secret: String
 }
 
 struct QRCodeImage: View {
@@ -51,54 +75,77 @@ struct QRCodeImage: View {
     }
 }
 
-struct QRSignInView: View {
+struct DeviceQRSignInView: View {
     @EnvironmentObject private var model: AppModel
-    let kind: String
-    @State private var ticket: QRStart?
-    @State private var error = ""
+    @State private var scanning = false
+    @State private var ticket: DeviceQRTicket?
+    @State private var claim: QRApproval?
+    @State private var proof = ""
     @State private var busy = false
+    @State private var error = ""
 
     var body: some View {
-        VStack(spacing: 14) {
-            Text(kind == "second-factor" ? "Approve with a signed-in app" : "Sign in with a QR code").font(.title3.bold())
-            Text("Open Hostwatch on another signed-in device, scan this code and compare the confirmation number before approving.")
+        VStack(spacing: 16) {
+            Text("Scan the QR on your website").font(.title3.bold())
+            Text("On a signed-in Hostwatch website, open Organization → Account security → Sign in on iPhone or iPad. Scan the code there with this device.")
                 .font(.footnote).foregroundStyle(HW.secondary).multilineTextAlignment(.center)
-            if let ticket, let url = QRPayload.url(server: model.baseURLText, id: ticket.id) {
-                QRCodeImage(value: url.absoluteString)
-                VStack(spacing: 4) {
-                    Text("VERIFICATION CODE").font(.caption2.bold()).tracking(1.4).foregroundStyle(HW.secondary)
-                    Text(ticket.verificationCode).font(.title.monospacedDigit().bold()).tracking(5).foregroundStyle(HW.teal)
-                    Text("Manual pairing code: \(ticket.entryCode)").font(.footnote.monospaced()).foregroundStyle(HW.secondary)
-                    Text("Expires in 2 minutes").font(.caption).foregroundStyle(HW.secondary)
-                }
+            Button { scanning = true } label: { Label("Scan website QR", systemImage: "qrcode.viewfinder") }
+                .buttonStyle(.borderedProminent).disabled(busy)
+            if let ticket, claim == nil {
+                Text("Website: \(ticket.server)").font(.footnote).foregroundStyle(HW.secondary).textSelection(.enabled)
+                Button(busy ? "Connecting…" : "Continue with this website") { Task { await connect(ticket) } }
+                    .buttonStyle(.bordered).disabled(busy)
+            }
+            if let claim {
+                Text("Compare this number with the website, then approve on the website:")
+                    .font(.footnote).foregroundStyle(HW.secondary).multilineTextAlignment(.center)
+                Text(claim.verificationCode).font(.largeTitle.monospacedDigit().bold()).tracking(4).foregroundStyle(HW.teal)
+                ProgressView("Waiting for website approval…").font(.footnote)
+                Button("Cancel") { self.claim = nil; self.ticket = nil; proof = "" }.buttonStyle(.bordered)
             }
             if !error.isEmpty { Label(error, systemImage: "exclamationmark.triangle").font(.footnote).foregroundStyle(HW.red) }
-            Button(busy ? "Preparing…" : "New code") { Task { await begin() } }
-                .buttonStyle(.bordered).disabled(busy)
         }
         .frame(maxWidth: .infinity)
-        .task(id: kind) { await begin() }
-        .task(id: ticket?.id) {
-            guard let ticket else { return }
+        .sheet(isPresented: $scanning) {
+            NavigationStack {
+                CameraQRScanner { value in
+                    scanning = false
+                    claim = nil; proof = ""; error = ""
+                    if let parsed = QRPayload.deviceTicket(from: value) { ticket = parsed }
+                    else { ticket = nil; error = "Scan the sign-in QR shown in your Hostwatch website account settings." }
+                }
+                .navigationTitle("Scan website QR")
+                .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { scanning = false } } }
+            }
+        }
+        .task(id: claim?.id) {
+            guard let ticket, claim != nil, !proof.isEmpty else { return }
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(2))
                 guard !Task.isCancelled else { return }
                 do {
-                    if try await model.redeemQR(ticket) { return }
+                    if try await model.redeemDeviceQR(ticket, proof: proof) { return }
                 } catch {
                     self.error = error.localizedDescription
-                    self.ticket = nil
+                    self.claim = nil; self.ticket = nil; proof = ""
                     return
                 }
             }
         }
     }
 
-    private func begin() async {
-        busy = true; error = ""; ticket = nil
-        defer { busy = false }
-        do { ticket = try await model.startQR(kind: kind) }
-        catch { self.error = error.localizedDescription }
+    private func connect(_ ticket: DeviceQRTicket) async {
+        busy = true; error = ""; defer { busy = false }
+        var bytes = [UInt8](repeating: 0, count: 32)
+        guard SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes) == errSecSuccess else {
+            error = "Could not create a secure device proof."; return
+        }
+        let proof = Data(bytes).base64EncodedString().replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "")
+        do {
+            claim = try await model.claimDeviceQR(ticket, proof: proof)
+            self.proof = proof
+        } catch { self.error = error.localizedDescription }
     }
 }
 

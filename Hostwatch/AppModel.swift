@@ -129,6 +129,23 @@ final class AppModel: ObservableObject {
         return true
     }
 
+    func claimDeviceQR(_ ticket: DeviceQRTicket, proof: String) async throws -> QRApproval {
+        guard let server = URL(string: ticket.server) else { throw APIError.invalidURL }
+        await client.configure(baseURL: server)
+        let claim = try await client.claimDeviceQR(ticket, proof: proof)
+        baseURLText = ticket.server
+        return claim
+    }
+
+    func redeemDeviceQR(_ ticket: DeviceQRTicket, proof: String) async throws -> Bool {
+        let result = try await client.redeemDeviceQR(ticket, proof: proof)
+        guard result.authenticated else { return false }
+        session = result
+        try await loadNodes()
+        await reload(page: .overview)
+        return true
+    }
+
     func inspectQR(_ value: String) async throws -> QRApproval { try await client.inspectQR(value) }
     func pendingQRApprovals() async throws -> [QRApproval] { try await client.pendingQRApprovals() }
     func approveQR(_ ticket: QRApproval, approve: Bool) async throws { try await client.approveQR(ticket, approve: approve) }

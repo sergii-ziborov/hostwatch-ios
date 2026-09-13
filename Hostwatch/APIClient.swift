@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 
 enum APIError: LocalizedError {
     case invalidURL
@@ -79,6 +80,14 @@ actor APIClient {
     func startQR(kind: String) async throws -> QRStart { try await call("/api/session/qr", method: "POST", body: QRKind(kind: kind)) }
     func redeemQR(_ ticket: QRStart) async throws -> SessionState {
         let value: SessionState = try await call("/api/session/qr/\(ticket.id)/redeem", method: "POST", body: QRSecret(secret: ticket.secret))
+        if value.authenticated { csrf = value.csrf ?? "" }
+        return value
+    }
+    func claimDeviceQR(_ ticket: DeviceQRTicket, proof: String) async throws -> QRApproval {
+        try await call("/api/session/qr/\(ticket.id)/claim", method: "POST", body: DeviceQRClaim(secret: ticket.secret, proof: proof, device: UIDevice.current.model))
+    }
+    func redeemDeviceQR(_ ticket: DeviceQRTicket, proof: String) async throws -> SessionState {
+        let value: SessionState = try await call("/api/session/qr/\(ticket.id)/redeem", method: "POST", body: DeviceQRProof(secret: ticket.secret, proof: proof))
         if value.authenticated { csrf = value.csrf ?? "" }
         return value
     }
@@ -165,6 +174,8 @@ private struct Credentials: Encodable { let email: String; let password: String 
 private struct OTP: Encodable { let otp: String }
 private struct QRKind: Encodable { let kind: String }
 private struct QRSecret: Encodable { let secret: String }
+private struct DeviceQRClaim: Encodable { let secret: String; let proof: String; let device: String }
+private struct DeviceQRProof: Encodable { let secret: String; let proof: String }
 private struct QRVerification: Encodable { let verificationCode: String }
 private struct CurrentPassword: Encodable { let currentPassword: String }
 private struct DisableTOTP: Encodable { let currentPassword: String; let otp: String }
