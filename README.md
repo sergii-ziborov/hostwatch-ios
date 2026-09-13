@@ -2,7 +2,7 @@
 
 Native SwiftUI control-plane client for Hostwatch. The iPhone and iPad app is intended for **public App Store distribution**, while access to a control plane is provisioned by an organization. It uses the same signed-in session and REST API as the web application. There is no public demo or registration flow.
 
-**Release status:** a development build is installed on a paired iPhone 13 mini; a physical-device launch and account sign-in have not yet been verified because the phone was locked. The first Xcode Cloud build has been started. A TestFlight build or public App Store release is not yet confirmed. Do not describe the app as available in the App Store until Apple has approved and published it.
+**Release status:** the App Store Connect record exists and a development build is installed on a paired iPhone 13 mini. The device was locked during launch attempts, so physical-device sign-in remains unverified. The first Xcode Cloud build passed, but an App Store archive, TestFlight distribution and public release are not yet complete.
 
 ## Product structure
 
@@ -30,7 +30,7 @@ xcodebuild -project Hostwatch.xcodeproj -scheme Hostwatch \
   -sdk iphonesimulator -configuration Debug CODE_SIGNING_ALLOWED=NO build
 ```
 
-For local screenshot and UI verification only, launch the Debug build with `HOSTWATCH_FIXTURES=1`. This switch is read from the process environment and is absent from the production interface.
+For local UI development only, a Debug build may be launched with `HOSTWATCH_FIXTURES=1`. These values are fabricated test fixtures, never production telemetry. A Release build ignores the flag and requires a real, authenticated control plane. No fixture screenshot is used as an App Store asset.
 
 All app screens use SwiftUI, SceneKit, MapKit and direct JSON API calls. There are no embedded web pages, WebViews or bundled HTML assets. A shared `Hostwatch` scheme and an Xcode Cloud workflow are configured for this iOS repository. The controller and Go agent remain separate products; this iOS workflow does not build or publish them. Public App Store distribution still requires a validated archive, App Store Connect metadata, review credentials, on-device testing and App Review approval.
 
@@ -42,10 +42,8 @@ Apple reviewers need a dedicated, working account on a live control plane with r
 
 The iOS source is public for inspection and evaluation but remains proprietary. It is **not MIT-licensed**. See [LICENSE](LICENSE). The backend, controller and agent are not included or licensed here.
 
-## Verified layouts
+For App Store review and users, see the [privacy policy](PRIVACY.md) and [support](SUPPORT.md). These links are also available from the signed-out app.
 
-| iPhone traffic | iPad runtime topology |
-| --- | --- |
-| ![iPhone traffic](docs/screenshots/iphone-traffic.png) | ![iPad runtime topology](docs/screenshots/ipad-topology.png) |
+## App Store screenshots
 
-Additional checked states are stored in `docs/screenshots`: sign in, iPhone overview, iPhone topology and iPad overview.
+The old UI-development screenshots used fabricated telemetry and have been removed. The store listing will use captures from a working build and a provisioned reviewer account with representative real control-plane data. Until that account and the live service are ready, screenshot fields remain incomplete.

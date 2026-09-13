@@ -40,7 +40,12 @@ final class AppModel: ObservableObject {
     private var liveTask: Task<Void, Never>?
 
     init() {
+#if DEBUG
         fixtures = ProcessInfo.processInfo.environment["HOSTWATCH_FIXTURES"] == "1"
+#else
+        // The distributed app always requires a real, authenticated control plane.
+        fixtures = false
+#endif
         let saved = UserDefaults.standard.string(forKey: "controlPlaneURL") ?? "https://gethostwatch.com"
         baseURLText = saved
         client = APIClient(baseURL: URL(string: saved) ?? URL(string: "https://gethostwatch.com")!)

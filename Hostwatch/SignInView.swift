@@ -50,8 +50,11 @@ struct SignInView: View {
 
                     Text("Hosted control plane or licensed enterprise installation. Access is provisioned by your organization.")
                         .font(.footnote).foregroundStyle(HW.secondary).multilineTextAlignment(.center).frame(maxWidth: 420)
-                    Link("Contact sales and support", destination: URL(string: "mailto:hello@gethostwatch.com")!)
-                        .font(.footnote.weight(.semibold))
+                    HStack(spacing: 16) {
+                        Link("Support", destination: URL(string: "https://github.com/sergii-ziborov/hostwatch-ios/blob/codex/initial-product/SUPPORT.md")!)
+                        Link("Privacy policy", destination: URL(string: "https://github.com/sergii-ziborov/hostwatch-ios/blob/codex/initial-product/PRIVACY.md")!)
+                    }
+                    .font(.footnote.weight(.semibold))
                     Spacer(minLength: 40)
                 }
                 .padding(.horizontal, 20)
