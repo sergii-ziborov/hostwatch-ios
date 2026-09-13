@@ -2,7 +2,7 @@
 
 Native SwiftUI control-plane client for Hostwatch. The iPhone and iPad app is intended for **public App Store distribution**, while access to a control plane is provisioned by an organization. It uses the same signed-in session and REST API as the web application. There is no public demo or registration flow.
 
-**Release status:** the App Store Connect record exists and a development build is installed on a paired iPhone 13 mini. The device was locked during launch attempts, so physical-device sign-in remains unverified. The first Xcode Cloud build passed, but an App Store archive, TestFlight distribution and public release are not yet complete.
+**Release status:** the App Store Connect record and public privacy declaration exist. Xcode Cloud builds the current branch, and the Release configuration builds and launches in iPhone and iPad simulators. A development build is installed on a paired iPhone 13 mini, but physical-device sign-in has not yet been verified because the device was locked. An App Store archive, TestFlight distribution, authenticated screenshots and public release are still pending.
 
 ## Product structure
 
@@ -30,7 +30,7 @@ xcodebuild -project Hostwatch.xcodeproj -scheme Hostwatch \
   -sdk iphonesimulator -configuration Debug CODE_SIGNING_ALLOWED=NO build
 ```
 
-For local UI development only, a Debug build may be launched with `HOSTWATCH_FIXTURES=1`. These values are fabricated test fixtures, never production telemetry. A Release build ignores the flag and requires a real, authenticated control plane. No fixture screenshot is used as an App Store asset.
+For local UI development only, a Debug build may be launched with `HOSTWATCH_FIXTURES=1`. These values are fabricated test fixtures and display a prominent **SAMPLE DATA · DEBUG BUILD** notice instead of a Live status. A Release build ignores the flag and requires a real, authenticated control plane. No fixture screenshot is used as an App Store asset.
 
 All app screens use SwiftUI, SceneKit, MapKit and direct JSON API calls. There are no embedded web pages, WebViews or bundled HTML assets. A shared `Hostwatch` scheme and an Xcode Cloud workflow are configured for this iOS repository. The controller and Go agent remain separate products; this iOS workflow does not build or publish them. Public App Store distribution still requires a validated archive, App Store Connect metadata, review credentials, on-device testing and App Review approval.
 
@@ -46,4 +46,4 @@ For App Store review and users, see the [privacy policy](PRIVACY.md) and [suppor
 
 ## App Store screenshots
 
-The old UI-development screenshots used fabricated telemetry and have been removed. The store listing will use captures from a working build and a provisioned reviewer account with representative real control-plane data. Until that account and the live service are ready, screenshot fields remain incomplete.
+The old UI-development screenshots used fabricated telemetry and have been removed. These are real **Release simulator captures of the signed-out screen**: [iPhone](docs/screenshots/iphone-sign-in.png) (1284 × 2778) and [iPad](docs/screenshots/ipad-sign-in.png) (2064 × 2752). They do not claim to show traffic. The store listing still needs authenticated captures from a provisioned account with representative real control-plane data; screenshot fields remain incomplete until that review setup is ready.
