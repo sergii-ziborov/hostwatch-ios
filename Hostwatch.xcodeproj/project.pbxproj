@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		205C7B38AA7F39C8549EB03F /* AdminViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B81C8E5DDA41AFCD8723E518 /* AdminViews.swift */; };
 		2397C7CB62CE9336F19578EB /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6B5BF4296604636AF818D8AF /* Assets.xcassets */; };
+		2935BBD561A194C24EC739DA /* AuthViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 550BEA74249D51485C13AF3E /* AuthViews.swift */; };
 		2D3749D562C2A34E6D9BD700 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76D7F5CC61DBDB2ABD270F11 /* AppModel.swift */; };
 		4EA8DD88F0712FE0CEAD618C /* NativeTopologyScene.swift in Sources */ = {isa = PBXBuildFile; fileRef = 453A7A03CCB0E61006B35768 /* NativeTopologyScene.swift */; };
 		549D6E78E5E2DCF33EA8467B /* Fixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18CD1780E2379A0DF2B888DE /* Fixtures.swift */; };
@@ -42,6 +43,7 @@
 		2F23EFDCF024E30815A1E55E /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		38E240A978385DC293B70166 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		453A7A03CCB0E61006B35768 /* NativeTopologyScene.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeTopologyScene.swift; sourceTree = "<group>"; };
+		550BEA74249D51485C13AF3E /* AuthViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthViews.swift; sourceTree = "<group>"; };
 		55C640803FA958183F2FE0C2 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
 		6B5BF4296604636AF818D8AF /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		758A87CE98F4E57324698D19 /* HostwatchTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = HostwatchTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -79,6 +81,7 @@
 				55C640803FA958183F2FE0C2 /* APIClient.swift */,
 				76D7F5CC61DBDB2ABD270F11 /* AppModel.swift */,
 				6B5BF4296604636AF818D8AF /* Assets.xcassets */,
+				550BEA74249D51485C13AF3E /* AuthViews.swift */,
 				18CD1780E2379A0DF2B888DE /* Fixtures.swift */,
 				299F150C6BF694745E48CC76 /* HostwatchApp.swift */,
 				FCD6674AE70D2F4CC67FC220 /* Info.plist */,
@@ -193,6 +196,7 @@
 				963A540C15DF394F13265CD9 /* APIClient.swift in Sources */,
 				205C7B38AA7F39C8549EB03F /* AdminViews.swift in Sources */,
 				2D3749D562C2A34E6D9BD700 /* AppModel.swift in Sources */,
+				2935BBD561A194C24EC739DA /* AuthViews.swift in Sources */,
 				549D6E78E5E2DCF33EA8467B /* Fixtures.swift in Sources */,
 				D2D39C4F1EBFE2ED8C93B8F2 /* HostwatchApp.swift in Sources */,
 				DD74D36910EE8D8F562347AA /* Models.swift in Sources */,

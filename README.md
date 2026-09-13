@@ -16,6 +16,8 @@ Native SwiftUI control-plane client for Hostwatch. It uses the same signed-in se
 
 The app supports the hosted control plane and licensed enterprise installations. The control-plane URL can be changed on the sign-in screen. Enterprise licenses remain created and verified by the controller REST API; the mobile app only displays and installs a signed license for an authorized owner.
 
+Sign-in supports password plus an authenticator code, or one-time QR approval from an already signed-in device. After password entry, a signed-in app can approve the second factor. **More → Account security** lets an account enroll, replace, or disable its authenticator, and review pending sign-ins. QR approval uses the device camera or a short manual pairing code, requires matching the displayed verification number, and asks for Face ID or the device passcode before sending approval. The controller keeps pairing tickets for two minutes in memory.
+
 The minimum deployment target is iOS 18. The four primary areas are native phone tabs; less frequent controls are under **More**. iPad keeps a sidebar. Links to a request destination or external advisory open in the system browser, outside the app.
 
 ## Build

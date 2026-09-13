@@ -35,7 +35,7 @@ struct RootView: View {
                     Section("Observe") { mobileMenu(.incidents) }
                     Section("Control") { mobileMenu(.policies); mobileMenu(.environment); mobileMenu(.automations) }
                     Section("Analyze") { mobileMenu(.codeHealth) }
-                    Section("Company") { mobileMenu(.access); mobileMenu(.organization) }
+                    Section("Company") { mobileMenu(.access); mobileMenu(.security); mobileMenu(.organization) }
                     Section { Button("Sign out", systemImage: "rectangle.portrait.and.arrow.right", role: .destructive) { Task { await model.signOut() } } }
                 }
                 .scrollContentBackground(.hidden)
@@ -69,7 +69,7 @@ struct RootView: View {
                     menu(.policies); menu(.environment); menu(.automations)
                 }
                 Section("Analyze") { menu(.codeHealth) }
-                Section("Company") { menu(.access); menu(.organization) }
+                Section("Company") { menu(.access); menu(.security); menu(.organization) }
 
                 Section {
                     Button(role: .destructive) { Task { await model.signOut() } } label: { Label("Sign out", systemImage: "rectangle.portrait.and.arrow.right") }
@@ -170,6 +170,7 @@ struct PageContainer: View {
             case .codeHealth: CodeHealthView()
             case .automations: AutomationsView()
             case .access: AccessView()
+            case .security: AccountSecurityView()
             case .organization: OrganizationView()
             }
         }

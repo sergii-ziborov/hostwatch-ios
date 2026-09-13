@@ -104,6 +104,35 @@ final class AppModel: ObservableObject {
         } catch { errorMessage = error.localizedDescription }
     }
 
+    func startQR(kind: String) async throws -> QRStart {
+        try await configureClient()
+        return try await client.startQR(kind: kind)
+    }
+
+    func redeemQR(_ ticket: QRStart) async throws -> Bool {
+        let result = try await client.redeemQR(ticket)
+        guard result.authenticated else { return false }
+        session = result
+        try await loadNodes()
+        await reload(page: .overview)
+        return true
+    }
+
+    func inspectQR(_ value: String) async throws -> QRApproval { try await client.inspectQR(value) }
+    func pendingQRApprovals() async throws -> [QRApproval] { try await client.pendingQRApprovals() }
+    func approveQR(_ ticket: QRApproval, approve: Bool) async throws { try await client.approveQR(ticket, approve: approve) }
+    func beginTOTP(currentPassword: String) async throws -> TOTPSetup { try await client.beginTOTP(currentPassword: currentPassword) }
+    func confirmTOTP(otp: String) async throws {
+        try await client.confirmTOTP(otp: otp)
+        _ = try? await client.signOut()
+        session = SessionState()
+    }
+    func disableTOTP(currentPassword: String, otp: String) async throws {
+        try await client.disableTOTP(currentPassword: currentPassword, otp: otp)
+        _ = try? await client.signOut()
+        session = SessionState()
+    }
+
     func signOut() async {
         if fixtures { return }
         do { session = try await client.signOut() } catch { errorMessage = error.localizedDescription }
@@ -174,6 +203,8 @@ final class AppModel: ObservableObject {
                 async let licenseCall = client.license()
                 async let memberCall = client.members()
                 (license, members) = try await (licenseCall, memberCall)
+            case .security:
+                break
             }
             errorMessage = nil
         } catch { errorMessage = error.localizedDescription }

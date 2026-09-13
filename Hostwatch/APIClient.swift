@@ -38,6 +38,7 @@ actor APIClient {
         var request = URLRequest(url: url)
         request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("Hostwatch iOS/1.0", forHTTPHeaderField: "User-Agent")
         if path.hasPrefix("/api/v1/"), !selectedNode.isEmpty { request.setValue(selectedNode, forHTTPHeaderField: "X-Hostwatch-Node") }
         if !csrf.isEmpty, !["GET", "HEAD"].contains(method) { request.setValue(csrf, forHTTPHeaderField: "X-Hostwatch-CSRF") }
         if let body {
@@ -73,6 +74,30 @@ actor APIClient {
         let value: SessionState = try await call("/api/session/totp", method: "POST", body: OTP(otp: otp))
         csrf = value.csrf ?? ""
         return value
+    }
+
+    func startQR(kind: String) async throws -> QRStart { try await call("/api/session/qr", method: "POST", body: QRKind(kind: kind)) }
+    func redeemQR(_ ticket: QRStart) async throws -> SessionState {
+        let value: SessionState = try await call("/api/session/qr/\(ticket.id)/redeem", method: "POST", body: QRSecret(secret: ticket.secret))
+        if value.authenticated { csrf = value.csrf ?? "" }
+        return value
+    }
+    func inspectQR(_ value: String) async throws -> QRApproval {
+        var parts = URLComponents(); parts.queryItems = [.init(name: "value", value: value)]
+        return try await call("/api/session/qr/inspect?\(parts.percentEncodedQuery ?? "")")
+    }
+    func pendingQRApprovals() async throws -> [QRApproval] { try await call("/api/session/qr/approvals") }
+    func approveQR(_ ticket: QRApproval, approve: Bool) async throws {
+        try await empty("/api/session/qr/\(ticket.id)/\(approve ? "approve" : "reject")", method: "POST", body: QRVerification(verificationCode: ticket.verificationCode))
+    }
+    func beginTOTP(currentPassword: String) async throws -> TOTPSetup {
+        try await call("/api/control/security/totp/setup", method: "POST", body: CurrentPassword(currentPassword: currentPassword))
+    }
+    func confirmTOTP(otp: String) async throws {
+        try await empty("/api/control/security/totp/confirm", method: "POST", body: OTP(otp: otp))
+    }
+    func disableTOTP(currentPassword: String, otp: String) async throws {
+        try await empty("/api/control/security/totp/disable", method: "POST", body: DisableTOTP(currentPassword: currentPassword, otp: otp))
     }
 
     func signOut() async throws -> SessionState {
@@ -138,6 +163,11 @@ actor APIClient {
 
 private struct Credentials: Encodable { let email: String; let password: String }
 private struct OTP: Encodable { let otp: String }
+private struct QRKind: Encodable { let kind: String }
+private struct QRSecret: Encodable { let secret: String }
+private struct QRVerification: Encodable { let verificationCode: String }
+private struct CurrentPassword: Encodable { let currentPassword: String }
+private struct DisableTOTP: Encodable { let currentPassword: String; let otp: String }
 private struct Rule: Encodable { let site: String; let kind: String; let value: String; let label: String }
 private struct EnvironmentValue: Encodable { let value: String }
 private struct NewUser: Encodable { let name: String; let email: String; let password: String; let role: String }

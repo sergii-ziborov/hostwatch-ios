@@ -12,6 +12,41 @@ struct SessionState: Codable {
     struct User: Codable { let id: String; let email: String; let name: String; let totpEnabled: Bool }
 }
 
+struct QRStart: Codable {
+    let id: String
+    let secret: String
+    let entryCode: String
+    let verificationCode: String
+    let expiresAt: String
+    let kind: String
+}
+
+struct QRApproval: Codable, Identifiable {
+    let id: String
+    let entryCode: String
+    let verificationCode: String
+    let expiresAt: String
+    let kind: String
+    let device: String
+    let clientIP: String
+    let status: String
+}
+
+struct TOTPSetup: Codable {
+    let totpSecret: String
+    let issuer: String
+    let account: String
+    var uri: String {
+        var parts = URLComponents()
+        parts.scheme = "otpauth"
+        parts.host = "totp"
+        parts.path = "/\(issuer):\(account)"
+        parts.queryItems = [.init(name: "secret", value: totpSecret), .init(name: "issuer", value: issuer),
+                            .init(name: "algorithm", value: "SHA1"), .init(name: "digits", value: "6"), .init(name: "period", value: "30")]
+        return parts.url?.absoluteString ?? ""
+    }
+}
+
 struct Organization: Codable, Identifiable { let id: String; let name: String; let slug: String; let createdAt: String }
 struct LicenseStatus: Codable {
     let deploymentMode: String
@@ -145,20 +180,20 @@ struct ProjectHealth: Codable, Identifiable, Hashable {
 struct JobState: Codable, Identifiable, Hashable { let id: String; let name: String; let timerUnit: String; let runUnit: String; let activeState: String; let unitFileState: String; let nextRun: String; let lastResult: String }
 
 enum SidebarPage: String, CaseIterable, Identifiable {
-    case overview, traffic, incidents, topology, workloads, policies, environment, codeHealth, automations, access, organization
+    case overview, traffic, incidents, topology, workloads, policies, environment, codeHealth, automations, access, security, organization
     var id: String { rawValue }
     var title: String {
         switch self {
         case .overview: "Overview"; case .traffic: "Traffic"; case .incidents: "Incidents & risks"; case .topology: "Runtime topology"
         case .workloads: "Workloads"; case .policies: "Traffic policies"; case .environment: "Environment"; case .codeHealth: "Code health"
-        case .automations: "Automations"; case .access: "Access"; case .organization: "Organization"
+        case .automations: "Automations"; case .access: "Access"; case .security: "Account security"; case .organization: "Organization"
         }
     }
     var icon: String {
         switch self {
         case .overview: "square.grid.2x2"; case .traffic: "chart.xyaxis.line"; case .incidents: "exclamationmark.shield"; case .topology: "point.3.connected.trianglepath.dotted"
         case .workloads: "shippingbox"; case .policies: "shield.lefthalf.filled"; case .environment: "key.horizontal"; case .codeHealth: "waveform.path.ecg.rectangle"
-        case .automations: "clock.arrow.trianglehead.counterclockwise.rotate.90"; case .access: "person.2.badge.gearshape"; case .organization: "building.2"
+        case .automations: "clock.arrow.trianglehead.counterclockwise.rotate.90"; case .access: "person.2.badge.gearshape"; case .security: "lock.shield"; case .organization: "building.2"
         }
     }
 }

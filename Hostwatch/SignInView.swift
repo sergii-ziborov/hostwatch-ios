@@ -6,6 +6,8 @@ struct SignInView: View {
     @State private var password = ""
     @State private var otp = ""
     @State private var showServer = false
+    @State private var useQR = false
+    @State private var approveInApp = false
 
     var body: some View {
         ZStack {
@@ -16,10 +18,27 @@ struct SignInView: View {
                     brand
                     VStack(spacing: 16) {
                         if model.session.requiresOtp == true {
-                            otpForm
+                            Picker("Verification", selection: $approveInApp) {
+                                Text("Authenticator").tag(false)
+                                Text("Signed-in app").tag(true)
+                            }.pickerStyle(.segmented)
+                            if approveInApp { QRSignInView(kind: "second-factor") }
+                            else { otpForm }
+                            Button("Use another account") { Task { await model.signOut(); otp = ""; approveInApp = false } }
+                                .font(.footnote).disabled(model.loading)
                         } else {
-                            credentialsForm
+                            Picker("Sign-in method", selection: $useQR) {
+                                Text("Password").tag(false)
+                                Text("QR code").tag(true)
+                            }.pickerStyle(.segmented)
+                            if useQR { QRSignInView(kind: "sign-in") }
+                            else { credentialsForm }
                         }
+                        DisclosureGroup("Control-plane address", isExpanded: $showServer) {
+                            TextField("https://control.example.com", text: $model.baseURLText)
+                                .textInputAutocapitalization(.never).keyboardType(.URL).padding(.top, 10)
+                            Text("Use the HTTPS address supplied by your administrator.").font(.caption).foregroundStyle(HW.secondary)
+                        }.font(.footnote)
                         if let error = model.errorMessage {
                             Label(error, systemImage: "exclamationmark.triangle.fill")
                                 .font(.footnote).foregroundStyle(HW.red).frame(maxWidth: .infinity, alignment: .leading)
@@ -66,12 +85,6 @@ struct SignInView: View {
             }
             .buttonStyle(.borderedProminent).controlSize(.large).disabled(email.isEmpty || password.isEmpty || model.loading)
 
-            DisclosureGroup("Control-plane address", isExpanded: $showServer) {
-                TextField("https://control.example.com", text: $model.baseURLText)
-                    .textInputAutocapitalization(.never).keyboardType(.URL).padding(.top, 10)
-                Text("Use the HTTPS address supplied by your administrator.").font(.caption).foregroundStyle(HW.secondary)
-            }
-            .font(.footnote)
         }
     }
 
@@ -86,4 +99,3 @@ struct SignInView: View {
         }
     }
 }
-
