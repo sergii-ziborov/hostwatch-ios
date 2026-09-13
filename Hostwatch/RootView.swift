@@ -117,6 +117,7 @@ struct PageContainer: View {
                 VStack(alignment: .leading, spacing: 12) {
                     PageHeader(page: page)
                     ScopeBar(page: page)
+                    sampleDataBanner
                     errorBanner
                     pageContent
                         .opacity(model.loading ? 0.64 : 1)
@@ -128,6 +129,7 @@ struct PageContainer: View {
                     VStack(alignment: .leading, spacing: 18) {
                         PageHeader(page: page)
                         ScopeBar(page: page)
+                        sampleDataBanner
                         errorBanner
                         pageContent
                             .opacity(model.loading ? 0.64 : 1)
@@ -151,6 +153,17 @@ struct PageContainer: View {
         if let error = model.errorMessage {
             Label(error, systemImage: "exclamationmark.triangle.fill")
                 .font(.footnote).foregroundStyle(HW.red).padding(12).frame(maxWidth: .infinity, alignment: .leading).panel()
+        }
+    }
+
+    @ViewBuilder private var sampleDataBanner: some View {
+        if model.fixtures {
+            Label("SAMPLE DATA · DEBUG BUILD — These figures do not come from a server.", systemImage: "exclamationmark.triangle.fill")
+                .font(.footnote.bold())
+                .foregroundStyle(HW.amber)
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .panel()
         }
     }
 
@@ -188,8 +201,9 @@ struct PageHeader: View {
                 Text(page.title).font(.system(.largeTitle, design: .rounded, weight: .bold))
             }
             HStack(spacing: 7) {
-                Circle().fill(model.live ? HW.teal : HW.amber).frame(width: 8, height: 8)
-                Text(model.live ? "Live" : "Paused").foregroundStyle(model.live ? HW.teal : HW.amber)
+                Circle().fill(model.fixtures || !model.live ? HW.amber : HW.teal).frame(width: 8, height: 8)
+                Text(model.fixtures ? "Sample data" : (model.live ? "Live" : "Paused"))
+                    .foregroundStyle(model.fixtures || !model.live ? HW.amber : HW.teal)
                 if let overview = model.overview { Text("· \(overview.hostname) · up \(Format.duration(overview.uptimeSeconds))").foregroundStyle(HW.secondary) }
             }
             .font(sizeClass == .compact ? .caption : .subheadline)
@@ -244,10 +258,11 @@ struct ScopeBar: View {
 
     private var liveButton: some View {
         Button { model.setLive(!model.live, page: page) } label: {
-            Label(model.live ? "Live" : "Paused", systemImage: model.live ? "dot.radiowaves.left.and.right" : "pause.fill")
+            Label(model.fixtures ? "Sample" : (model.live ? "Live" : "Paused"), systemImage: model.fixtures ? "exclamationmark.triangle" : (model.live ? "dot.radiowaves.left.and.right" : "pause.fill"))
         }
         .buttonStyle(.bordered)
-        .tint(model.live ? HW.teal : HW.amber)
+        .tint(model.fixtures || !model.live ? HW.amber : HW.teal)
+        .disabled(model.fixtures)
     }
 
     private var nodeMenu: some View {
