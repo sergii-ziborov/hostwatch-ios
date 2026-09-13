@@ -2,7 +2,7 @@
 
 Native SwiftUI control-plane client for Hostwatch. The iPhone and iPad app is intended for **public App Store distribution**, while access to a control plane is provisioned by an organization. It uses the same signed-in session and REST API as the web application. There is no public demo or registration flow.
 
-**Release status:** the App Store Connect record and public privacy declaration exist. Xcode Cloud builds the current branch, and the Release configuration builds and launches in iPhone and iPad simulators. A development build is installed on a paired iPhone 13 mini, but physical-device sign-in has not yet been verified because the device was locked. An App Store archive, TestFlight distribution, authenticated screenshots and public release are still pending.
+**Release status:** the App Store Connect record and public privacy declaration exist. Xcode Cloud builds the current branch, and the Release configuration builds and launches in iPhone and iPad simulators. A local development-signed archive also builds, but exporting it for App Store Connect requires a distribution account and profile that the command-line Xcode environment does not have. A development build is installed on a paired iPhone 13 mini, but physical-device sign-in has not yet been verified because the device was locked. An App Store distribution archive, TestFlight upload, authenticated screenshots and public release are still pending.
 
 ## Product structure
 

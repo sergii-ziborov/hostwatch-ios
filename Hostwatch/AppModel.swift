@@ -49,6 +49,7 @@ final class AppModel: ObservableObject {
         let saved = UserDefaults.standard.string(forKey: "controlPlaneURL") ?? "https://gethostwatch.com"
         baseURLText = saved
         client = APIClient(baseURL: URL(string: saved) ?? URL(string: "https://gethostwatch.com")!)
+#if DEBUG
         if fixtures {
             session = SessionState(authenticated: true, csrf: "fixture", user: .init(id: "owner", email: "owner@hostwatch.local", name: "Sergii Ziborov", totpEnabled: true), organization: .init(id: "org", name: "Ziborov Infrastructure", slug: "ziborov", createdAt: ISO8601DateFormatter().string(from: .now)), role: "platform_owner")
             nodes = [.init(id: "primary", name: "Primary node", url: "https://node.internal", local: false, createdAt: ISO8601DateFormatter().string(from: .now))]
@@ -57,10 +58,14 @@ final class AppModel: ObservableObject {
         } else {
             Task { await restoreSession() }
         }
+#else
+        Task { await restoreSession() }
+#endif
     }
 
     deinit { liveTask?.cancel() }
 
+#if DEBUG
     private func installFixtures() {
         overview = Fixtures.overview; sites = Fixtures.sites; dataServices = Fixtures.dataServices; dataServicesError = nil
         history = Fixtures.history; traffic = Fixtures.traffic; sources = Fixtures.sources
@@ -82,6 +87,7 @@ final class AppModel: ObservableObject {
         accessRules = .init(rules: [.init(id: "rule-1", site: "applydjinn", kind: "country", value: "RU", label: "Policy review", createdAt: ISO8601DateFormatter().string(from: .now))], managed: true, updatedAt: ISO8601DateFormatter().string(from: .now), error: nil)
         guardState = .init(policy: .init(enabled: true, mode: "automatic", includedBytes: 21_990_232_555_520, warningBytes: 32_985_348_833_280, cutoffBytes: 41_782_136_619_008, normalMbps: 100, warningMbps: 20, emergencyMbps: 1, warningAction: "throttle", anomalyEnabled: true, maxRequestsPerSecond: 800, maxIngressMbps: 180, maxPacketsPerSecond: 10_000, anomalyAction: "throttle", anomalyMbps: 5, triggerSeconds: 20, recoverySeconds: 180, riskThreshold: 72, updatedAt: ISO8601DateFormatter().string(from: .now)), stage: "normal", reason: "No active threshold breach", requestsPerSecond: 62, ingressMbps: 4.8, egressMbps: 2.1, packetsPerSecond: 138, appliedMbps: 100, managed: true, error: nil)
     }
+#endif
 
     func restoreSession() async {
         do {
@@ -172,7 +178,9 @@ final class AppModel: ObservableObject {
     }
 
     func reload(page: SidebarPage, quiet: Bool = false) async {
+#if DEBUG
         if fixtures { installFixtures(); return }
+#endif
         if !quiet { loading = true }; defer { if !quiet { loading = false } }
         do {
             let commonOverview = try await client.overview()
@@ -226,15 +234,19 @@ final class AppModel: ObservableObject {
     }
 
     func scanStorage(refresh: Bool = false) async {
+#if DEBUG
         if fixtures { storage = Fixtures.storage; return }
+#endif
         do { storage = try await client.storage(refresh: refresh) } catch { errorMessage = error.localizedDescription }
     }
 
     func browseStorage(path: String) async {
+#if DEBUG
         if fixtures {
             storage = StorageResponse(mode: "browse", scannedAt: Fixtures.storage.scannedAt, root: "/", path: path, parent: path == "/" ? nil : "/", disk: Fixtures.storage.disk, totalBytes: Fixtures.storage.totalBytes, analyzedBytes: Fixtures.storage.analyzedBytes, unattributedBytes: 0, sites: Fixtures.storage.sites, categories: Fixtures.storage.categories, areas: Fixtures.storage.entries.filter { $0.path.hasPrefix(path) }, entries: Fixtures.storage.entries.filter { $0.path.hasPrefix(path) })
             return
         }
+#endif
         do { storage = try await client.storage(path: path) } catch { errorMessage = error.localizedDescription }
     }
 

@@ -1,5 +1,6 @@
 import Foundation
 
+#if DEBUG
 enum Fixtures {
     static let overview = Overview(
         timestamp: ISO8601DateFormatter().string(from: .now), hostname: "apps-prod-nbg1-2", uptimeSeconds: 270_000,
@@ -72,3 +73,4 @@ enum Fixtures {
         .init(id: "scan", name: "Code health scan", timerUnit: "scan.timer", runUnit: "scan.service", activeState: "active", unitFileState: "enabled", nextRun: "tomorrow 02:00", lastResult: "success")
     ]
 }
+#endif
