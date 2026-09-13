@@ -1,0 +1,28 @@
+Hostwatch iOS — Source-Available License
+Copyright © 2026 Serhii Ziborov. All rights reserved.
+
+The source of the Hostwatch iPhone and iPad app is public so that customers,
+reviewers, and researchers can inspect it. It is proprietary software, not an
+open-source project. No MIT or other open-source license applies to this code.
+
+You may read and audit this source, quote short excerpts with attribution, and
+build and run it on your own devices solely to evaluate the app or verify a
+claim about it. You may submit proposed changes to the repository; submitting
+them does not give you a license to use the Hostwatch name or software elsewhere.
+
+Without prior written permission, you may not incorporate this source into
+another product or service; redistribute, sublicense, sell, or publish it or a
+modified version; create a port or other derivative work; or distribute a build
+through an app store or another channel. This license grants no rights to the
+Hostwatch name, logo, or app icon. The server, controller, and agent are separate
+products and are not licensed by this file.
+
+Any third-party material included in the repository remains subject to its own
+license. This notice does not limit rights that a third-party license grants.
+
+THE SOURCE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND
+NONINFRINGEMENT. TO THE EXTENT PERMITTED BY LAW, THE AUTHOR IS NOT LIABLE FOR
+CLAIMS OR DAMAGES ARISING FROM USE OF THE SOURCE.
+
+For permissions beyond this license, contact hello@gethostwatch.com.

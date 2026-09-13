@@ -1,0 +1,9 @@
+{
+  "id" : "a6a17ad7-3740-4ce5-b54f-02383a786f20",
+  "targets" : [
+    {
+      "id" : "8e50d70a-2c74-4594-9be5-425c426dc7dd",
+      "name" : "Hostwatch"
+    }
+  ]
+}

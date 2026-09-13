@@ -1,6 +1,8 @@
 # Hostwatch for iPhone and iPad
 
-Native SwiftUI control-plane client for Hostwatch. It uses the same signed-in session and REST API as the web application. There is no public demo or registration flow.
+Native SwiftUI control-plane client for Hostwatch. The iPhone and iPad app is intended for **public App Store distribution**, while access to a control plane is provisioned by an organization. It uses the same signed-in session and REST API as the web application. There is no public demo or registration flow.
+
+**Release status:** a development build is installed on a paired iPhone 13 mini; a physical-device launch and account sign-in have not yet been verified because the phone was locked. The first Xcode Cloud build has been started. A TestFlight build or public App Store release is not yet confirmed. Do not describe the app as available in the App Store until Apple has approved and published it.
 
 ## Product structure
 
@@ -30,9 +32,15 @@ xcodebuild -project Hostwatch.xcodeproj -scheme Hostwatch \
 
 For local screenshot and UI verification only, launch the Debug build with `HOSTWATCH_FIXTURES=1`. This switch is read from the process environment and is absent from the production interface.
 
-All app screens use SwiftUI, SceneKit, MapKit and direct JSON API calls. There are no embedded web pages, WebViews or bundled HTML assets. No CI/CD workflow is included. Release signing and distribution are intentionally manual.
+All app screens use SwiftUI, SceneKit, MapKit and direct JSON API calls. There are no embedded web pages, WebViews or bundled HTML assets. A shared `Hostwatch` scheme and an Xcode Cloud workflow are configured for this iOS repository. The controller and Go agent remain separate products; this iOS workflow does not build or publish them. Public App Store distribution still requires a validated archive, App Store Connect metadata, review credentials, on-device testing and App Review approval.
 
-To run on a physical iPhone, open `Hostwatch.xcodeproj` in Xcode, select the Hostwatch target, choose your Apple development team under Signing & Capabilities, then select the device. A signed device build requires that team's provisioning profile; the simulator build above does not.
+To run on a physical iPhone, open `Hostwatch.xcodeproj` in Xcode and select your device. Automatic signing uses the configured developer team; Xcode must have an authenticated Apple Account. For an Xcode Cloud archive, use the shared `Hostwatch` scheme, verify the selected branch and stable Xcode version, and explicitly enable App Store Connect distribution. Do not turn on automatic public release.
+
+Apple reviewers need a dedicated, working account on a live control plane with representative data and any second-factor instructions. The sign-in screen alone is insufficient for review. The public privacy and support URLs, screenshots of the shipping build, app privacy answers, review notes and tester coverage must match the actual service before submission.
+
+## License
+
+The iOS source is public for inspection and evaluation but remains proprietary. It is **not MIT-licensed**. See [LICENSE](LICENSE). The backend, controller and agent are not included or licensed here.
 
 ## Verified layouts
 
