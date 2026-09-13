@@ -20,15 +20,15 @@
 	<string>1.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
-	<key>NSCameraUsageDescription</key>
-	<string>Scan a one-time Hostwatch sign-in QR code shown on your other device.</string>
-	<key>NSFaceIDUsageDescription</key>
-	<string>Confirm that you approve a Hostwatch sign-in on another device.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSCameraUsageDescription</key>
+	<string>Scan a one-time Hostwatch sign-in QR code shown on your other device.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Confirm that you approve a Hostwatch sign-in on another device.</string>
 	<key>UILaunchScreen</key>
 	<dict>
 		<key>UIColorName</key>

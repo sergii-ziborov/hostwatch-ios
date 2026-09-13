@@ -24,10 +24,13 @@ targets:
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         TARGETED_DEVICE_FAMILY: "1,2"
         CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: XMS5ZC28UJ
     info:
       path: Hostwatch/Info.plist
       properties:
         CFBundleDisplayName: Hostwatch
+        NSCameraUsageDescription: Scan a one-time Hostwatch sign-in QR code shown on your other device.
+        NSFaceIDUsageDescription: Confirm that you approve a Hostwatch sign-in on another device.
         UILaunchScreen:
           UIColorName: LaunchBackground
         UIUserInterfaceStyle: Dark
@@ -49,3 +52,16 @@ targets:
       - HostwatchTests
     dependencies:
       - target: Hostwatch
+schemes:
+  Hostwatch:
+    build:
+      targets:
+        Hostwatch: all
+        HostwatchTests: [test]
+    run:
+      config: Debug
+    test:
+      targets:
+        - HostwatchTests
+    archive:
+      config: Release

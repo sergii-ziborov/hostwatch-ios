@@ -153,6 +153,7 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					EFD66600FF6D62E67E778FBF = {
+						DevelopmentTeam = XMS5ZC28UJ;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -293,6 +294,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = XMS5ZC28UJ;
 				INFOPLIST_FILE = Hostwatch/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -312,6 +314,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = XMS5ZC28UJ;
 				INFOPLIST_FILE = Hostwatch/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
