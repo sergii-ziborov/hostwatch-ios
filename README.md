@@ -7,7 +7,7 @@ Native SwiftUI control-plane client for Hostwatch. It uses the same signed-in se
 - **Overview** — host resources and capacity with resource drilldowns.
 - **Traffic** — requests, errors, destinations, sources, locations and retained evidence.
 - **Incidents & risks** — operational incidents, anomaly signals and vulnerabilities in separate tabs.
-- **Runtime topology** — the complete Repo Lens Cyberboard adapted to live workloads: orbit, tilt, pinch/scroll zoom, top/isometric views, layer elevation, connection tracing, animated request/response packets and detailed inspectors.
+- **Runtime topology** — a native SceneKit view of live project towers and node-to-project traffic. Drag to orbit, pinch or use controls to zoom, double tap to focus, and tap a tower or layer for a native inspector.
 - **Workloads** — project traffic, processes, storage, limits and controls.
 - **Traffic policies** — bandwidth, anomaly and IP/country access rules.
 - **Environment** — per-project environment variable management.
@@ -16,10 +16,11 @@ Native SwiftUI control-plane client for Hostwatch. It uses the same signed-in se
 
 The app supports the hosted control plane and licensed enterprise installations. The control-plane URL can be changed on the sign-in screen. Enterprise licenses remain created and verified by the controller REST API; the mobile app only displays and installs a signed license for an authorized owner.
 
+The minimum deployment target is iOS 18. The four primary areas are native phone tabs; less frequent controls are under **More**. iPad keeps a sidebar. Links to a request destination or external advisory open in the system browser, outside the app.
+
 ## Build
 
 ```bash
-./scripts/sync-topology-renderer.sh
 xcodegen generate
 xcodebuild -project Hostwatch.xcodeproj -scheme Hostwatch \
   -sdk iphonesimulator -configuration Debug CODE_SIGNING_ALLOWED=NO build
@@ -27,7 +28,9 @@ xcodebuild -project Hostwatch.xcodeproj -scheme Hostwatch \
 
 For local screenshot and UI verification only, launch the Debug build with `HOSTWATCH_FIXTURES=1`. This switch is read from the process environment and is absent from the production interface.
 
-No CI/CD workflow is included. Release signing and distribution are intentionally manual.
+All app screens use SwiftUI, SceneKit, MapKit and direct JSON API calls. There are no embedded web pages, WebViews or bundled HTML assets. No CI/CD workflow is included. Release signing and distribution are intentionally manual.
+
+To run on a physical iPhone, open `Hostwatch.xcodeproj` in Xcode, select the Hostwatch target, choose your Apple development team under Signing & Capabilities, then select the device. A signed device build requires that team's provisioning profile; the simulator build above does not.
 
 ## Verified layouts
 

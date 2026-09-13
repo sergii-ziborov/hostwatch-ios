@@ -10,18 +10,15 @@
 		205C7B38AA7F39C8549EB03F /* AdminViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B81C8E5DDA41AFCD8723E518 /* AdminViews.swift */; };
 		2397C7CB62CE9336F19578EB /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6B5BF4296604636AF818D8AF /* Assets.xcassets */; };
 		2D3749D562C2A34E6D9BD700 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76D7F5CC61DBDB2ABD270F11 /* AppModel.swift */; };
-		413BD67BEDA03F3864DD8675 /* topology.css in Resources */ = {isa = PBXBuildFile; fileRef = 2DFDBF4C1E1C985D5C679B02 /* topology.css */; };
+		4EA8DD88F0712FE0CEAD618C /* NativeTopologyScene.swift in Sources */ = {isa = PBXBuildFile; fileRef = 453A7A03CCB0E61006B35768 /* NativeTopologyScene.swift */; };
 		549D6E78E5E2DCF33EA8467B /* Fixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18CD1780E2379A0DF2B888DE /* Fixtures.swift */; };
-		586768A2CD4C1CA858FC40FD /* topology.js in Resources */ = {isa = PBXBuildFile; fileRef = 741F0C6D47AEA6F255D9928A /* topology.js */; };
 		7ED8B18934CABF0ACAA3D457 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F23EFDCF024E30815A1E55E /* Theme.swift */; };
 		93965628E34EC6B52EFAF658 /* OverviewTrafficViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB8618F607DEE2D2E1E2849A /* OverviewTrafficViews.swift */; };
 		963A540C15DF394F13265CD9 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55C640803FA958183F2FE0C2 /* APIClient.swift */; };
 		A283FF16E0B0559681B2DD92 /* SignInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 876AF943DE6092E87224123B /* SignInView.swift */; };
-		C751A95BB91B9FE5ADD93B8F /* TopologyWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E2FD57AF191F2171E059393 /* TopologyWebView.swift */; };
 		D2D39C4F1EBFE2ED8C93B8F2 /* HostwatchApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 299F150C6BF694745E48CC76 /* HostwatchApp.swift */; };
 		D8CE39787CB162FF7D6FA697 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12746C62342BD6DFB5CE4414 /* RootView.swift */; };
 		DD74D36910EE8D8F562347AA /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38E240A978385DC293B70166 /* Models.swift */; };
-		E1874D9782A66DFA6455E983 /* ios-topology.html in Resources */ = {isa = PBXBuildFile; fileRef = B547B3DEA9AFC7B72DBB7F79 /* ios-topology.html */; };
 		E32E989754F3E88256ADC83C /* HostwatchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F82A7AF0AADF24B29949F0F2 /* HostwatchTests.swift */; };
 		F75981AC11F1D1D2C1CCC97B /* OperationsViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D9117ACA765A183085A0EE6 /* OperationsViews.swift */; };
 /* End PBXBuildFile section */
@@ -42,18 +39,15 @@
 		18CD1780E2379A0DF2B888DE /* Fixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Fixtures.swift; sourceTree = "<group>"; };
 		1D9117ACA765A183085A0EE6 /* OperationsViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OperationsViews.swift; sourceTree = "<group>"; };
 		299F150C6BF694745E48CC76 /* HostwatchApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostwatchApp.swift; sourceTree = "<group>"; };
-		2DFDBF4C1E1C985D5C679B02 /* topology.css */ = {isa = PBXFileReference; lastKnownFileType = text.css; path = topology.css; sourceTree = "<group>"; };
 		2F23EFDCF024E30815A1E55E /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		38E240A978385DC293B70166 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		453A7A03CCB0E61006B35768 /* NativeTopologyScene.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeTopologyScene.swift; sourceTree = "<group>"; };
 		55C640803FA958183F2FE0C2 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
 		6B5BF4296604636AF818D8AF /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		6E2FD57AF191F2171E059393 /* TopologyWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TopologyWebView.swift; sourceTree = "<group>"; };
-		741F0C6D47AEA6F255D9928A /* topology.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = topology.js; sourceTree = "<group>"; };
 		758A87CE98F4E57324698D19 /* HostwatchTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = HostwatchTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		76D7F5CC61DBDB2ABD270F11 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
 		876AF943DE6092E87224123B /* SignInView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignInView.swift; sourceTree = "<group>"; };
 		AB8618F607DEE2D2E1E2849A /* OverviewTrafficViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverviewTrafficViews.swift; sourceTree = "<group>"; };
-		B547B3DEA9AFC7B72DBB7F79 /* ios-topology.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = "ios-topology.html"; sourceTree = "<group>"; };
 		B81C8E5DDA41AFCD8723E518 /* AdminViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminViews.swift; sourceTree = "<group>"; };
 		F82A7AF0AADF24B29949F0F2 /* HostwatchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostwatchTests.swift; sourceTree = "<group>"; };
 		FCD6674AE70D2F4CC67FC220 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -89,25 +83,14 @@
 				299F150C6BF694745E48CC76 /* HostwatchApp.swift */,
 				FCD6674AE70D2F4CC67FC220 /* Info.plist */,
 				38E240A978385DC293B70166 /* Models.swift */,
+				453A7A03CCB0E61006B35768 /* NativeTopologyScene.swift */,
 				1D9117ACA765A183085A0EE6 /* OperationsViews.swift */,
 				AB8618F607DEE2D2E1E2849A /* OverviewTrafficViews.swift */,
 				12746C62342BD6DFB5CE4414 /* RootView.swift */,
 				876AF943DE6092E87224123B /* SignInView.swift */,
 				2F23EFDCF024E30815A1E55E /* Theme.swift */,
-				6E2FD57AF191F2171E059393 /* TopologyWebView.swift */,
-				C2A7D1395460FDD08B41822A /* TopologyRenderer */,
 			);
 			path = Hostwatch;
-			sourceTree = "<group>";
-		};
-		C2A7D1395460FDD08B41822A /* TopologyRenderer */ = {
-			isa = PBXGroup;
-			children = (
-				B547B3DEA9AFC7B72DBB7F79 /* ios-topology.html */,
-				2DFDBF4C1E1C985D5C679B02 /* topology.css */,
-				741F0C6D47AEA6F255D9928A /* topology.js */,
-			);
-			path = TopologyRenderer;
 			sourceTree = "<group>";
 		};
 		F09FE85719E48C949EBD4670 /* HostwatchTests */ = {
@@ -197,9 +180,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				2397C7CB62CE9336F19578EB /* Assets.xcassets in Resources */,
-				E1874D9782A66DFA6455E983 /* ios-topology.html in Resources */,
-				413BD67BEDA03F3864DD8675 /* topology.css in Resources */,
-				586768A2CD4C1CA858FC40FD /* topology.js in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -216,12 +196,12 @@
 				549D6E78E5E2DCF33EA8467B /* Fixtures.swift in Sources */,
 				D2D39C4F1EBFE2ED8C93B8F2 /* HostwatchApp.swift in Sources */,
 				DD74D36910EE8D8F562347AA /* Models.swift in Sources */,
+				4EA8DD88F0712FE0CEAD618C /* NativeTopologyScene.swift in Sources */,
 				F75981AC11F1D1D2C1CCC97B /* OperationsViews.swift in Sources */,
 				93965628E34EC6B52EFAF658 /* OverviewTrafficViews.swift in Sources */,
 				D8CE39787CB162FF7D6FA697 /* RootView.swift in Sources */,
 				A283FF16E0B0559681B2DD92 /* SignInView.swift in Sources */,
 				7ED8B18934CABF0ACAA3D457 /* Theme.swift in Sources */,
-				C751A95BB91B9FE5ADD93B8F /* TopologyWebView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

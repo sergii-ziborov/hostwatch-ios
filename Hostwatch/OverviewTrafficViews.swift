@@ -4,7 +4,7 @@ import SwiftUI
 
 struct OverviewView: View {
     @EnvironmentObject private var model: AppModel
-    private let columns = [GridItem(.adaptive(minimum: 185), spacing: 12)]
+    private let columns = [GridItem(.adaptive(minimum: 155), spacing: 12)]
 
     var body: some View {
         if let value = model.overview {
@@ -16,6 +16,7 @@ struct OverviewView: View {
                     NavigationLink { ResourceDetailView(kind: .network) } label: { StatCard(title: "Network egress", value: Format.rate(value.network.txBytesPerSecond), detail: "in \(Format.rate(value.network.rxBytesPerSecond)) · \(value.network.txPacketsPerSecond.formatted()) pkt/s", icon: "arrow.up.arrow.down") }
                 }
                 ResourceTimelineCard()
+                DataServicesView()
                 HStack {
                     Label(value.nginxLogHealthy ? "Nginx analytics healthy" : "Nginx analytics unavailable", systemImage: value.nginxLogHealthy ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
                     Spacer()
@@ -82,14 +83,124 @@ struct ResourceTimelineCard: View {
     var focus: ResourceKind? = nil
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack { VStack(alignment: .leading) { Eyebrow(text: "Last \(model.hours) hours"); Text(focus.map { "\($0.rawValue) history" } ?? "CPU, memory & load").font(.title3.bold()) }; Spacer(); Text("Drag to inspect").font(.caption).foregroundStyle(HW.secondary) }
-            Chart(Array(model.traffic.enumerated()), id: \.offset) { index, point in
-                LineMark(x: .value("Interval", index), y: .value("Requests", point.requests)).foregroundStyle(HW.teal).interpolationMethod(.catmullRom)
-                if focus == nil || focus == .memory { LineMark(x: .value("Interval", index), y: .value("Latency", min(point.averageMs / 10, 100))).foregroundStyle(HW.amber).interpolationMethod(.catmullRom) }
+            HStack { VStack(alignment: .leading) { Eyebrow(text: "Last \(model.hours) hours"); Text(focus.map { "\($0.rawValue) history" } ?? "CPU & memory").font(.title3.bold()) }; Spacer(); Text("Host samples").font(.caption).foregroundStyle(HW.secondary) }
+            if model.history.isEmpty {
+                EmptyState(icon: "chart.xyaxis.line", title: "No host history", detail: "Samples will appear after the collector records host metrics.")
+            } else {
+                Chart(Array(model.history.enumerated()), id: \.offset) { index, point in
+                    if focus == nil || focus == .cpu {
+                        LineMark(x: .value("Interval", index), y: .value("CPU %", point.cpuPercent), series: .value("Metric", "CPU"))
+                            .foregroundStyle(HW.teal).interpolationMethod(.catmullRom)
+                    }
+                    if focus == nil || focus == .memory {
+                        LineMark(x: .value("Interval", index), y: .value("Memory %", point.memoryBytes / max(1, model.overview?.memory.total ?? 1) * 100), series: .value("Metric", "Memory"))
+                            .foregroundStyle(HW.amber).interpolationMethod(.catmullRom)
+                    }
+                    if focus == .network {
+                        LineMark(x: .value("Interval", index), y: .value("Egress KB/s", point.txBytesPerSecond / 1024), series: .value("Metric", "Egress"))
+                            .foregroundStyle(HW.teal).interpolationMethod(.catmullRom)
+                    }
+                }
+                .chartYScale(domain: focus == .network ? 0...max(1, (model.history.map(\.txBytesPerSecond).max() ?? 1024) / 1024 * 1.15) : 0...100)
+                .frame(height: 220)
+                HStack(spacing: 14) {
+                    if focus != .memory { Label(focus == .network ? "Egress KB/s" : "CPU %", systemImage: "line.diagonal").foregroundStyle(HW.teal) }
+                    if focus == nil || focus == .memory { Label("Memory %", systemImage: "line.diagonal").foregroundStyle(HW.amber) }
+                }.font(.caption)
             }
-            .chartYScale(domain: 0...max(120, model.traffic.map(\.requests).max() ?? 120)).frame(height: 230)
         }
         .padding(18).panel()
+    }
+}
+
+struct DataServicesView: View {
+    @EnvironmentObject private var model: AppModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Eyebrow(text: "Stateful infrastructure")
+                    Text("Databases, caches & queues").font(.title3.bold())
+                }
+                Spacer()
+                Text("\(model.dataServices.count)").font(.headline.monospacedDigit()).foregroundStyle(HW.teal)
+            }
+            if let error = model.dataServicesError {
+                Label("Service inventory unavailable: \(error)", systemImage: "exclamationmark.triangle")
+                    .font(.footnote).foregroundStyle(HW.amber)
+            } else if model.dataServices.isEmpty {
+                Text("No containerized data service detected. Remote and managed databases need an exporter or agent endpoint for query, connection and cache metrics.")
+                    .font(.footnote).foregroundStyle(HW.secondary)
+            } else {
+                ForEach(model.dataServices) { service in
+                    NavigationLink { DataServiceDetailView(service: service) } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: service.type.lowercased().contains("redis") || service.role.lowercased().contains("cache") ? "memorychip" : "cylinder.split.1x2")
+                                .foregroundStyle(service.container.state == "running" ? HW.teal : HW.red)
+                                .frame(width: 28)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(service.container.name).font(.subheadline.bold()).lineLimit(1)
+                                Text("\(service.type) · \(service.siteName ?? "Host & shared")")
+                                    .font(.caption).foregroundStyle(HW.secondary).lineLimit(1)
+                            }
+                            Spacer(minLength: 4)
+                            VStack(alignment: .trailing, spacing: 3) {
+                                Text(Format.bytes(service.container.memoryBytes)).font(.caption.bold())
+                                Text(Format.percent(service.container.cpuPercent)).font(.caption2).foregroundStyle(HW.secondary)
+                            }
+                            Image(systemName: "chevron.right").font(.caption2).foregroundStyle(HW.secondary)
+                        }
+                        .padding(12)
+                        .background(HW.panelRaised)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            Text("Container CPU and memory are live. Network counters cover the container lifetime.")
+                .font(.caption2).foregroundStyle(HW.secondary)
+        }
+        .padding(16)
+        .panel()
+    }
+}
+
+struct DataServiceDetailView: View {
+    @EnvironmentObject private var model: AppModel
+    let service: DataService
+    private var site: Site? { model.sites.first { $0.id == service.siteId } }
+
+    var body: some View {
+        List {
+            Section("Service") {
+                LabeledContent("Type", value: service.type)
+                LabeledContent("Role", value: service.role)
+                LabeledContent("State", value: service.container.state)
+                LabeledContent("Status", value: service.container.status)
+                LabeledContent("Project", value: service.siteName ?? "Host & shared runtime")
+            }
+            Section("Load") {
+                LabeledContent("CPU", value: Format.percent(service.container.cpuPercent))
+                LabeledContent("Memory", value: Format.bytes(service.container.memoryBytes))
+                LabeledContent("Memory limit", value: Format.bytes(service.container.memoryLimit))
+                LabeledContent("Processes", value: service.container.pids.formatted())
+                LabeledContent("Network received", value: Format.bytes(service.container.networkRxBytes))
+                LabeledContent("Network sent", value: Format.bytes(service.container.networkTxBytes))
+            }
+            Section("Runtime evidence") {
+                LabeledContent("Image", value: service.container.image)
+                LabeledContent("Compose project", value: service.container.project)
+                LabeledContent("Container ID", value: service.container.id)
+            }
+            Section { Text("Query rate, active connections, storage growth and cache hit ratio require a database exporter or native metrics endpoint.")
+                .font(.footnote).foregroundStyle(HW.secondary) }
+            if let site { Section { NavigationLink("Open \(site.name) workload") { WorkloadDetailView(site: site) } } }
+        }
+        .scrollContentBackground(.hidden)
+        .background(HW.background)
+        .navigationTitle(service.type)
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 
@@ -191,12 +302,15 @@ struct StoragePathDetail: View {
 
 struct TrafficView: View {
     @EnvironmentObject private var model: AppModel
+    private var historicalErrors: Int {
+        Int(model.traffic.reduce(0) { $0 + $1.errors4xx + $1.errors5xx })
+    }
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             TrafficChart()
             HStack(spacing: 12) {
                 NavigationLink { RequestExplorerView() } label: { StatCard(title: "Retained requests", value: model.requests.count.formatted(), detail: "IP, location, destination and full trace", icon: "list.bullet.rectangle") }
-                NavigationLink { ErrorExplorerView() } label: { StatCard(title: "Errors", value: model.errorEvidence?.retainedErrors.formatted() ?? "0", detail: "Status, method, path and request evidence", color: HW.red, icon: "exclamationmark.triangle") }
+                NavigationLink { ErrorExplorerView() } label: { StatCard(title: "Errors", value: historicalErrors.formatted(), detail: "Selected window · inspect status, path and evidence", color: HW.red, icon: "exclamationmark.triangle") }
             }
             .buttonStyle(.plain)
             AttributionGrid()
@@ -210,9 +324,12 @@ struct TrafficChart: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack { VStack(alignment: .leading) { Eyebrow(text: "HTTP traffic · last \(model.hours)h"); Text("Request volume").font(.title2.bold()); Text("Tap Requests or Errors below for complete evidence.").font(.caption).foregroundStyle(HW.secondary) }; Spacer(); Text(model.traffic.reduce(0) { $0 + Int($1.requests) }.formatted()).font(.title3.bold()) }
             Chart(Array(model.traffic.enumerated()), id: \.offset) { index, point in
-                AreaMark(x: .value("Interval", index), y: .value("Requests", point.requests)).foregroundStyle(LinearGradient(colors: [HW.teal.opacity(0.34), .clear], startPoint: .top, endPoint: .bottom))
-                LineMark(x: .value("Interval", index), y: .value("Requests", point.requests)).foregroundStyle(HW.teal).interpolationMethod(.catmullRom)
-                LineMark(x: .value("Interval", index), y: .value("Errors", point.errors4xx + point.errors5xx)).foregroundStyle(HW.amber)
+                AreaMark(x: .value("Interval", index), y: .value("Requests", point.requests), series: .value("Metric", "Requests"))
+                    .foregroundStyle(LinearGradient(colors: [HW.teal.opacity(0.34), .clear], startPoint: .top, endPoint: .bottom))
+                LineMark(x: .value("Interval", index), y: .value("Requests", point.requests), series: .value("Metric", "Requests"))
+                    .foregroundStyle(HW.teal).interpolationMethod(.catmullRom)
+                LineMark(x: .value("Interval", index), y: .value("Errors", point.errors4xx + point.errors5xx), series: .value("Metric", "Errors"))
+                    .foregroundStyle(HW.amber)
             }.frame(height: 280)
         }.padding(18).panel()
     }
@@ -290,13 +407,24 @@ struct RequestDetailView: View {
                 Text("\(request.method) \(request.path)").font(.system(.title2, design: .rounded, weight: .bold)).textSelection(.enabled)
                 Text("\(request.time) · \(request.host)").foregroundStyle(HW.secondary)
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 210))], spacing: 12) {
-                    StatCard(title: "Response", value: String(request.status), detail: "\(request.durationMs.formatted()) ms · \(Format.bytes(request.bytes))", color: request.status >= 400 ? HW.red : HW.teal, icon: "arrow.left.arrow.right")
+                    StatCard(title: "Response", value: "\(request.status) \(HTTPURLResponse.localizedString(forStatusCode: request.status).capitalized)", detail: "\(request.durationMs.formatted()) ms · \(Format.bytes(request.bytes))", color: request.status >= 400 ? HW.red : HW.teal, icon: "arrow.left.arrow.right")
                     StatCard(title: "Client", value: request.clientIp, detail: "\(request.city ?? "Unknown"), \(request.country)", icon: "network")
                     StatCard(title: "Attribution", value: request.source, detail: request.referrerPath ?? "No usable referrer or UTM source", color: HW.amber, icon: "arrow.triangle.branch")
                     StatCard(title: "Agent", value: request.bot ?? "Browser / service", detail: request.userAgent, icon: "person.text.rectangle")
                 }
                 trace
-                Button("Block this IP for \(siteName)", systemImage: "hand.raised.fill", role: .destructive) { confirmBlock = true }.buttonStyle(.borderedProminent).tint(HW.red)
+                if let destinationURL {
+                    Link(destination: destinationURL) { Label("Open destination in browser", systemImage: "arrow.up.right.square") }
+                        .buttonStyle(.bordered)
+                    Text("Opens outside Hostwatch. Query strings are not retained, and a fresh response may differ from the recorded request.")
+                        .font(.caption).foregroundStyle(HW.secondary)
+                }
+                if IPAddressSafety.isInternal(request.clientIp) || request.internalRequest == true {
+                    Label("Internal service address · blocking it may interrupt your applications", systemImage: "exclamationmark.shield")
+                        .font(.footnote).foregroundStyle(HW.amber)
+                } else {
+                    Button("Block this IP for \(siteName)", systemImage: "hand.raised.fill", role: .destructive) { confirmBlock = true }.buttonStyle(.borderedProminent).tint(HW.red)
+                }
             }.padding(20)
         }.background(HW.background).navigationTitle("Request").navigationBarTitleDisplayMode(.inline)
         .confirmationDialog("Block \(request.clientIp)?", isPresented: $confirmBlock, titleVisibility: .visible) {
@@ -304,6 +432,14 @@ struct RequestDetailView: View {
         } message: { Text("A project-scoped access rule will be applied to \(siteName).") }
     }
     private var siteName: String { model.sites.first(where: { $0.id == request.site })?.name ?? request.site }
+    private var destinationURL: URL? {
+        guard ["GET", "HEAD"].contains(request.method.uppercased()), !request.host.isEmpty else { return nil }
+        var components = URLComponents()
+        components.scheme = request.scheme == "http" ? "http" : "https"
+        components.host = request.host
+        components.path = request.path.hasPrefix("/") ? request.path : "/\(request.path)"
+        return components.url
+    }
     private var trace: some View {
         VStack(spacing: 0) {
             traceRow("Request ID", request.id); traceRow("Destination", "\(request.scheme ?? "https")://\(request.host)\(request.path)")
@@ -319,24 +455,84 @@ struct RequestDetailView: View {
 struct ErrorExplorerView: View {
     @EnvironmentObject private var model: AppModel
     private var errors: [RequestSample] { model.errorEvidence?.requests.filter { $0.status >= 400 } ?? [] }
-    private var statuses: [(Int, Int)] { Dictionary(grouping: errors, by: \.status).map { ($0.key, $0.value.count) }.sorted { $0.1 > $1.1 } }
-    private var methods: [(String, Int)] { Dictionary(grouping: errors, by: \.method).map { ($0.key, $0.value.count) }.sorted { $0.1 > $1.1 } }
+    private var statuses: [(String, Double)] { dimensions(\.errorStatuses, fallback: Dictionary(grouping: errors, by: { String($0.status) }).mapValues { Double($0.count) }) }
+    private var methods: [(String, Double)] { dimensions(\.errorMethods, fallback: Dictionary(grouping: errors, by: \.method).mapValues { Double($0.count) }) }
+    private var aggregateErrors: Double { model.paths.reduce(0) { $0 + $1.errors4xx + $1.errors5xx } }
+    private var clientErrors: Int { Int(model.paths.isEmpty ? Double(errors.filter { (400..<500).contains($0.status) }.count) : model.paths.reduce(0) { $0 + $1.errors4xx }) }
+    private var serverErrors: Int { Int(model.paths.isEmpty ? Double(errors.filter { $0.status >= 500 }.count) : model.paths.reduce(0) { $0 + $1.errors5xx }) }
+
+    private func dimensions(_ keyPath: KeyPath<RequestPath, [String: Double]?>, fallback: [String: Double]) -> [(String, Double)] {
+        var totals: [String: Double] = [:]
+        for path in model.paths {
+            for (key, count) in path[keyPath: keyPath] ?? [:] { totals[key, default: 0] += count }
+        }
+        return (totals.isEmpty ? fallback : totals).map { ($0.key, $0.value) }.sorted { $0.1 > $1.1 }
+    }
     var body: some View {
         List {
             Section {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 145))], spacing: 10) {
-                    StatCard(title: "Retained errors", value: errors.count.formatted(), detail: model.errorEvidence?.capped == true ? "Buffer limit reached" : "Complete current RAM evidence", color: HW.red)
-                    StatCard(title: "Client", value: errors.filter { (400..<500).contains($0.status) }.count.formatted(), detail: "HTTP 4xx", color: HW.red)
-                    StatCard(title: "Server", value: errors.filter { $0.status >= 500 }.count.formatted(), detail: "HTTP 5xx", color: HW.red)
+                    StatCard(title: "Retained errors", value: errors.count.formatted(), detail: model.errorEvidence?.capped == true ? "Buffer limit reached" : "Bounded live buffer", color: HW.red)
+                    StatCard(title: "Client", value: clientErrors.formatted(), detail: "Historical HTTP 4xx", color: HW.red)
+                    StatCard(title: "Server", value: serverErrors.formatted(), detail: "Historical HTTP 5xx", color: HW.red)
                 }.listRowInsets(EdgeInsets())
             }
-            Section("Response status") { ForEach(statuses, id: \.0) { item in NavigationLink { ErrorFilteredView(title: "HTTP \(item.0)", requests: errors.filter { $0.status == item.0 }) } label: { LabeledContent("HTTP \(item.0)", value: item.1.formatted()) } } }
-            Section("Methods") { ForEach(methods, id: \.0) { item in NavigationLink { ErrorFilteredView(title: item.0, requests: errors.filter { $0.method == item.0 }) } label: { LabeledContent(item.0, value: item.1.formatted()) } } }
+            if aggregateErrors > 0 { Section { LabeledContent("Historical errors", value: Int(aggregateErrors).formatted()); Text("Exact status and method coverage may be partial; older requests cannot be reconstructed.").font(.caption).foregroundStyle(HW.secondary) } }
+            Section("Response status") { ForEach(statuses, id: \.0) { item in NavigationLink { ErrorAggregateDetailView(kind: "status", value: item.0, count: item.1) } label: { LabeledContent("HTTP \(item.0)", value: Int(item.1).formatted()) } } }
+            Section("Methods") { ForEach(methods, id: \.0) { item in NavigationLink { ErrorAggregateDetailView(kind: "method", value: item.0, count: item.1) } label: { LabeledContent(item.0, value: Int(item.1).formatted()) } } }
             Section("Affected paths") {
                 ForEach(model.paths.filter { $0.errors4xx + $0.errors5xx > 0 }) { path in NavigationLink { PathDetailView(path: path) } label: { VStack(alignment: .leading) { HStack { Text(path.path).font(.system(.body, design: .monospaced)); Spacer(); Text("\(Int(path.errors4xx + path.errors5xx)) errors").foregroundStyle(HW.red) }; Text("\(Int(path.requests)) requests · \(path.averageMs.formatted()) ms average").font(.caption).foregroundStyle(HW.secondary) } } }
             }
             if errors.isEmpty { Section { EmptyState(icon: "clock.badge.questionmark", title: "No retained error requests", detail: "Historical aggregates remain valid, but old individual URLs and IPs cannot be reconstructed. New requests appear here as the bounded buffer fills.") } }
         }.scrollContentBackground(.hidden).background(HW.background).navigationTitle("Errors")
+    }
+}
+
+struct ErrorAggregateDetailView: View {
+    @EnvironmentObject private var model: AppModel
+    let kind: String
+    let value: String
+    let count: Double
+
+    private var paths: [RequestPath] {
+        model.paths.filter { path in
+            ((kind == "status" ? path.errorStatuses : path.errorMethods)?[value] ?? 0) > 0
+        }
+    }
+
+    private var retained: [RequestSample] {
+        model.errorEvidence?.requests.filter { request in
+            request.status >= 400 && (kind == "status" ? String(request.status) == value : request.method == value)
+        } ?? []
+    }
+
+    var body: some View {
+        List {
+            Section {
+                LabeledContent("Exact-code evidence", value: Int(count).formatted())
+                Text("These counts cover only intervals collected with this dimension. Individual requests below come from the bounded live buffer.")
+                    .font(.footnote).foregroundStyle(HW.secondary)
+            }
+            Section("Affected URL paths") {
+                ForEach(paths) { path in
+                    NavigationLink { PathDetailView(path: path) } label: {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(path.path).font(.system(.subheadline, design: .monospaced)).lineLimit(2)
+                            Text("\(Int((kind == "status" ? path.errorStatuses : path.errorMethods)?[value] ?? 0)) matching errors · \(Int(path.requests)) requests")
+                                .font(.caption).foregroundStyle(HW.secondary)
+                        }
+                    }
+                }
+                if paths.isEmpty { Text("The retained sample has no matching historical path aggregate.").foregroundStyle(HW.secondary) }
+            }
+            Section("Retained requests · \(retained.count)") {
+                ForEach(retained) { request in NavigationLink { RequestDetailView(request: request) } label: { RequestRow(request: request) } }
+                if retained.isEmpty { Text("No individual request remains in the live buffer.").foregroundStyle(HW.secondary) }
+            }
+        }
+        .scrollContentBackground(.hidden)
+        .background(HW.background)
+        .navigationTitle(kind == "status" ? "HTTP \(value)" : value)
     }
 }
 
@@ -353,8 +549,53 @@ struct PathDetailView: View {
         List {
             Section { StatCard(title: "Path", value: path.path, detail: "\(Int(path.requests)) requests · \(Int(path.errors4xx + path.errors5xx)) errors · \(path.averageMs.formatted()) ms", color: path.errors4xx + path.errors5xx > 0 ? HW.red : HW.teal) }
             if path.path.lowercased().contains("other") { Section { Text("This is a historical overflow bucket. Low-volume names that were already combined cannot be reconstructed. Current retained requests remain individually visible below.").foregroundStyle(HW.amber) } }
+            if let statuses = path.errorStatuses, !statuses.isEmpty {
+                Section("HTTP error codes") {
+                    ForEach(statuses.sorted(by: { $0.value > $1.value }), id: \.key) { item in
+                        NavigationLink { PathErrorDimensionView(path: path, kind: "status", value: item.key, count: item.value, requests: rows.filter { String($0.status) == item.key }) } label: {
+                            LabeledContent("HTTP \(item.key) · \(HTTPURLResponse.localizedString(forStatusCode: Int(item.key) ?? 0).capitalized)", value: Int(item.value).formatted())
+                        }
+                    }
+                }
+            }
+            if let methods = path.errorMethods, !methods.isEmpty {
+                Section("Methods that failed") {
+                    ForEach(methods.sorted(by: { $0.value > $1.value }), id: \.key) { item in
+                        NavigationLink { PathErrorDimensionView(path: path, kind: "method", value: item.key, count: item.value, requests: rows.filter { $0.method == item.key && $0.status >= 400 }) } label: {
+                            LabeledContent(item.key, value: Int(item.value).formatted())
+                        }
+                    }
+                }
+            }
             Section("Retained requests") { ForEach(rows) { request in NavigationLink { RequestDetailView(request: request) } label: { RequestRow(request: request) } } }
         }.scrollContentBackground(.hidden).background(HW.background).navigationTitle("Path details")
+    }
+}
+
+struct PathErrorDimensionView: View {
+    let path: RequestPath
+    let kind: String
+    let value: String
+    let count: Double
+    let requests: [RequestSample]
+
+    var body: some View {
+        List {
+            Section("Historical aggregate") {
+                LabeledContent("Path", value: path.path)
+                LabeledContent(kind == "status" ? "HTTP status" : "Method", value: value)
+                LabeledContent("Matching errors", value: Int(count).formatted())
+                Text("The aggregate is complete for the recorded dimension. Individual requests may have expired from the bounded live buffer.")
+                    .font(.footnote).foregroundStyle(HW.secondary)
+            }
+            Section("Retained evidence · \(requests.count)") {
+                ForEach(requests) { request in NavigationLink { RequestDetailView(request: request) } label: { RequestRow(request: request) } }
+                if requests.isEmpty { Text("No matching individual request remains in memory.").foregroundStyle(HW.secondary) }
+            }
+        }
+        .scrollContentBackground(.hidden)
+        .background(HW.background)
+        .navigationTitle(kind == "status" ? "HTTP \(value)" : value)
     }
 }
 
@@ -371,13 +612,25 @@ struct SourceDetailView: View {
             else if mode == "Flow" { TrafficFlowView(requests: matching, source: source.name) }
             else {
                 List {
+                    Section("Selected window") {
+                        LabeledContent("Requests", value: Int(source.requests).formatted())
+                        LabeledContent("Transfer", value: Format.bytes(source.bytes))
+                        LabeledContent("Retained requests", value: matching.count.formatted())
+                    }
                     if kind == "source", source.name == "Direct" { Section { Text("Direct means no usable referrer or UTM source was sent. Destinations, IPs, locations and user agents below identify what the traffic actually did.").foregroundStyle(HW.amber) } }
+                    if kind == "country", model.selectedSite.isEmpty { Section { Text("Choose a site in the traffic scope before blocking a country. Country rules always apply to one project.").foregroundStyle(HW.amber) } }
+                    if matching.isEmpty { Section { Text("The historical count is available, but no matching individual request remains in the bounded live buffer. Exact destinations and client IPs cannot be reconstructed for older traffic.").foregroundStyle(HW.amber) } }
                     Section("Destinations") { ForEach(destinationGroups, id: \.0) { item in NavigationLink { ErrorFilteredView(title: item.0, requests: matching.filter { $0.path == item.0 }) } label: { LabeledContent(item.0, value: item.1.formatted()) } } }
                     Section("Individual requests") { ForEach(matching) { row in NavigationLink { RequestDetailView(request: row) } label: { RequestRow(request: row) } } }
                 }.scrollContentBackground(.hidden).background(HW.background)
             }
         }.background(HW.background).navigationTitle(source.name).navigationBarTitleDisplayMode(.inline)
-        .toolbar { if kind == "country" { Button("Block", systemImage: "hand.raised", role: .destructive) { confirmCountry = true } } }
+        .toolbar {
+            if kind == "country" {
+                Button("Block", systemImage: "hand.raised", role: .destructive) { confirmCountry = true }
+                    .disabled(model.selectedSite.isEmpty || matching.first?.countryCode.isEmpty != false)
+            }
+        }
         .confirmationDialog("Block \(source.name)?", isPresented: $confirmCountry) { Button("Block country", role: .destructive) { Task { await model.block(site: model.selectedSite, kind: "country", value: matching.first?.countryCode ?? source.name) } } } message: { Text("This creates a scoped traffic policy for the selected site.") }
     }
     private var destinationGroups: [(String, Int)] { Dictionary(grouping: matching, by: \.path).map { ($0.key, $0.value.count) }.sorted { $0.1 > $1.1 } }

@@ -14,6 +14,9 @@ final class AppModel: ObservableObject {
 
     @Published var overview: Overview?
     @Published var sites: [Site] = []
+    @Published var dataServices: [DataService] = []
+    @Published var dataServicesError: String?
+    @Published var history: [SystemPoint] = []
     @Published var traffic: [TrafficPoint] = []
     @Published var sources = Sources(windowHours: 24, site: nil, sources: [], countries: [], bots: [])
     @Published var requests: [RequestSample] = []
@@ -54,7 +57,8 @@ final class AppModel: ObservableObject {
     deinit { liveTask?.cancel() }
 
     private func installFixtures() {
-        overview = Fixtures.overview; sites = Fixtures.sites; traffic = Fixtures.traffic; sources = Fixtures.sources
+        overview = Fixtures.overview; sites = Fixtures.sites; dataServices = Fixtures.dataServices; dataServicesError = nil
+        history = Fixtures.history; traffic = Fixtures.traffic; sources = Fixtures.sources
         requests = Fixtures.requests; errorEvidence = .init(windowHours: 24, site: nil, interval: nil, requests: Fixtures.requests.filter { $0.status >= 400 }, retainedErrors: Fixtures.requests.filter { $0.status >= 400 }.count, retainedFrom: Fixtures.requests.last?.time, capped: false)
         let grouped = Dictionary(grouping: Fixtures.requests, by: \RequestSample.path)
         var fixturePaths: [RequestPath] = []
@@ -116,8 +120,8 @@ final class AppModel: ObservableObject {
         await client.select(node: selectedNode)
     }
 
-    func changeNode(_ id: String) async {
-        selectedNode = id; await client.select(node: id); await reload(page: .overview)
+    func changeNode(_ id: String, page: SidebarPage) async {
+        selectedNode = id; await client.select(node: id); await reload(page: page)
     }
 
     func setLive(_ enabled: Bool, page: SidebarPage) {
@@ -142,7 +146,8 @@ final class AppModel: ObservableObject {
             overview = commonOverview; sites = commonSites
             switch page {
             case .overview:
-                _ = try await client.history(hours: hours)
+                history = try await client.history(hours: hours)
+                await loadDataServices()
             case .traffic:
                 async let trafficCall = client.traffic(site: selectedSite, hours: hours)
                 async let sourcesCall = client.sources(site: selectedSite, hours: hours)
@@ -156,6 +161,7 @@ final class AppModel: ObservableObject {
                 if page != .codeHealth { jobs = try await client.jobs() }
             case .workloads:
                 requests = try await client.requests(site: selectedSite)
+                await loadDataServices()
             case .policies:
                 async let guardCall = client.trafficGuard()
                 async let rulesCall = client.accessRules(site: selectedSite)
@@ -171,6 +177,16 @@ final class AppModel: ObservableObject {
             }
             errorMessage = nil
         } catch { errorMessage = error.localizedDescription }
+    }
+
+    private func loadDataServices() async {
+        do {
+            dataServices = try await client.dataServices()
+            dataServicesError = nil
+        } catch {
+            dataServices = []
+            dataServicesError = error.localizedDescription
+        }
     }
 
     func scanStorage(refresh: Bool = false) async {
@@ -193,7 +209,10 @@ final class AppModel: ObservableObject {
 
     func block(site: String, kind: String, value: String) async {
         guard !fixtures else { return }
-        do { try await client.addAccessRule(site: site, kind: kind, value: value, label: "Added from iOS") } catch { errorMessage = error.localizedDescription }
+        do {
+            try await client.addAccessRule(site: site, kind: kind, value: value, label: "Added from iOS")
+            accessRules = try await client.accessRules(site: selectedSite)
+        } catch { errorMessage = error.localizedDescription }
     }
 
     func setEnvironment(name: String, value: String) async {

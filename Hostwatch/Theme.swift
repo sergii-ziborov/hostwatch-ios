@@ -87,3 +87,16 @@ enum Format {
     }
 }
 
+enum IPAddressSafety {
+    static func isInternal(_ address: String) -> Bool {
+        let parts = address.split(separator: ".").compactMap { UInt8($0) }
+        if parts.count == 4 {
+            return parts[0] == 10 || parts[0] == 127 ||
+                (parts[0] == 172 && (16...31).contains(parts[1])) ||
+                (parts[0] == 192 && parts[1] == 168) ||
+                (parts[0] == 169 && parts[1] == 254)
+        }
+        let lower = address.lowercased()
+        return lower == "::1" || lower.hasPrefix("fc") || lower.hasPrefix("fd") || lower.hasPrefix("fe8") || lower.hasPrefix("fe9") || lower.hasPrefix("fea") || lower.hasPrefix("feb")
+    }
+}

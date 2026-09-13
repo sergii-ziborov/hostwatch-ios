@@ -45,6 +45,9 @@ struct VulnerabilityDetail: View {
 
 struct TopologyView: View {
     @EnvironmentObject private var model: AppModel
+    @State private var mode: TopologyMode = .towers
+    @State private var command = TopologyCommand(number: 0, action: .fit)
+    @State private var selection: TopologySelection?
 
     private var sites: [Site] {
         model.selectedSite.isEmpty ? model.sites : model.sites.filter { $0.id == model.selectedSite }
@@ -63,8 +66,63 @@ struct TopologyView: View {
     var body: some View {
         Group {
             if let overview = model.overview, !sites.isEmpty {
-                TopologyWebView(snapshot: .init(node: node, overview: overview, sites: sites, projects: projects, jobs: model.jobs))
-                    .accessibilityLabel("Interactive runtime topology")
+                VStack(spacing: 10) {
+                    HStack(spacing: 8) {
+                        Picker("Runtime view", selection: $mode) {
+                            ForEach(TopologyMode.allCases, id: \.self) { value in Text(value.rawValue).tag(value) }
+                        }
+                        .pickerStyle(.segmented)
+                        .frame(maxWidth: 260)
+                        Spacer(minLength: 0)
+                        Button { send(.top) } label: { Image(systemName: "square.3.layers.3d.top.filled") }
+                            .accessibilityLabel("Top view")
+                        Button { send(.fit) } label: { Image(systemName: "arrow.up.left.and.arrow.down.right") }
+                            .accessibilityLabel("Fit all towers")
+                    }
+                    .buttonStyle(.bordered)
+                    ZStack(alignment: .bottomTrailing) {
+                        NativeTopologyScene(snapshot: .init(node: node, overview: overview, sites: sites, projects: projects),
+                                            mode: mode, command: command, selection: $selection)
+                        VStack(spacing: 8) {
+                            Button { send(.zoomIn) } label: { Image(systemName: "plus.magnifyingglass") }
+                                .accessibilityLabel("Zoom in")
+                            Button { send(.zoomOut) } label: { Image(systemName: "minus.magnifyingglass") }
+                                .accessibilityLabel("Zoom out")
+                        }
+                        .buttonStyle(.bordered)
+                        .padding(12)
+                    }
+                    .frame(minHeight: 330)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    Text(mode == .traffic
+                         ? "Lines show measured node-to-project traffic, not inferred service dependencies."
+                         : "Drag to orbit · pinch to zoom · double tap a tower to focus · tap for details")
+                        .font(.caption2).foregroundStyle(HW.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(sites) { site in
+                                Button {
+                                    selection = TopologySelection(siteID: site.id, layer: nil)
+                                } label: {
+                                    HStack(spacing: 6) {
+                                        Circle().fill(site.errorRate >= 3 ? HW.red : HW.teal).frame(width: 7, height: 7)
+                                        Text(site.name).lineLimit(1)
+                                        Text("\(Int(site.requestsPerMinute))/min").foregroundStyle(HW.secondary)
+                                    }
+                                }
+                                .buttonStyle(.bordered)
+                            }
+                        }
+                    }
+                }
+                .sheet(item: $selection) { picked in
+                    if let site = sites.first(where: { $0.id == picked.siteID }) {
+                        TopologyTowerInspector(site: site,
+                                               project: projects.first(where: { $0.id == site.id }),
+                                               layer: picked.layer)
+                    }
+                }
             } else {
                 EmptyState(
                     icon: "point.3.connected.trianglepath.dotted",
@@ -77,6 +135,81 @@ struct TopologyView: View {
         .background(HW.background)
         .clipShape(RoundedRectangle(cornerRadius: 14))
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(HW.border))
+    }
+
+    private func send(_ action: TopologyCameraAction) {
+        command = TopologyCommand(number: command.number + 1, action: action)
+    }
+}
+
+struct TopologyTowerInspector: View {
+    @Environment(\.dismiss) private var dismiss
+    let site: Site
+    let project: ProjectHealth?
+    let layer: Int?
+
+    private var selectedContainer: ContainerInfo? {
+        guard let layer, layers.indices.contains(layer) else { return nil }
+        return layers[layer].container
+    }
+
+    private var layers: [TopologyLayer] { TopologyLayer.layers(for: site, project: project) }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    LabeledContent("Project", value: site.name)
+                    LabeledContent("Domains", value: site.domains.joined(separator: ", "))
+                    LabeledContent("Requests", value: "\(site.requestsPerMinute.formatted())/min")
+                    LabeledContent("Errors", value: Format.percent(site.errorRate))
+                    LabeledContent("p95 latency", value: "\(site.p95Ms.formatted()) ms")
+                }
+                Section("Resources") {
+                    LabeledContent("CPU", value: Format.percent(site.cpuPercent))
+                    LabeledContent("Memory", value: "\(Format.bytes(site.memoryBytes)) of \(Format.bytes(site.memoryLimit))")
+                    LabeledContent("Traffic", value: "\(Format.bytes(site.bytesPerMinute))/min")
+                }
+                if let layer, layers.indices.contains(layer) {
+                    Section("Selected layer · \(layer + 1) of \(layers.count)") {
+                        LabeledContent("Name", value: layers[layer].title)
+                        Text(layers[layer].detail).foregroundStyle(HW.secondary)
+                    }
+                }
+                if let container = selectedContainer {
+                    Section("Container details") {
+                        LabeledContent("State", value: container.state)
+                        LabeledContent("Image", value: container.image)
+                        LabeledContent("CPU", value: Format.percent(container.cpuPercent))
+                        LabeledContent("Memory", value: Format.bytes(container.memoryBytes))
+                        LabeledContent("Processes", value: container.pids.formatted())
+                    }
+                }
+                Section("Tower layers") {
+                    ForEach(Array(layers.enumerated()), id: \.offset) { index, layer in
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Layer \(index + 1) · \(layer.title)")
+                                Text(layer.detail)
+                                    .font(.caption).foregroundStyle(HW.secondary)
+                            }
+                    }
+                }
+                if let project {
+                    Section("Code evidence") {
+                        LabeledContent("Coverage", value: project.completeness)
+                        LabeledContent("Revision", value: project.revision)
+                        NavigationLink("Inspect code health") { CodeProjectDetail(project: project) }
+                    }
+                }
+                Section { NavigationLink("Open workload") { WorkloadDetailView(site: site) } }
+            }
+            .scrollContentBackground(.hidden)
+            .background(HW.background)
+            .navigationTitle(site.name)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } } }
+        }
+        .presentationDetents([.medium, .large])
     }
 }
 
@@ -102,8 +235,11 @@ struct WorkloadsView: View {
     @EnvironmentObject private var model: AppModel
     var filtered: [Site] { model.selectedSite.isEmpty ? model.sites : model.sites.filter { $0.id == model.selectedSite } }
     var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 280), spacing: 12)], spacing: 12) {
             ForEach(filtered) { site in NavigationLink { WorkloadDetailView(site: site) } label: { VStack(alignment: .leading, spacing: 13) { HStack { VStack(alignment: .leading) { Text(site.name).font(.title3.bold()); Text(site.domains.joined(separator: ", ")).font(.caption).foregroundStyle(HW.secondary) }; Spacer(); Text(site.errorRate > 2 ? "AT RISK" : "HEALTHY").font(.caption2.bold()).foregroundStyle(site.errorRate > 2 ? HW.red : HW.teal) }; HStack { mini("Requests", "\(site.requestsPerMinute.formatted())/min"); mini("CPU", Format.percent(site.cpuPercent)); mini("Memory", Format.bytes(site.memoryBytes)) }; ProgressView(value: site.memoryBytes, total: max(1, site.memoryLimit)).tint(site.memoryBytes / max(1, site.memoryLimit) > 0.85 ? HW.red : HW.teal); HStack { Text("Open requests, processes, storage & limits").font(.caption).foregroundStyle(HW.teal); Spacer(); Image(systemName: "chevron.right") } }.padding(16).panel() }.buttonStyle(.plain) }
+        }
+        DataServicesView()
         }
     }
     private func mini(_ name: String, _ value: String) -> some View { VStack(alignment: .leading) { Text(name).font(.caption2).foregroundStyle(HW.secondary); Text(value).font(.caption.bold()) }.frame(maxWidth: .infinity, alignment: .leading) }

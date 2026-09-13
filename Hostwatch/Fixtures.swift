@@ -24,6 +24,22 @@ enum Fixtures {
         return .init(time: ISO8601DateFormatter().string(from: Date().addingTimeInterval(Double(index - 47) * 1_800)), requests: max(4, wave + burst + Double(index % 7) * 3), bytes: (wave + 12) * 19_000, errors4xx: Double(index % 8), errors5xx: index % 13 == 0 ? 3 : 0, averageMs: 120 + Double((index * 71) % 430))
     }
 
+    static let history: [SystemPoint] = (0..<48).map { index in
+        let time = ISO8601DateFormatter().string(from: Date().addingTimeInterval(Double(index - 47) * 1_800))
+        return .init(time: time, cpuPercent: 10 + Double((index * 17) % 29), memoryBytes: 2_500_000_000 + Double(index * 5_000_000), swapBytes: 0,
+                     diskBytes: 61_000_000_000, load1: 0.5 + Double(index % 8) / 10,
+                     rxBytesPerSecond: 50_000 + Double((index * 31_919) % 120_000),
+                     txBytesPerSecond: 20_000 + Double((index * 21_819) % 70_000),
+                     rxPacketsPerSecond: 30 + Double(index % 21), txPacketsPerSecond: 20 + Double(index % 13), riskScore: Double(index % 18))
+    }
+
+    static let dataServices: [DataService] = [
+        .init(type: "PostgreSQL", role: "Relational database", siteId: "applydjinn", siteName: "ApplyDjinn",
+              container: .init(id: "postgres-fixture", name: "applydjinn-postgres-1", project: "applydjinn", state: "running", status: "Up 3 days", image: "postgres:16", imageId: "sha256:fixture", cpuPercent: 4.6, memoryBytes: 417_000_000, memoryLimit: 1_073_741_824, networkRxBytes: 42_000_000, networkTxBytes: 18_000_000, pids: 18)),
+        .init(type: "Redis / Valkey", role: "Cache & key-value store", siteId: "kablay-il", siteName: "Kablay IL",
+              container: .init(id: "redis-fixture", name: "kablay-redis-1", project: "kablay", state: "running", status: "Up 3 days", image: "redis:7", imageId: "sha256:fixture", cpuPercent: 1.2, memoryBytes: 112_000_000, memoryLimit: 536_870_912, networkRxBytes: 27_000_000, networkTxBytes: 11_000_000, pids: 5))
+    ]
+
     static let sources = Sources(windowHours: 24, site: nil,
         sources: [.init(name: "Direct", requests: 5_854, bytes: 81_920_000), .init(name: "Googlebot", requests: 2_945, bytes: 35_651_584), .init(name: "Google", requests: 1_082, bytes: 9_437_184)],
         countries: [.init(name: "Israel", requests: 6_657, bytes: 73_400_320), .init(name: "United States", requests: 2_180, bytes: 30_408_704), .init(name: "Germany", requests: 859, bytes: 8_601_600)],

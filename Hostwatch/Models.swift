@@ -67,6 +67,15 @@ struct ContainerInfo: Codable, Identifiable {
     let cpuPercent: Double; let memoryBytes: Double; let memoryLimit: Double; let networkRxBytes: Double; let networkTxBytes: Double; let pids: Int
 }
 
+struct DataService: Codable, Identifiable {
+    var id: String { container.id }
+    let type: String
+    let role: String
+    let siteId: String?
+    let siteName: String?
+    let container: ContainerInfo
+}
+
 struct Site: Codable, Identifiable, Hashable {
     let id: String; let name: String; let domains: [String]; let sharedNginx: Bool; let containers: [ContainerInfo]
     let cpuPercent: Double; let memoryBytes: Double; let memoryLimit: Double; let requestsPerMinute: Double; let bytesPerMinute: Double; let errorRate: Double; let p95Ms: Double

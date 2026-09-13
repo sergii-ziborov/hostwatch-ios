@@ -16,8 +16,6 @@ targets:
       - Hostwatch
     resources:
       - Hostwatch/Assets.xcassets
-      - path: Hostwatch/TopologyRenderer
-        type: folder
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.hostwatch.controlplane

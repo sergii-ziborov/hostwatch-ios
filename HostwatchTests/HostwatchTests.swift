@@ -12,4 +12,11 @@ final class HostwatchTests: XCTestCase {
         XCTAssertFalse(SidebarPage.allCases.map(\.title).contains("Weavatrix"))
         XCTAssertFalse(SidebarPage.allCases.map(\.title).contains("Repo Lens"))
     }
+
+    func testInternalServiceAddressCannotBeBlockedFromRequestInspector() {
+        XCTAssertTrue(IPAddressSafety.isInternal("172.21.0.3"))
+        XCTAssertTrue(IPAddressSafety.isInternal("10.0.0.8"))
+        XCTAssertTrue(IPAddressSafety.isInternal("::1"))
+        XCTAssertFalse(IPAddressSafety.isInternal("203.0.113.10"))
+    }
 }
