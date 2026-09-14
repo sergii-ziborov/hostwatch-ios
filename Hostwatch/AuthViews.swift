@@ -87,7 +87,7 @@ struct DeviceQRSignInView: View {
     var body: some View {
         VStack(spacing: 16) {
             Text("Scan the QR on your website").font(.title3.bold())
-            Text("On a signed-in Hostwatch website, open Organization → Account security → Sign in on iPhone or iPad. Scan the code there with this device.")
+            Text("First sign in on gethostwatch.com with your email and password. There, open Organization → Account security → Sign in on iPhone or iPad → Show sign-in QR. Scan that code with this iPhone, compare the number, and approve on the website. If you cannot access the website, use Password above instead.")
                 .font(.footnote).foregroundStyle(HW.secondary).multilineTextAlignment(.center)
             Button { scanning = true } label: { Label("Scan website QR", systemImage: "qrcode.viewfinder") }
                 .buttonStyle(.borderedProminent).disabled(busy)

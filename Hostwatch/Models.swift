@@ -97,6 +97,27 @@ struct Overview: Codable {
     struct Budget: Codable { let period: String; let usedBytes: Double; let includedBytes: Double; let warningBytes: Double; let cutoffBytes: Double; let locked: Bool; let egressMbps: Double; let emergencyMbps: Double; let monthlyMaxAtCapBytes: Double }
 }
 
+struct NetworkPort: Codable, Identifiable {
+    var id: String { "\(protocolName):\(port)" }
+    let protocolName: String
+    let port: Int
+    let connections: Int
+    let listening: Bool?
+
+    enum CodingKeys: String, CodingKey { case protocolName = "protocol", port, connections, listening }
+}
+
+struct NetworkPorts: Codable {
+    let observedAt: String
+    let interface: String
+    let tcpConnections: Int
+    let udpConnections: Int
+    let localPorts: [NetworkPort]
+    let remotePorts: [NetworkPort]
+    let available: Bool
+    let error: String?
+}
+
 struct ContainerInfo: Codable, Identifiable {
     let id: String; let name: String; let project: String; let state: String; let status: String; let image: String; let imageId: String
     let cpuPercent: Double; let memoryBytes: Double; let memoryLimit: Double; let networkRxBytes: Double; let networkTxBytes: Double; let pids: Int

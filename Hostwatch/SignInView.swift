@@ -6,7 +6,7 @@ struct SignInView: View {
     @State private var password = ""
     @State private var otp = ""
     @State private var showServer = false
-    @State private var useQR = true
+    @State private var useQR = false
 
     var body: some View {
         ZStack {
@@ -70,6 +70,8 @@ struct SignInView: View {
     private var credentialsForm: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Sign in").font(.title2.bold())
+            Text("Use your company account. After signing in, this app can approve QR sign-ins on the website.")
+                .font(.footnote).foregroundStyle(HW.secondary)
             TextField("Email", text: $email).textContentType(.username).keyboardType(.emailAddress).textInputAutocapitalization(.never)
                 .padding(14).background(HW.background).clipShape(RoundedRectangle(cornerRadius: 12))
             SecureField("Password", text: $password).textContentType(.password)

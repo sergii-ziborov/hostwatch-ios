@@ -128,6 +128,7 @@ actor APIClient {
 
     func nodes() async throws -> [ManagedNode] { try await call("/api/control/nodes") }
     func overview() async throws -> Overview { try await call("/api/v1/overview") }
+    func networkPorts() async throws -> NetworkPorts { try await call("/api/v1/network-ports") }
     func sites() async throws -> [Site] { try await call("/api/v1/sites") }
     func dataServices() async throws -> [DataService] { try await call("/api/v1/data-services") }
     func history(hours: Int) async throws -> [SystemPoint] { try await call("/api/v1/system-history?hours=\(hours)") }

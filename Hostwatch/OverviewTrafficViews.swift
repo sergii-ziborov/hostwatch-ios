@@ -33,6 +33,8 @@ enum ResourceKind: String, Identifiable { case cpu = "CPU", memory = "Memory", n
 struct ResourceDetailView: View {
     @EnvironmentObject private var model: AppModel
     let kind: ResourceKind
+    @State private var ports: NetworkPorts?
+    @State private var portError: String?
 
     var body: some View {
         ScrollView {
@@ -44,12 +46,53 @@ struct ResourceDetailView: View {
                         ForEach(stats(overview), id: \.0) { StatCard(title: $0.0, value: $0.1, detail: $0.2, color: $0.3) }
                     }
                     ResourceTimelineCard(focus: kind)
+                    if kind == .network { networkPortsCard }
                     detailRows(overview)
                 }
             }
             .padding(20)
         }
         .background(HW.background).navigationTitle(kind.rawValue).navigationBarTitleDisplayMode(.inline)
+        .task(id: model.selectedNode) { if kind == .network { await loadPorts() } }
+        .refreshable { if kind == .network { await loadPorts() } }
+    }
+
+    private var networkPortsCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack { VStack(alignment: .leading) { Eyebrow(text: "Live socket snapshot"); Text("Ports in use").font(.title3.bold()) }
+                Spacer(); Button("Refresh") { Task { await loadPorts() } }.font(.footnote) }
+            Text("Local service ports and remote destination ports. Counts are active sockets at one instant; the chart above shows bytes for the entire host interface.")
+                .font(.footnote).foregroundStyle(HW.secondary)
+            if let portError { Text(portError).font(.footnote).foregroundStyle(HW.red) }
+            if let ports {
+                Text("\(ports.tcpConnections) TCP · \(ports.udpConnections) UDP connected · \(ports.interface)")
+                    .font(.caption).foregroundStyle(HW.secondary)
+                if let error = ports.error { Text("Partial inventory: \(error)").font(.caption).foregroundStyle(HW.amber) }
+                portRows("Local ports", ports.localPorts)
+                portRows("Remote ports", ports.remotePorts)
+            } else if portError == nil { ProgressView("Reading active sockets…") }
+            Text("Per-port byte totals require a flow collector and are not inferred from these socket counts.")
+                .font(.caption).foregroundStyle(HW.secondary)
+        }.padding(18).frame(maxWidth: .infinity, alignment: .leading).panel()
+    }
+
+    private func portRows(_ title: String, _ items: [NetworkPort]) -> some View {
+        VStack(alignment: .leading, spacing: 9) {
+            Text(title).font(.headline)
+            if items.isEmpty { Text("No sockets observed.").foregroundStyle(HW.secondary) }
+            ForEach(Array(items.prefix(30))) { item in
+                HStack { Text("\(item.protocolName) :\(item.port)").font(.system(.subheadline, design: .monospaced))
+                    if item.listening == true { Text("LISTEN").font(.caption2.bold()).foregroundStyle(HW.teal) }
+                    Spacer(); Text("\(item.connections) sockets").font(.caption).foregroundStyle(HW.secondary) }
+                Divider()
+            }
+            if items.count > 30 { Text("Showing 30 of \(items.count) ports").font(.caption).foregroundStyle(HW.secondary) }
+        }
+    }
+
+    private func loadPorts() async {
+        do { ports = try await model.networkPorts(); portError = nil }
+        catch { portError = error.localizedDescription }
     }
 
     private func stats(_ value: Overview) -> [(String, String, String, Color)] {
@@ -59,7 +102,7 @@ struct ResourceDetailView: View {
         case .memory:
             [("Used", Format.bytes(value.memory.used), "of \(Format.bytes(value.memory.total))", HW.amber), ("Available", Format.bytes(value.memory.available), "Immediately reclaimable", HW.teal), ("Swap", Format.bytes(value.memory.swapUsed), "of \(Format.bytes(value.memory.swapTotal))", value.memory.swapUsed > 0 ? HW.amber : HW.teal)]
         case .network:
-            [("Egress", Format.rate(value.network.txBytesPerSecond), "\(value.network.txPacketsPerSecond.formatted()) packets/s", HW.teal), ("Ingress", Format.rate(value.network.rxBytesPerSecond), "\(value.network.rxPacketsPerSecond.formatted()) packets/s", HW.teal), ("Period egress", Format.bytes(value.network.txBytes), "Current counter", HW.amber)]
+            [("Egress", Format.rate(value.network.txBytesPerSecond), "\(value.network.txPacketsPerSecond.formatted()) packets/s", HW.teal), ("Ingress", Format.rate(value.network.rxBytesPerSecond), "\(value.network.rxPacketsPerSecond.formatted()) packets/s", HW.teal), ("Sent counter", Format.bytes(value.network.txBytes), "Since interface reset or host boot", HW.amber), ("Received counter", Format.bytes(value.network.rxBytes), "Since interface reset or host boot", HW.amber)]
         }
     }
 

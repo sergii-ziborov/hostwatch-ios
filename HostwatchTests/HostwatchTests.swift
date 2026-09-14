@@ -50,4 +50,14 @@ final class HostwatchTests: XCTestCase {
         XCTAssertEqual(parts?.queryItems?.first(where: { $0.name == "secret" })?.value, "ABCDEFGHIJKLMNOP")
         XCTAssertEqual(parts?.queryItems?.first(where: { $0.name == "issuer" })?.value, "HOSTWATCH")
     }
+
+    func testNetworkSocketSnapshotDecodesPortEvidence() throws {
+        let payload = Data("""
+        {"observedAt":"2026-09-14T08:45:00Z","interface":"eth0","tcpConnections":2,"udpConnections":0,"localPorts":[{"protocol":"TCP","port":443,"connections":1,"listening":true}],"remotePorts":[{"protocol":"TCP","port":5432,"connections":1}],"available":true}
+        """.utf8)
+        let snapshot = try JSONDecoder().decode(NetworkPorts.self, from: payload)
+        XCTAssertEqual(snapshot.localPorts.first?.port, 443)
+        XCTAssertEqual(snapshot.remotePorts.first?.protocolName, "TCP")
+        XCTAssertEqual(snapshot.tcpConnections, 2)
+    }
 }

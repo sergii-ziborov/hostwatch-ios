@@ -208,6 +208,13 @@ final class AppModel: ObservableObject {
         await client.select(node: selectedNode)
     }
 
+    func networkPorts() async throws -> NetworkPorts {
+#if DEBUG
+        if fixtures { throw APIError.server("Port inventory is unavailable in the sample preview.") }
+#endif
+        return try await client.networkPorts()
+    }
+
     func changeNode(_ id: String, page: SidebarPage) async {
         selectedNode = id; storage = nil; storageBrowse = nil; cleanupPreview = nil
         await client.select(node: id); await reload(page: page)
