@@ -25,7 +25,8 @@ actor APIClient {
     init(baseURL: URL) {
         self.baseURL = baseURL
         let configuration = URLSessionConfiguration.default
-        configuration.timeoutIntervalForRequest = 60
+        configuration.timeoutIntervalForRequest = 25
+        configuration.timeoutIntervalForResource = 90
         configuration.httpCookieStorage = .shared
         configuration.httpShouldSetCookies = true
         session = URLSession(configuration: configuration)
@@ -38,6 +39,10 @@ actor APIClient {
         guard let url = URL(string: path, relativeTo: baseURL)?.absoluteURL else { throw APIError.invalidURL }
         var request = URLRequest(url: url)
         request.httpMethod = method
+        // A cold disk scan or Docker prune may take close to the controller's 75-second limit.
+        // Session restore must fail quickly instead of trapping a disconnected user on the splash.
+        request.timeoutInterval = path.hasPrefix("/api/v1/storage") || path.hasPrefix("/api/v1/cleanup") ? 85 :
+            (path == "/api/session" && method == "GET" ? 12 : 25)
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("Hostwatch iOS/1.0", forHTTPHeaderField: "User-Agent")
         if path.hasPrefix("/api/v1/"), !selectedNode.isEmpty { request.setValue(selectedNode, forHTTPHeaderField: "X-Hostwatch-Node") }
@@ -115,6 +120,12 @@ actor APIClient {
         return value
     }
 
+    func forgetSession() {
+        csrf = ""; selectedNode = ""
+        let storage = HTTPCookieStorage.shared
+        for cookie in storage.cookies(for: baseURL) ?? [] { storage.deleteCookie(cookie) }
+    }
+
     func nodes() async throws -> [ManagedNode] { try await call("/api/control/nodes") }
     func overview() async throws -> Overview { try await call("/api/v1/overview") }
     func sites() async throws -> [Site] { try await call("/api/v1/sites") }
@@ -134,6 +145,11 @@ actor APIClient {
         if refresh { items.append(.init(name: "refresh", value: "1")) }
         var components = URLComponents(); components.queryItems = items
         return try await call("/api/v1/storage\(components.percentEncodedQuery.map { "?\($0)" } ?? "")")
+    }
+    func cleanupPreview() async throws -> CleanupPreview { try await call("/api/v1/cleanup") }
+    func cleanCache(_ kind: String) async throws -> CleanupRun {
+        guard ["docker-build-cache", "apt-archives", "man-cache", "all"].contains(kind) else { throw APIError.invalidResponse }
+        return try await call("/api/v1/cleanup/\(kind)", method: "DELETE")
     }
     func projects() async throws -> [ProjectHealth] { try await call("/api/v1/projects") }
     func jobs() async throws -> [JobState] { try await call("/api/v1/jobs") }

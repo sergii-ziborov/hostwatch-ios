@@ -162,6 +162,16 @@ struct StorageResponse: Codable {
     let sites: [StorageGroup]; let categories: [StorageGroup]; let areas: [StorageEntry]; let entries: [StorageEntry]
 }
 
+struct CleanupTarget: Codable, Identifiable {
+    var id: String { kind }
+    let kind: String; let name: String; let path: String
+    let bytes: Double; let items: Int; let available: Bool
+    let description: String; let consequence: String; let error: String?
+}
+struct CleanupPreview: Codable { let targets: [CleanupTarget]; let scannedAt: String }
+struct CleanupResult: Codable { let kind: String; let reclaimedBytes: Double; let deletedItems: Int; let completedAt: String }
+struct CleanupRun: Codable { let results: [CleanupResult]; let errors: [String: String]?; let completedAt: String }
+
 struct Vulnerability: Codable, Identifiable, Hashable { let id: String; let severity: String; let package: String; let installedVersion: String; let fixedVersion: String; let summary: String; let url: String }
 struct HealthFinding: Codable, Identifiable, Hashable { var id: String { "\(file):\(line):\(message)" }; let category: String; let severity: String; let message: String; let file: String; let line: Int }
 struct GraphHealth: Codable { let status: String?; let revision: String?; let nodes: Int?; let edges: Int?; let buildMs: Double? }
@@ -180,19 +190,19 @@ struct ProjectHealth: Codable, Identifiable, Hashable {
 struct JobState: Codable, Identifiable, Hashable { let id: String; let name: String; let timerUnit: String; let runUnit: String; let activeState: String; let unitFileState: String; let nextRun: String; let lastResult: String }
 
 enum SidebarPage: String, CaseIterable, Identifiable {
-    case overview, traffic, incidents, topology, workloads, policies, environment, codeHealth, automations, access, security, organization
+    case overview, traffic, incidents, topology, workloads, cleanup, policies, environment, codeHealth, automations, access, security, organization
     var id: String { rawValue }
     var title: String {
         switch self {
         case .overview: "Overview"; case .traffic: "Traffic"; case .incidents: "Incidents & risks"; case .topology: "Runtime topology"
-        case .workloads: "Workloads"; case .policies: "Traffic policies"; case .environment: "Environment"; case .codeHealth: "Code health"
+        case .workloads: "Workloads"; case .cleanup: "Cleanup"; case .policies: "Traffic policies"; case .environment: "Environment"; case .codeHealth: "Code health"
         case .automations: "Automations"; case .access: "Access"; case .security: "Account security"; case .organization: "Organization"
         }
     }
     var icon: String {
         switch self {
         case .overview: "square.grid.2x2"; case .traffic: "chart.xyaxis.line"; case .incidents: "exclamationmark.shield"; case .topology: "point.3.connected.trianglepath.dotted"
-        case .workloads: "shippingbox"; case .policies: "shield.lefthalf.filled"; case .environment: "key.horizontal"; case .codeHealth: "waveform.path.ecg.rectangle"
+        case .workloads: "shippingbox"; case .cleanup: "sparkles.rectangle.stack"; case .policies: "shield.lefthalf.filled"; case .environment: "key.horizontal"; case .codeHealth: "waveform.path.ecg.rectangle"
         case .automations: "clock.arrow.trianglehead.counterclockwise.rotate.90"; case .access: "person.2.badge.gearshape"; case .security: "lock.shield"; case .organization: "building.2"
         }
     }

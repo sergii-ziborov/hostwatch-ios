@@ -33,7 +33,7 @@ struct RootView: View {
             NavigationStack {
                 List {
                     Section("Observe") { mobileMenu(.incidents) }
-                    Section("Control") { mobileMenu(.policies); mobileMenu(.environment); mobileMenu(.automations) }
+                    Section("Control") { mobileMenu(.policies); mobileMenu(.environment); mobileMenu(.cleanup); mobileMenu(.automations) }
                     Section("Analyze") { mobileMenu(.codeHealth) }
                     Section("Company") { mobileMenu(.access); mobileMenu(.security); mobileMenu(.organization) }
                     Section { Button("Sign out", systemImage: "rectangle.portrait.and.arrow.right", role: .destructive) { Task { await model.signOut() } } }
@@ -66,7 +66,7 @@ struct RootView: View {
                     menu(.overview); menu(.traffic); menu(.incidents); menu(.topology); menu(.workloads)
                 }
                 Section("Control") {
-                    menu(.policies); menu(.environment); menu(.automations)
+                    menu(.policies); menu(.environment); menu(.cleanup); menu(.automations)
                 }
                 Section("Analyze") { menu(.codeHealth) }
                 Section("Company") { menu(.access); menu(.security); menu(.organization) }
@@ -178,6 +178,7 @@ struct PageContainer: View {
             case .incidents: IncidentsView()
             case .topology: TopologyView()
             case .workloads: WorkloadsView()
+            case .cleanup: CleanupView()
             case .policies: TrafficPoliciesView()
             case .environment: EnvironmentView()
             case .codeHealth: CodeHealthView()

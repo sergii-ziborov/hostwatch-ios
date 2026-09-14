@@ -2,11 +2,12 @@
 
 Native SwiftUI control-plane client for Hostwatch. The iPhone and iPad app is intended for **public App Store distribution**, while access to a control plane is provisioned by an organization. It uses the same signed-in session and REST API as the web application. There is no public demo or registration flow.
 
-**Release status:** the App Store Connect record and public privacy declaration exist. Xcode Cloud builds the current branch, and the Release configuration builds and launches in iPhone and iPad simulators. A local development-signed archive also builds, but exporting it for App Store Connect requires a distribution account and profile that the command-line Xcode environment does not have. A development build is installed on a paired iPhone 13 mini, but physical-device sign-in has not yet been verified because the device was locked. An App Store distribution archive, TestFlight upload, authenticated screenshots and public release are still pending.
+**Release status:** the App Store Connect record and public privacy declaration exist. Xcode Cloud builds the current branch, and Release builds for iPhone and iPad. A local development-signed build also succeeds, but the updated build cannot be installed on the paired iPhone 13 mini until that device becomes available to Xcode; an earlier build is installed there. Physical-device sign-in and Face ID have not yet been verified. An App Store distribution archive, TestFlight upload, authenticated screenshots and public release are still pending.
 
 ## Product structure
 
 - **Overview** — host resources and capacity with resource drilldowns.
+- **Cleanup** — preview and explicitly remove only old APT downloads, generated manual-page caches, and unused Docker build records. The disk inspector links to the same section. Actual filesystem space freed by Docker may be lower than its virtual cache size.
 - **Traffic** — requests, errors, destinations, sources, locations and retained evidence.
 - **Incidents & risks** — operational incidents, anomaly signals and vulnerabilities in separate tabs.
 - **Runtime topology** — a native SceneKit view of live project towers and node-to-project traffic. Drag to orbit, pinch or use controls to zoom, double tap to focus, and tap a tower or layer for a native inspector.
@@ -21,6 +22,8 @@ The app supports the hosted control plane and licensed enterprise installations.
 On iPhone or iPad, sign in by scanning the one-time QR shown in **Organization → Account security → Sign in on iPhone or iPad** on an already signed-in Hostwatch website. Compare the six-digit number on both screens and approve on the website. The QR expires after two minutes and can only sign in the device that claimed it. Password and authenticator-code sign-in remain available. **More → Account security** lets an account enroll, replace, or disable its authenticator and approve another device's website sign-in with the camera or a short manual pairing code. That approval asks for Face ID or the device passcode.
 
 The minimum deployment target is iOS 18. The four primary areas are native phone tabs; less frequent controls are under **More**. iPad keeps a sidebar. Links to a request destination or external advisory open in the system browser, outside the app.
+
+On launch, a native Hostwatch splash stays visible while the saved server session is checked. From **More → Account security**, enable device unlock to require Face ID or the device passcode on subsequent launches and after sending the app to the background. This is an on-device screen lock for an existing server session, not a substitute for signing in to the control plane or its two-factor policy. Disk scans show progress and errors, and directory drilldown preserves the host summary while loading child entries.
 
 ## Build
 

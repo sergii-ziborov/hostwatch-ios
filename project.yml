@@ -6,8 +6,8 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    CURRENT_PROJECT_VERSION: 1
-    MARKETING_VERSION: 1.0.0
+    CURRENT_PROJECT_VERSION: 3
+    MARKETING_VERSION: 1.0.1
 targets:
   Hostwatch:
     type: application
@@ -29,8 +29,10 @@ targets:
       path: Hostwatch/Info.plist
       properties:
         CFBundleDisplayName: Hostwatch
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         NSCameraUsageDescription: Scan a one-time Hostwatch sign-in QR code shown on your other device.
-        NSFaceIDUsageDescription: Confirm that you approve a Hostwatch sign-in on another device.
+        NSFaceIDUsageDescription: Unlock your signed-in Hostwatch app and confirm a sign-in on another device.
         UILaunchScreen:
           UIColorName: LaunchBackground
         UIUserInterfaceStyle: Dark

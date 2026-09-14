@@ -10,6 +10,7 @@ final class AppModel: ObservableObject {
     @Published var hours = 24
     @Published var live = true
     @Published var loading = false
+    @Published var restoringSession = true
     @Published var errorMessage: String?
 
     @Published var overview: Overview?
@@ -23,6 +24,13 @@ final class AppModel: ObservableObject {
     @Published var errorEvidence: ErrorEvidence?
     @Published var paths: [RequestPath] = []
     @Published var storage: StorageResponse?
+    @Published var storageBrowse: StorageResponse?
+    @Published var storageLoading = false
+    @Published var storageError: String?
+    @Published var cleanupPreview: CleanupPreview?
+    @Published var cleanupLoading = false
+    @Published var cleanupError: String?
+    @Published var cleanupNotice: String?
     @Published var projects: [ProjectHealth] = []
     @Published var jobs: [JobState] = []
     @Published var license: LicenseStatus?
@@ -56,14 +64,20 @@ final class AppModel: ObservableObject {
             selectedNode = "primary"
             installFixtures()
         } else {
-            Task { await restoreSession() }
+            Task { await initialRestore() }
         }
 #else
-        Task { await restoreSession() }
+        Task { await initialRestore() }
 #endif
     }
 
     deinit { liveTask?.cancel() }
+
+    private func initialRestore() async {
+        await restoreSession()
+        try? await Task.sleep(for: .milliseconds(500))
+        restoringSession = false
+    }
 
 #if DEBUG
     private func installFixtures() {
@@ -80,7 +94,7 @@ final class AppModel: ObservableObject {
             fixturePaths.append(.init(path: path, requests: Double(rows.count), bytes: bytes, errors4xx: Double(clientErrors), errors5xx: Double(serverErrors), averageMs: duration / Double(rows.count), errorStatuses: nil, errorMethods: nil))
         }
         paths = fixturePaths.sorted { $0.requests > $1.requests }
-        storage = Fixtures.storage; projects = Fixtures.projects; jobs = Fixtures.jobs
+        storage = Fixtures.storage; restoringSession = false; projects = Fixtures.projects; jobs = Fixtures.jobs
         license = .init(deploymentMode: "enterprise", state: "active", enforced: true, installationId: "hostwatch-enterprise", message: "Enterprise license active", claims: .init(customer: "Ziborov Infrastructure", edition: "enterprise", expiresAt: "2027-09-12", limits: .init(nodes: 25, users: 100), features: ["traffic", "topology", "code-health", "policies"]))
         members = [.init(userId: "owner", organizationId: "org", role: "platform_owner", user: .init(id: "owner", email: "owner@hostwatch.local", name: "Sergii Ziborov")), .init(userId: "ops", organizationId: "org", role: "operator", user: .init(id: "ops", email: "ops@hostwatch.local", name: "Operations"))]
         environment = .init(siteId: selectedSite.isEmpty ? Fixtures.sites[0].id : selectedSite, variables: [.init(name: "DATABASE_URL", secret: true), .init(name: "NODE_ENV", secret: false), .init(name: "SENTRY_DSN", secret: true)], managed: true, updatedAt: ISO8601DateFormatter().string(from: .now), error: nil)
@@ -153,17 +167,34 @@ final class AppModel: ObservableObject {
     func confirmTOTP(otp: String) async throws {
         try await client.confirmTOTP(otp: otp)
         _ = try? await client.signOut()
+        await client.forgetSession()
         session = SessionState()
+        clearPrivateData()
     }
     func disableTOTP(currentPassword: String, otp: String) async throws {
         try await client.disableTOTP(currentPassword: currentPassword, otp: otp)
         _ = try? await client.signOut()
+        await client.forgetSession()
         session = SessionState()
+        clearPrivateData()
     }
 
     func signOut() async {
         if fixtures { return }
-        do { session = try await client.signOut() } catch { errorMessage = error.localizedDescription }
+        do { _ = try await client.signOut(); errorMessage = nil }
+        catch { errorMessage = "The local session was removed, but server sign-out could not be confirmed: \(error.localizedDescription)" }
+        await client.forgetSession()
+        session = SessionState()
+        clearPrivateData()
+    }
+
+    private func clearPrivateData() {
+        liveTask?.cancel(); liveTask = nil
+        overview = nil; sites = []; dataServices = []; history = []; traffic = []
+        requests = []; errorEvidence = nil; paths = []; storage = nil; storageBrowse = nil
+        storageError = nil; cleanupPreview = nil; cleanupError = nil; cleanupNotice = nil
+        projects = []; jobs = []; members = []; license = nil; environment = nil
+        nodes = []; selectedNode = ""; selectedSite = ""
     }
 
     private func configureClient() async throws {
@@ -178,7 +209,8 @@ final class AppModel: ObservableObject {
     }
 
     func changeNode(_ id: String, page: SidebarPage) async {
-        selectedNode = id; await client.select(node: id); await reload(page: page)
+        selectedNode = id; storage = nil; storageBrowse = nil; cleanupPreview = nil
+        await client.select(node: id); await reload(page: page)
     }
 
     func setLive(_ enabled: Bool, page: SidebarPage) {
@@ -221,6 +253,8 @@ final class AppModel: ObservableObject {
             case .workloads:
                 requests = try await client.requests(site: selectedSite)
                 await loadDataServices()
+            case .cleanup:
+                await refreshCleanup()
             case .policies:
                 async let guardCall = client.trafficGuard()
                 async let rulesCall = client.accessRules(site: selectedSite)
@@ -252,19 +286,50 @@ final class AppModel: ObservableObject {
 
     func scanStorage(refresh: Bool = false) async {
 #if DEBUG
-        if fixtures { storage = Fixtures.storage; return }
+        if fixtures { storage = Fixtures.storage; storageError = nil; return }
 #endif
-        do { storage = try await client.storage(refresh: refresh) } catch { errorMessage = error.localizedDescription }
+        guard !storageLoading else { return }
+        storageLoading = true; storageError = nil
+        defer { storageLoading = false }
+        do {
+            storage = try await client.storage(refresh: refresh)
+            storageBrowse = nil
+        } catch { storageError = error.localizedDescription }
     }
 
     func browseStorage(path: String) async {
 #if DEBUG
         if fixtures {
-            storage = StorageResponse(mode: "browse", scannedAt: Fixtures.storage.scannedAt, root: "/", path: path, parent: path == "/" ? nil : "/", disk: Fixtures.storage.disk, totalBytes: Fixtures.storage.totalBytes, analyzedBytes: Fixtures.storage.analyzedBytes, unattributedBytes: 0, sites: Fixtures.storage.sites, categories: Fixtures.storage.categories, areas: Fixtures.storage.entries.filter { $0.path.hasPrefix(path) }, entries: Fixtures.storage.entries.filter { $0.path.hasPrefix(path) })
+            storageBrowse = StorageResponse(mode: "browse", scannedAt: Fixtures.storage.scannedAt, root: "/", path: path, parent: path == "/" ? nil : "/", disk: Fixtures.storage.disk, totalBytes: Fixtures.storage.totalBytes, analyzedBytes: Fixtures.storage.analyzedBytes, unattributedBytes: 0, sites: Fixtures.storage.sites, categories: Fixtures.storage.categories, areas: Fixtures.storage.entries.filter { $0.path.hasPrefix(path) }, entries: Fixtures.storage.entries.filter { $0.path.hasPrefix(path) })
             return
         }
 #endif
-        do { storage = try await client.storage(path: path) } catch { errorMessage = error.localizedDescription }
+        storageLoading = true; storageError = nil
+        defer { storageLoading = false }
+        do { storageBrowse = try await client.storage(path: path) } catch { storageError = error.localizedDescription }
+    }
+
+    func refreshCleanup() async {
+        guard !fixtures, !cleanupLoading else { return }
+        cleanupLoading = true; cleanupError = nil
+        defer { cleanupLoading = false }
+        do { cleanupPreview = try await client.cleanupPreview() }
+        catch { cleanupError = error.localizedDescription }
+    }
+
+    func cleanCache(_ kind: String) async {
+        guard !fixtures, ["platform_owner", "owner", "admin"].contains(session.role ?? "") else { return }
+        cleanupLoading = true; cleanupError = nil; cleanupNotice = nil
+        defer { cleanupLoading = false }
+        do {
+            let result = try await client.cleanCache(kind)
+            let count = result.results.reduce(0) { $0 + $1.deletedItems }
+            cleanupNotice = "Removed \(count) eligible cache files or records. Actual freed space depends on shared Docker layers."
+            if let errors = result.errors, !errors.isEmpty {
+                cleanupError = errors.map { "\($0.key): \($0.value)" }.sorted().joined(separator: " · ")
+            }
+            cleanupPreview = try await client.cleanupPreview()
+        } catch { cleanupError = error.localizedDescription }
     }
 
     func runSiteAction(_ site: Site, action: String) async {

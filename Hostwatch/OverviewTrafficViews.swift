@@ -213,7 +213,15 @@ struct StorageInspectorView: View {
             VStack(alignment: .leading, spacing: 18) {
                 HStack {
                     VStack(alignment: .leading, spacing: 6) { Eyebrow(text: "Host resource inspector"); Text("Disk").font(.largeTitle.bold()); Text("Space by project, data type and exact path").foregroundStyle(HW.secondary) }
-                    Spacer(); Button("Rescan", systemImage: "arrow.clockwise") { Task { await model.scanStorage(refresh: true) } }.buttonStyle(.bordered)
+                    Spacer(); Button("Rescan", systemImage: "arrow.clockwise") { Task { await model.scanStorage(refresh: true) } }.buttonStyle(.bordered).disabled(model.storageLoading)
+                }
+                if model.storageLoading { ProgressView("Scanning host storage… this can take up to a minute").tint(HW.teal).frame(maxWidth: .infinity, alignment: .leading) }
+                if let error = model.storageError {
+                    VStack(alignment: .leading, spacing: 9) {
+                        Label("Disk scan failed", systemImage: "exclamationmark.triangle.fill").font(.headline).foregroundStyle(HW.red)
+                        Text(error).font(.footnote).foregroundStyle(HW.secondary).textSelection(.enabled)
+                        Button("Retry scan") { Task { await model.scanStorage() } }.buttonStyle(.bordered)
+                    }.padding(16).frame(maxWidth: .infinity, alignment: .leading).panel()
                 }
                 if let storage = model.storage {
                     let ratio = storage.disk.total > 0 ? storage.disk.used / storage.disk.total : 0
@@ -228,13 +236,18 @@ struct StorageInspectorView: View {
                     if tab == "Sites" { groupList(storage.sites, hostBytes: storage.unattributedBytes) }
                     else if tab == "Types" { groupList(storage.categories, hostBytes: 0) }
                     else { entryList(storage.entries) }
+                    NavigationLink { CleanupView() } label: { Label("Safe cleanup · preview cached files", systemImage: "sparkles.rectangle.stack") }
+                        .buttonStyle(.bordered)
                 } else {
-                    EmptyState(icon: "internaldrive", title: "Disk scan not loaded", detail: "Scan the host to attribute project, container, database, media and operating-system usage.")
-                        .task { await model.scanStorage() }
+                    if !model.storageLoading {
+                        EmptyState(icon: "internaldrive", title: model.storageError == nil ? "Disk scan not loaded" : "Unable to load disk details", detail: "Scan the host to attribute project, container, database, media and operating-system usage.")
+                        Button("Scan disk") { Task { await model.scanStorage() } }.buttonStyle(.borderedProminent)
+                    }
                 }
             }.padding(20)
         }
         .background(HW.background).navigationTitle("Disk").navigationBarTitleDisplayMode(.inline)
+        .task { if model.storage == nil { await model.scanStorage() } }
     }
 
     private func groupList(_ groups: [StorageGroup], hostBytes: Double) -> some View {
@@ -285,8 +298,13 @@ struct StoragePathDetail: View {
                     StatCard(title: "Owner", value: entry.siteName ?? "Host & shared", detail: entry.siteId ?? "Operating system, containers or shared data", color: HW.amber, icon: "person.crop.square")
                     StatCard(title: "Type", value: entry.category, detail: entry.kind, icon: "folder")
                 }
-                Button("Open directory contents", systemImage: "folder.badge.gearshape") { Task { await model.browseStorage(path: entry.path) } }.buttonStyle(.borderedProminent)
-                if let storage = model.storage, storage.mode == "browse", storage.path == entry.path {
+                if entry.direct != true {
+                    Button("Open directory contents", systemImage: "folder.badge.gearshape") { Task { await model.browseStorage(path: entry.category == "Unclassified host space" ? "unclassified:\(entry.path)" : entry.path) } }
+                        .buttonStyle(.borderedProminent).disabled(model.storageLoading)
+                } else { Text("This is a direct file; there are no deeper directories.").font(.footnote).foregroundStyle(HW.secondary) }
+                if model.storageLoading { ProgressView("Inspecting directory…") }
+                if let error = model.storageError { Label(error, systemImage: "exclamationmark.triangle.fill").foregroundStyle(HW.red).font(.footnote) }
+                if let storage = model.storageBrowse, storage.path == entry.path {
                     VStack(alignment: .leading, spacing: 10) {
                         Text("Directory contents").font(.headline)
                         ForEach(storage.entries) { child in

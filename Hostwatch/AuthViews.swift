@@ -151,6 +151,8 @@ struct DeviceQRSignInView: View {
 
 struct AccountSecurityView: View {
     @EnvironmentObject private var model: AppModel
+    @AppStorage("biometricUnlockEnabled") private var biometricUnlockEnabled = false
+    @State private var deviceUnlockAvailable = false
     @State private var showApproval = false
     @State private var pendingCount = 0
     @State private var currentPassword = ""
@@ -163,6 +165,15 @@ struct AccountSecurityView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("App unlock").font(.title3.bold())
+                Toggle("Use Face ID or device passcode", isOn: $biometricUnlockEnabled)
+                    .disabled(!deviceUnlockAvailable)
+                Text(deviceUnlockAvailable
+                     ? "Lock Hostwatch when it goes to the background and confirm again on return. This protects the app on this device; it does not replace website sign-in or account two-factor authentication."
+                     : "Set up Face ID and a device passcode in Settings to enable app unlock.")
+                    .font(.footnote).foregroundStyle(HW.secondary)
+            }.padding(18).frame(maxWidth: .infinity, alignment: .leading).panel()
             VStack(alignment: .leading, spacing: 10) {
                 Eyebrow(text: "Account security")
                 Text("Approve a sign-in").font(.title2.bold())
@@ -201,6 +212,7 @@ struct AccountSecurityView: View {
             }.padding(18).frame(maxWidth: .infinity, alignment: .leading).panel()
         }
         .sheet(isPresented: $showApproval) { QRApprovalView() }
+        .task { deviceUnlockAvailable = DeviceUnlock.isAvailable() }
         .task {
             guard !model.fixtures else { return }
             while !Task.isCancelled {
