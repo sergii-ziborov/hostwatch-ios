@@ -16,6 +16,9 @@ final class AppModel: ObservableObject {
     @Published var overview: Overview?
     @Published var sites: [Site] = []
     @Published var dataServices: [DataService] = []
+    @Published var dataFiles: [DataFile] = []
+    @Published var dataServicesScannedAt: String?
+    @Published var dataServicesScanError: String?
     @Published var dataServicesError: String?
     @Published var history: [SystemPoint] = []
     @Published var traffic: [TrafficPoint] = []
@@ -190,7 +193,7 @@ final class AppModel: ObservableObject {
 
     private func clearPrivateData() {
         liveTask?.cancel(); liveTask = nil
-        overview = nil; sites = []; dataServices = []; history = []; traffic = []
+        overview = nil; sites = []; dataServices = []; dataFiles = []; dataServicesScannedAt = nil; dataServicesScanError = nil; dataServicesError = nil; history = []; traffic = []
         requests = []; errorEvidence = nil; paths = []; storage = nil; storageBrowse = nil
         storageError = nil; cleanupPreview = nil; cleanupError = nil; cleanupNotice = nil
         projects = []; jobs = []; members = []; license = nil; environment = nil
@@ -283,10 +286,17 @@ final class AppModel: ObservableObject {
 
     private func loadDataServices() async {
         do {
-            dataServices = try await client.dataServices()
+            let inventory = try await client.dataServices()
+            dataServices = inventory.services
+            dataFiles = inventory.files
+            dataServicesScannedAt = inventory.scannedAt
+            dataServicesScanError = inventory.scanError
             dataServicesError = nil
         } catch {
             dataServices = []
+            dataFiles = []
+            dataServicesScannedAt = nil
+            dataServicesScanError = nil
             dataServicesError = error.localizedDescription
         }
     }

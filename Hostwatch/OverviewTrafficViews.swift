@@ -124,28 +124,40 @@ struct ResourceDetailView: View {
 struct ResourceTimelineCard: View {
     @EnvironmentObject private var model: AppModel
     var focus: ResourceKind? = nil
+    private var samples: [(date: Date, point: SystemPoint)] {
+        model.history.compactMap { point in ChartTime.parse(point.time).map { (date: $0, point: point) } }
+    }
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack { VStack(alignment: .leading) { Eyebrow(text: "Last \(model.hours) hours"); Text(focus.map { "\($0.rawValue) history" } ?? "CPU & memory").font(.title3.bold()) }; Spacer(); Text("Host samples").font(.caption).foregroundStyle(HW.secondary) }
-            if model.history.isEmpty {
+            if samples.isEmpty {
                 EmptyState(icon: "chart.xyaxis.line", title: "No host history", detail: "Samples will appear after the collector records host metrics.")
             } else {
-                Chart(Array(model.history.enumerated()), id: \.offset) { index, point in
+                Chart(samples, id: \.point.id) { sample in
                     if focus == nil || focus == .cpu {
-                        LineMark(x: .value("Interval", index), y: .value("CPU %", point.cpuPercent), series: .value("Metric", "CPU"))
+                        LineMark(x: .value("Time", sample.date), y: .value("CPU %", sample.point.cpuPercent), series: .value("Metric", "CPU"))
                             .foregroundStyle(HW.teal).interpolationMethod(.catmullRom)
                     }
                     if focus == nil || focus == .memory {
-                        LineMark(x: .value("Interval", index), y: .value("Memory %", point.memoryBytes / max(1, model.overview?.memory.total ?? 1) * 100), series: .value("Metric", "Memory"))
+                        LineMark(x: .value("Time", sample.date), y: .value("Memory %", sample.point.memoryBytes / max(1, model.overview?.memory.total ?? 1) * 100), series: .value("Metric", "Memory"))
                             .foregroundStyle(HW.amber).interpolationMethod(.catmullRom)
                     }
                     if focus == .network {
-                        LineMark(x: .value("Interval", index), y: .value("Egress KB/s", point.txBytesPerSecond / 1024), series: .value("Metric", "Egress"))
+                        LineMark(x: .value("Time", sample.date), y: .value("Egress KB/s", sample.point.txBytesPerSecond / 1024), series: .value("Metric", "Egress"))
                             .foregroundStyle(HW.teal).interpolationMethod(.catmullRom)
                     }
                 }
                 .chartYScale(domain: focus == .network ? 0...max(1, (model.history.map(\.txBytesPerSecond).max() ?? 1024) / 1024 * 1.15) : 0...100)
+                .chartXAxis {
+                    AxisMarks(values: .automatic(desiredCount: 4)) { _ in
+                        AxisGridLine(); AxisTick(); AxisValueLabel(format: .dateTime.hour().minute())
+                    }
+                }
                 .frame(height: 220)
+                if let first = samples.first?.date, let last = samples.last?.date {
+                    Text("Time · \(ChartTime.range(first, last))")
+                        .font(.caption2).foregroundStyle(HW.secondary)
+                }
                 HStack(spacing: 14) {
                     if focus != .memory { Label(focus == .network ? "Egress KB/s" : "CPU %", systemImage: "line.diagonal").foregroundStyle(HW.teal) }
                     if focus == nil || focus == .memory { Label("Memory %", systemImage: "line.diagonal").foregroundStyle(HW.amber) }
@@ -158,6 +170,7 @@ struct ResourceTimelineCard: View {
 
 struct DataServicesView: View {
     @EnvironmentObject private var model: AppModel
+    private var currentFiles: [DataFile] { model.dataFiles.filter { !$0.backup } }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -167,16 +180,21 @@ struct DataServicesView: View {
                     Text("Databases, caches & queues").font(.title3.bold())
                 }
                 Spacer()
-                Text("\(model.dataServices.count)").font(.headline.monospacedDigit()).foregroundStyle(HW.teal)
+                Text("\(model.dataServices.count) services · \(model.dataFiles.count) files")
+                    .font(.caption.bold()).foregroundStyle(HW.teal).multilineTextAlignment(.trailing)
             }
             if let error = model.dataServicesError {
                 Label("Service inventory unavailable: \(error)", systemImage: "exclamationmark.triangle")
                     .font(.footnote).foregroundStyle(HW.amber)
-            } else if model.dataServices.isEmpty {
-                Text("No containerized data service detected. Remote and managed databases need an exporter or agent endpoint for query, connection and cache metrics.")
+            } else if model.dataServices.isEmpty && model.dataFiles.isEmpty {
+                Text("No database container or data file was detected on scanned application mounts. Remote and managed databases need an exporter for query and connection metrics.")
                     .font(.footnote).foregroundStyle(HW.secondary)
             } else {
-                ForEach(model.dataServices) { service in
+                if model.dataServices.isEmpty {
+                    Text("No dedicated database container detected; the application data files below are real disk evidence, not live database load metrics.")
+                        .font(.footnote).foregroundStyle(HW.secondary)
+                }
+                ForEach(model.dataServices.prefix(3)) { service in
                     NavigationLink { DataServiceDetailView(service: service) } label: {
                         HStack(spacing: 12) {
                             Image(systemName: service.type.lowercased().contains("redis") || service.role.lowercased().contains("cache") ? "memorychip" : "cylinder.split.1x2")
@@ -200,12 +218,107 @@ struct DataServicesView: View {
                     }
                     .buttonStyle(.plain)
                 }
+                ForEach(currentFiles.prefix(4)) { file in
+                    NavigationLink { DataFileDetailView(file: file) } label: { DataFileRow(file: file) }
+                        .buttonStyle(.plain)
+                }
+                if !model.dataFiles.isEmpty || model.dataServices.count > 3 {
+                    NavigationLink { DataInventoryView() } label: {
+                        Label("See all services and data files", systemImage: "list.bullet.rectangle")
+                            .font(.subheadline.bold()).frame(maxWidth: .infinity, alignment: .leading)
+                    }.buttonStyle(.bordered)
+                }
             }
-            Text("Container CPU and memory are live. Network counters cover the container lifetime.")
+            if let scanError = model.dataServicesScanError, !scanError.isEmpty {
+                Label("File scan incomplete: \(scanError)", systemImage: "exclamationmark.triangle")
+                    .font(.caption).foregroundStyle(HW.amber)
+            }
+            Text("Container CPU and memory are live. File sizes are disk evidence; query rate and cache hit ratio are not collected.")
                 .font(.caption2).foregroundStyle(HW.secondary)
         }
         .padding(16)
         .panel()
+    }
+}
+
+private struct DataFileRow: View {
+    let file: DataFile
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: file.type.lowercased().contains("cache") ? "archivebox" : "externaldrive")
+                .foregroundStyle(HW.teal).frame(width: 28)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(file.siteName ?? "Host & shared runtime").font(.subheadline.bold())
+                Text(file.type).font(.caption).foregroundStyle(HW.secondary)
+                Text(file.path).font(.caption2.monospaced()).foregroundStyle(HW.secondary)
+                    .lineLimit(1).truncationMode(.middle)
+            }
+            Spacer(minLength: 4)
+            Text(Format.bytes(file.sizeBytes)).font(.caption.bold())
+            Image(systemName: "chevron.right").font(.caption2).foregroundStyle(HW.secondary)
+        }
+        .padding(12).background(HW.panelRaised).clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+}
+
+struct DataInventoryView: View {
+    @EnvironmentObject private var model: AppModel
+    private var files: [DataFile] { model.dataFiles.filter { !$0.backup } }
+    private var storedCopies: [DataFile] { model.dataFiles.filter(\.backup) }
+    var body: some View {
+        List {
+            Section("Running database, cache and queue containers · \(model.dataServices.count)") {
+                ForEach(model.dataServices) { service in
+                    NavigationLink { DataServiceDetailView(service: service) } label: {
+                        LabeledContent(service.siteName ?? "Host & shared", value: "\(service.type) · \(Format.bytes(service.container.memoryBytes))")
+                    }
+                }
+                if model.dataServices.isEmpty { Text("No dedicated data-service container detected.").foregroundStyle(HW.secondary) }
+            }
+            Section("Data files on application mounts · \(files.count)") {
+                ForEach(files) { file in NavigationLink { DataFileDetailView(file: file) } label: { DataFileRow(file: file) } }
+            }
+            if !storedCopies.isEmpty {
+                Section("Stored copies and failed imports · \(storedCopies.count)") {
+                    ForEach(storedCopies) { file in NavigationLink { DataFileDetailView(file: file) } label: { DataFileRow(file: file) } }
+                }
+            }
+            Section("Coverage") {
+                Text("Scanned at: \(model.dataServicesScannedAt.flatMap(ChartTime.parse).map { $0.formatted(date: .abbreviated, time: .shortened) } ?? "Not reported")")
+                Text("Files are detected by name and size on running container mounts. A file may exist without an open database connection. Remote databases and query load require a dedicated exporter.")
+                    .foregroundStyle(HW.secondary)
+                if let error = model.dataServicesScanError { Text("Scan issue: \(error)").foregroundStyle(HW.amber) }
+            }
+        }
+        .scrollContentBackground(.hidden).background(HW.background)
+        .navigationTitle("Data inventory")
+    }
+}
+
+struct DataFileDetailView: View {
+    @EnvironmentObject private var model: AppModel
+    let file: DataFile
+    private var site: Site? { model.sites.first { $0.id == file.siteId } }
+    var body: some View {
+        List {
+            Section("Observed file") {
+                LabeledContent("Project", value: file.siteName ?? "Host & shared runtime")
+                LabeledContent("Type", value: file.type)
+                LabeledContent("Size", value: Format.bytes(file.sizeBytes))
+                LabeledContent("Container", value: file.container ?? "Not reported")
+                LabeledContent("Modified", value: ChartTime.parse(file.modifiedAt)?.formatted(date: .abbreviated, time: .shortened) ?? file.modifiedAt)
+                LabeledContent("Stored copy", value: file.backup ? "Yes" : "No")
+                Text(file.path).font(.footnote.monospaced()).textSelection(.enabled)
+            }
+            Section("Measurement") {
+                Text("This is a file discovered on disk. Its size does not tell us whether the database is open or how many queries it serves. Query rate, active connections and cache hits need database metrics.")
+                    .foregroundStyle(HW.secondary)
+            }
+            if let site { Section { NavigationLink("Open \(site.name) workload") { WorkloadDetailView(site: site) } } }
+        }
+        .scrollContentBackground(.hidden).background(HW.background)
+        .navigationTitle(file.type)
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 
@@ -381,17 +494,38 @@ struct TrafficView: View {
 
 struct TrafficChart: View {
     @EnvironmentObject private var model: AppModel
+    private var samples: [(date: Date, point: TrafficPoint)] {
+        model.traffic.compactMap { point in ChartTime.parse(point.time).map { (date: $0, point: point) } }
+    }
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack { VStack(alignment: .leading) { Eyebrow(text: "HTTP traffic · last \(model.hours)h"); Text("Request volume").font(.title2.bold()); Text("Tap Requests or Errors below for complete evidence.").font(.caption).foregroundStyle(HW.secondary) }; Spacer(); Text(model.traffic.reduce(0) { $0 + Int($1.requests) }.formatted()).font(.title3.bold()) }
-            Chart(Array(model.traffic.enumerated()), id: \.offset) { index, point in
-                AreaMark(x: .value("Interval", index), y: .value("Requests", point.requests), series: .value("Metric", "Requests"))
+            HStack { VStack(alignment: .leading) { Eyebrow(text: "HTTP traffic · last \(model.hours)h"); Text("Request volume").font(.title2.bold()); Text("Each point is a five-minute interval. Tap Requests or Errors below for evidence.").font(.caption).foregroundStyle(HW.secondary) }; Spacer(); Text(model.traffic.reduce(0) { $0 + Int($1.requests) }.formatted()).font(.title3.bold()) }
+            if samples.isEmpty {
+                EmptyState(icon: "chart.xyaxis.line", title: "No traffic history", detail: "Request samples will appear after the collector records HTTP traffic.")
+            } else {
+            Chart(samples, id: \.point.id) { sample in
+                AreaMark(x: .value("Time", sample.date), y: .value("Requests", sample.point.requests), series: .value("Metric", "Requests"))
                     .foregroundStyle(LinearGradient(colors: [HW.teal.opacity(0.34), .clear], startPoint: .top, endPoint: .bottom))
-                LineMark(x: .value("Interval", index), y: .value("Requests", point.requests), series: .value("Metric", "Requests"))
+                LineMark(x: .value("Time", sample.date), y: .value("Requests", sample.point.requests), series: .value("Metric", "Requests"))
                     .foregroundStyle(HW.teal).interpolationMethod(.catmullRom)
-                LineMark(x: .value("Interval", index), y: .value("Errors", point.errors4xx + point.errors5xx), series: .value("Metric", "Errors"))
+                LineMark(x: .value("Time", sample.date), y: .value("Errors", sample.point.errors4xx + sample.point.errors5xx), series: .value("Metric", "Errors"))
                     .foregroundStyle(HW.amber)
-            }.frame(height: 280)
+            }
+            .chartXAxis {
+                AxisMarks(values: .automatic(desiredCount: 4)) { _ in
+                    AxisGridLine(); AxisTick(); AxisValueLabel(format: .dateTime.hour().minute())
+                }
+            }
+            .frame(height: 280)
+            if let first = samples.first?.date, let last = samples.last?.date {
+                Text("Time · \(ChartTime.range(first, last))")
+                    .font(.caption2).foregroundStyle(HW.secondary)
+            }
+            HStack(spacing: 14) {
+                Label("Requests / 5 min", systemImage: "line.diagonal").foregroundStyle(HW.teal)
+                Label("Errors / 5 min", systemImage: "line.diagonal").foregroundStyle(HW.amber)
+            }.font(.caption)
+            }
         }.padding(18).panel()
     }
 }
@@ -449,10 +583,11 @@ struct RequestExplorerView: View {
 
 struct RequestRow: View {
     let request: RequestSample
+    private var unparsed: Bool { request.method == "UNKNOWN" && !RequestEvidence.usableHost(request.host) }
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
-            HStack { Text(request.method).font(.caption.bold()).foregroundStyle(HW.teal); Text(request.path).font(.system(.body, design: .monospaced, weight: .semibold)).lineLimit(1); Spacer(); Text(String(request.status)).foregroundStyle(request.status >= 400 ? HW.red : HW.teal).bold() }
-            Text("\(request.host) · \(request.clientIp) · \(request.city ?? request.country) · \(request.durationMs.formatted()) ms").font(.caption).foregroundStyle(HW.secondary).lineLimit(1)
+            HStack { Text(unparsed ? "UNPARSED" : request.method).font(.caption.bold()).foregroundStyle(unparsed ? HW.amber : HW.teal); Text(unparsed ? "Request target unavailable" : request.path).font(.system(.body, design: .monospaced, weight: .semibold)).lineLimit(1); Spacer(); Text(String(request.status)).foregroundStyle(request.status >= 400 ? HW.red : HW.teal).bold() }
+            Text("\(unparsed ? "Unmapped host" : request.host) · \(request.clientIp) · \(request.city ?? request.country) · \(request.durationMs.formatted()) ms").font(.caption).foregroundStyle(HW.secondary).lineLimit(1)
         }.padding(.vertical, 5)
     }
 }
@@ -461,18 +596,34 @@ struct RequestDetailView: View {
     @EnvironmentObject private var model: AppModel
     let request: RequestSample
     @State private var confirmBlock = false
+    private var mappedSite: Site? { model.sites.first { $0.id == request.site } }
+    private var hasObservedHost: Bool { RequestEvidence.usableHost(request.host) }
+    private var observedPath: String {
+        request.method == "UNKNOWN" && !hasObservedHost && request.path == "/"
+            ? "Not recorded (older collector used / as fallback)" : request.path
+    }
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 Eyebrow(text: "Individual HTTP request")
-                Text("\(request.method) \(request.path)").font(.system(.title2, design: .rounded, weight: .bold)).textSelection(.enabled)
-                Text("\(request.time) · \(request.host)").foregroundStyle(HW.secondary)
+                Text(request.method == "UNKNOWN" ? "Unparsed HTTP request" : "\(request.method) \(request.path)")
+                    .font(.system(.title2, design: .rounded, weight: .bold)).textSelection(.enabled)
+                Text("\(ChartTime.parse(request.time)?.formatted(date: .abbreviated, time: .standard) ?? request.time) · \(hasObservedHost ? request.host : "unmapped host")")
+                    .foregroundStyle(HW.secondary)
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 210))], spacing: 12) {
                     StatCard(title: "Response", value: "\(request.status) \(HTTPURLResponse.localizedString(forStatusCode: request.status).capitalized)", detail: "\(request.durationMs.formatted()) ms · \(Format.bytes(request.bytes))", color: request.status >= 400 ? HW.red : HW.teal, icon: "arrow.left.arrow.right")
                     StatCard(title: "Client", value: request.clientIp, detail: "\(request.city ?? "Unknown"), \(request.country)", icon: "network")
                     StatCard(title: "Attribution", value: request.source, detail: request.referrerPath ?? "No usable referrer or UTM source", color: HW.amber, icon: "arrow.triangle.branch")
                     StatCard(title: "Agent", value: request.bot ?? "Browser / service", detail: request.userAgent, icon: "person.text.rectangle")
                 }
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(request.status >= 400 ? "What this error tells us" : "Observed destination")
+                        .font(.headline)
+                    Text(RequestEvidence.diagnosis(status: request.status, host: request.host, method: request.method, path: request.path, upstream: request.upstreamAddr))
+                        .font(.subheadline).foregroundStyle(request.status >= 400 ? HW.amber : HW.secondary)
+                    Text("Project: \(siteName) · target: \(observedPath) · upstream: \(request.upstreamAddr.flatMap { $0 == "-" ? nil : $0 } ?? "not recorded")")
+                        .font(.caption.monospaced()).foregroundStyle(HW.secondary).textSelection(.enabled)
+                }.padding(16).frame(maxWidth: .infinity, alignment: .leading).panel()
                 trace
                 if let destinationURL {
                     Link(destination: destinationURL) { Label("Open destination in browser", systemImage: "arrow.up.right.square") }
@@ -480,7 +631,10 @@ struct RequestDetailView: View {
                     Text("Opens outside Hostwatch. Query strings are not retained, and a fresh response may differ from the recorded request.")
                         .font(.caption).foregroundStyle(HW.secondary)
                 }
-                if IPAddressSafety.isInternal(request.clientIp) || request.internalRequest == true {
+                if mappedSite == nil {
+                    Label("This request is not mapped to a project, so a project-scoped IP rule cannot be created here.", systemImage: "questionmark.shield")
+                        .font(.footnote).foregroundStyle(HW.amber)
+                } else if IPAddressSafety.isInternal(request.clientIp) || request.internalRequest == true {
                     Label("Internal service address · blocking it may interrupt your applications", systemImage: "exclamationmark.shield")
                         .font(.footnote).foregroundStyle(HW.amber)
                 } else {
@@ -492,9 +646,9 @@ struct RequestDetailView: View {
             Button("Block IP", role: .destructive) { Task { await model.block(site: request.site, kind: "ip", value: request.clientIp) } }
         } message: { Text("A project-scoped access rule will be applied to \(siteName).") }
     }
-    private var siteName: String { model.sites.first(where: { $0.id == request.site })?.name ?? request.site }
+    private var siteName: String { mappedSite?.name ?? "Unmapped traffic" }
     private var destinationURL: URL? {
-        guard ["GET", "HEAD"].contains(request.method.uppercased()), !request.host.isEmpty else { return nil }
+        guard ["GET", "HEAD"].contains(request.method.uppercased()), hasObservedHost, request.path.hasPrefix("/") else { return nil }
         var components = URLComponents()
         components.scheme = request.scheme == "http" ? "http" : "https"
         components.host = request.host
@@ -503,10 +657,15 @@ struct RequestDetailView: View {
     }
     private var trace: some View {
         VStack(spacing: 0) {
-            traceRow("Request ID", request.id); traceRow("Destination", "\(request.scheme ?? "https")://\(request.host)\(request.path)")
+            traceRow("Request ID", request.id)
+            traceRow("Project", siteName)
+            traceRow("Destination", hasObservedHost && request.path.hasPrefix("/") ? "\(request.scheme ?? "https")://\(request.host)\(request.path)" : "Unmapped · target \(observedPath)")
+            traceRow("Recorded Host", hasObservedHost ? request.host : "\(request.host.isEmpty ? "Missing" : request.host) · fallback / unmapped")
+            traceRow("HTTP status", "\(request.status) \(HTTPURLResponse.localizedString(forStatusCode: request.status).capitalized)")
             traceRow("Protocol", [request.protocolName, request.tlsProtocol, request.tlsCipher].compactMap { $0 }.joined(separator: " · "))
             traceRow("Upstream", [request.upstreamAddr, request.upstreamStatus, request.upstreamMs.map { "\($0.formatted()) ms" }].compactMap { $0 }.joined(separator: " · "))
             traceRow("Cache", request.cacheStatus ?? "Not reported"); traceRow("Request bytes", request.requestBytes.map(Format.bytes) ?? "Not reported")
+            traceRow("Response bytes sent", Format.bytes(request.bytes))
             traceRow("User agent", request.userAgent)
         }.padding(.horizontal, 16).panel()
     }

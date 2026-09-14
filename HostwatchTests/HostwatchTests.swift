@@ -60,4 +60,30 @@ final class HostwatchTests: XCTestCase {
         XCTAssertEqual(snapshot.remotePorts.first?.protocolName, "TCP")
         XCTAssertEqual(snapshot.tcpConnections, 2)
     }
+
+    func testDataInventoryDecodesServicesAndObservedFiles() throws {
+        let payload = Data("""
+        {"services":[],"files":[{"path":"/srv/data/app/app.sqlite3","type":"SQLite database","siteId":"app","siteName":"App","container":"app-1","sizeBytes":1048576,"modifiedAt":"2026-09-14T08:45:00Z","backup":false}],"dockerHealthy":true,"scannedAt":"2026-09-14T08:46:00Z"}
+        """.utf8)
+        let inventory = try JSONDecoder().decode(DataServicesResponse.self, from: payload)
+        XCTAssertEqual(inventory.services.count, 0)
+        XCTAssertEqual(inventory.files.first?.siteName, "App")
+        XCTAssertEqual(inventory.files.first?.sizeBytes, 1_048_576)
+    }
+
+    func testChartTimeUsesTimestampsAndAcceptsFractionalSeconds() {
+        guard let start = ChartTime.parse("2026-09-13T08:00:00Z"),
+              let end = ChartTime.parse("2026-09-13T08:05:00.123Z") else {
+            XCTFail("Expected ISO timestamps to parse")
+            return
+        }
+        XCTAssertEqual(end.timeIntervalSince(start), 300.123, accuracy: 0.001)
+    }
+
+    func testUnmappedNginxHostIsNotAnOpenableDestination() {
+        XCTAssertFalse(RequestEvidence.usableHost("_"))
+        XCTAssertFalse(RequestEvidence.usableHost("localhost"))
+        XCTAssertTrue(RequestEvidence.usableHost("api.kablay.us"))
+        XCTAssertTrue(RequestEvidence.diagnosis(status: 400, host: "_", method: "UNKNOWN", path: "/", upstream: nil).contains("No application or destination page"))
+    }
 }

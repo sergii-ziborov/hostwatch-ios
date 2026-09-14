@@ -132,6 +132,44 @@ struct DataService: Codable, Identifiable {
     let container: ContainerInfo
 }
 
+struct DataFile: Decodable, Identifiable {
+    var id: String { path }
+    let path: String
+    let type: String
+    let siteId: String?
+    let siteName: String?
+    let container: String?
+    let sizeBytes: Double
+    let modifiedAt: String
+    let backup: Bool
+}
+
+struct DataServicesResponse: Decodable {
+    let services: [DataService]
+    let files: [DataFile]
+    let dockerHealthy: Bool
+    let scannedAt: String
+    let scanError: String?
+
+    // Older node agents returned a bare service array. Keep their inventory
+    // readable while accepting the current response with discovered data files.
+    init(from decoder: Decoder) throws {
+        if let legacy = try? [DataService](from: decoder) {
+            services = legacy; files = []; dockerHealthy = true; scannedAt = ""
+            scanError = "This node agent does not report database files yet."
+            return
+        }
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        services = try values.decode([DataService].self, forKey: .services)
+        files = try values.decode([DataFile].self, forKey: .files)
+        dockerHealthy = try values.decode(Bool.self, forKey: .dockerHealthy)
+        scannedAt = try values.decode(String.self, forKey: .scannedAt)
+        scanError = try values.decodeIfPresent(String.self, forKey: .scanError)
+    }
+
+    private enum CodingKeys: String, CodingKey { case services, files, dockerHealthy, scannedAt, scanError }
+}
+
 struct Site: Codable, Identifiable, Hashable {
     let id: String; let name: String; let domains: [String]; let sharedNginx: Bool; let containers: [ContainerInfo]
     let cpuPercent: Double; let memoryBytes: Double; let memoryLimit: Double; let requestsPerMinute: Double; let bytesPerMinute: Double; let errorRate: Double; let p95Ms: Double

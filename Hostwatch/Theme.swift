@@ -87,6 +87,23 @@ enum Format {
     }
 }
 
+enum ChartTime {
+    private static let plain = ISO8601DateFormatter()
+    private static let fractional: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+
+    static func parse(_ value: String) -> Date? {
+        fractional.date(from: value) ?? plain.date(from: value)
+    }
+
+    static func range(_ first: Date, _ last: Date) -> String {
+        "\(first.formatted(.dateTime.month(.abbreviated).day().hour().minute())) – \(last.formatted(.dateTime.month(.abbreviated).day().hour().minute())) · device time"
+    }
+}
+
 enum IPAddressSafety {
     static func isInternal(_ address: String) -> Bool {
         let parts = address.split(separator: ".").compactMap { UInt8($0) }
@@ -98,5 +115,35 @@ enum IPAddressSafety {
         }
         let lower = address.lowercased()
         return lower == "::1" || lower.hasPrefix("fc") || lower.hasPrefix("fd") || lower.hasPrefix("fe8") || lower.hasPrefix("fe9") || lower.hasPrefix("fea") || lower.hasPrefix("feb")
+    }
+}
+
+enum RequestEvidence {
+    static func usableHost(_ host: String) -> Bool {
+        let value = host.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        if value.isEmpty || value == "_" || value == "-" || value == "localhost" || IPAddressSafety.isInternal(value) { return false }
+        let labels = value.split(separator: ".", omittingEmptySubsequences: false)
+        return labels.count >= 2 && labels.allSatisfy { label in
+            !label.isEmpty && label.count <= 63 && label.first != "-" && label.last != "-" &&
+                label.unicodeScalars.allSatisfy { CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyz0123456789-").contains($0) }
+        }
+    }
+
+    static func diagnosis(status: Int, host: String, method: String, path: String, upstream: String?) -> String {
+        if status == 400 && method == "UNKNOWN" && !usableHost(host) && (path == "/" || !path.hasPrefix("/")) {
+            return "Nginx rejected a request with no parsed HTTP method or usable Host. No application or destination page is identified. For older samples, “/” may be a collector fallback rather than a requested page. The incoming bytes and exact parser error were not retained."
+        }
+        if !usableHost(host) {
+            return "The recorded host is “\(host.isEmpty ? "missing" : host)”, not a usable website domain. Nginx could not associate this request with a configured site; no destination URL can be reconstructed."
+        }
+        switch status {
+        case 400: return "Bad Request: the proxy rejected this HTTP request. The exact parser reason is not retained; correlate the request ID and time with the Nginx error log."
+        case 404: return "Not Found: the requested path did not resolve on the observed host. Check the route and upstream application logs."
+        case 408: return "Request Timeout: the client did not complete the request in time."
+        case 499: return "Client Closed Request: the client disconnected before the server finished responding."
+        case 502...504 where upstream != nil: return "Gateway failure involving upstream \(upstream!). Correlate the upstream status, request ID and time with the application logs."
+        case 502...504: return "Gateway failure with no upstream address recorded. Check the proxy error log using the request ID and time."
+        default: return status >= 400 ? "HTTP error recorded. Response bodies are not collected; use the request ID, time and upstream details to find the exact cause in server logs." : "Request completed without an HTTP error."
+        }
     }
 }

@@ -7,10 +7,12 @@ Native SwiftUI control-plane client for Hostwatch. The iPhone and iPad app is in
 ## Product structure
 
 - **Overview** — host resources and capacity with resource drilldowns.
+- **Data inventory** — running data-service containers and observed database/cache files are shown separately. File size is disk evidence; query rate and cache hit ratio require a dedicated exporter.
 - **Cleanup** — preview and explicitly remove only old APT downloads, generated manual-page caches, and unused Docker build records. The disk inspector links to the same section. Actual filesystem space freed by Docker may be lower than its virtual cache size.
 - **Network** — the host Network card shows all interface ingress and egress and a live local/remote port socket snapshot. Port counts are not per-port byte totals.
 - **Two QR paths** — a signed-in app can approve a website sign-in under More → Account security → Approve a sign-in. To sign in to the app by QR, first sign in on the website with a password, then open Organization → Account security → Sign in on iPhone or iPad. The app's first sign-in defaults to email and password.
 - **Traffic** — requests, errors, destinations, sources, locations and retained evidence.
+- **Time and error evidence** — charts use local time on the horizontal axis. Unparsed Nginx requests with no usable Host are labeled as unmapped instead of inventing a website URL.
 - **Incidents & risks** — operational incidents, anomaly signals and vulnerabilities in separate tabs.
 - **Runtime topology** — a native SceneKit view of live project towers and node-to-project traffic. Drag to orbit, pinch or use controls to zoom, double tap to focus, and tap a tower or layer for a native inspector.
 - **Workloads** — project traffic, processes, storage, limits and controls.

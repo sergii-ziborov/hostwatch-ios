@@ -130,7 +130,7 @@ actor APIClient {
     func overview() async throws -> Overview { try await call("/api/v1/overview") }
     func networkPorts() async throws -> NetworkPorts { try await call("/api/v1/network-ports") }
     func sites() async throws -> [Site] { try await call("/api/v1/sites") }
-    func dataServices() async throws -> [DataService] { try await call("/api/v1/data-services") }
+    func dataServices() async throws -> DataServicesResponse { try await call("/api/v1/data-services") }
     func history(hours: Int) async throws -> [SystemPoint] { try await call("/api/v1/system-history?hours=\(hours)") }
     func traffic(site: String, hours: Int) async throws -> [TrafficPoint] { try await call("/api/v1/traffic?\(scope(site: site, hours: hours))") }
     func sources(site: String, hours: Int) async throws -> Sources { try await call("/api/v1/sources?\(scope(site: site, hours: hours))") }
