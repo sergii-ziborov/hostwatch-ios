@@ -482,6 +482,7 @@ struct TrafficView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             TrafficChart()
+            InternalTrafficSection()
             HStack(spacing: 12) {
                 NavigationLink { RequestExplorerView() } label: { StatCard(title: "Retained requests", value: model.requests.count.formatted(), detail: "IP, location, destination and full trace", icon: "list.bullet.rectangle") }
                 NavigationLink { ErrorExplorerView() } label: { StatCard(title: "Errors", value: historicalErrors.formatted(), detail: "Selected window · inspect status, path and evidence", color: HW.red, icon: "exclamationmark.triangle") }
@@ -499,7 +500,7 @@ struct TrafficChart: View {
     }
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack { VStack(alignment: .leading) { Eyebrow(text: "HTTP traffic · last \(model.hours)h"); Text("Request volume").font(.title2.bold()); Text("Each point is a five-minute interval. Tap Requests or Errors below for evidence.").font(.caption).foregroundStyle(HW.secondary) }; Spacer(); Text(model.traffic.reduce(0) { $0 + Int($1.requests) }.formatted()).font(.title3.bold()) }
+            HStack { VStack(alignment: .leading) { Eyebrow(text: "Nginx HTTP · last \(model.hours)h"); Text("Request volume").font(.title2.bold()); Text("Each point counts HTTP requests received by Nginx in five minutes, including internal calls. This is not host-wide network RPS.").font(.caption).foregroundStyle(HW.secondary) }; Spacer(); Text(model.traffic.reduce(0) { $0 + Int($1.requests) }.formatted()).font(.title3.bold()) }
             if samples.isEmpty {
                 EmptyState(icon: "chart.xyaxis.line", title: "No traffic history", detail: "Request samples will appear after the collector records HTTP traffic.")
             } else {
@@ -535,7 +536,9 @@ struct AttributionGrid: View {
     let columns = [GridItem(.adaptive(minimum: 245), spacing: 12)]
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Eyebrow(text: "Attribution"); Text("Where requests come from").font(.title2.bold())
+            Eyebrow(text: "HTTP attribution"); Text("Referrers & access groups").font(.title2.bold())
+            Text("Referer/UTM identifies a page or campaign, not the calling service. “Direct” only means no usable referrer was sent. These historical totals include internal Nginx calls.")
+                .font(.caption).foregroundStyle(HW.secondary)
             LazyVGrid(columns: columns, spacing: 12) {
                 metricGroup("Sources & referrers", items: model.sources.sources, kind: "source")
                 metricGroup("Countries", items: model.sources.countries, kind: "country")
@@ -558,6 +561,72 @@ struct AttributionGrid: View {
                 }.buttonStyle(.plain)
             }
         }.padding(16).frame(maxWidth: .infinity, minHeight: 230, alignment: .topLeading).panel()
+    }
+}
+
+struct InternalTrafficSection: View {
+    @EnvironmentObject private var model: AppModel
+    private var classified: Int { Int(model.sources.classifiedRequests ?? 0) }
+    private var total: Int { Int(model.sources.totalRequests ?? Double(model.traffic.reduce(0) { $0 + Int($1.requests) })) }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Eyebrow(text: "Nginx request split")
+            Text("Public clients & internal services").font(.title2.bold())
+            HStack(spacing: 10) {
+                StatCard(title: "External", value: Int(model.sources.externalRequests ?? 0).formatted(), detail: "Public client IP after forwarding", icon: "globe")
+                StatCard(title: "Internal", value: Int(model.sources.internalRequests ?? 0).formatted(), detail: "Private client IP · may include an unknown proxy", icon: "point.3.connected.trianglepath.dotted")
+            }
+            if total > classified {
+                Text("\((total - classified).formatted()) older Nginx requests have no internal/external classification. Service identity was not recorded then.")
+                    .font(.caption).foregroundStyle(HW.amber)
+            }
+            Text("Counts are Nginx HTTP entries for the selected window. Host network traffic and calls that bypass Nginx are separate; divide an interval count by 300 for its average requests/second.")
+                .font(.caption).foregroundStyle(HW.secondary)
+            if (model.sources.internalRoutes ?? []).isEmpty {
+                Text(classified == 0 ? "Internal service routes will appear after the upgraded collector receives requests." : "No internal calls reached Nginx in the classified interval.")
+                    .font(.caption).foregroundStyle(HW.secondary)
+            } else {
+                ForEach(model.sources.internalRoutes ?? []) { route in
+                    NavigationLink { InternalRouteDetail(route: route) } label: {
+                        VStack(alignment: .leading, spacing: 5) {
+                            HStack { Text(route.caller).font(.subheadline.bold()); Spacer(); Text(Int(route.requests).formatted()).bold() }
+                            Text("→ \(route.destinationHost)\(route.targetService.map { " · upstream \($0)" } ?? " · upstream unverified")")
+                                .font(.caption).foregroundStyle(HW.secondary)
+                            Text("\(Format.bytes(route.bytes)) · inspect retained requests →")
+                                .font(.caption2).foregroundStyle(HW.teal)
+                        }.padding(12).panel()
+                    }.buttonStyle(.plain)
+                }
+            }
+        }.padding(16).panel()
+    }
+}
+
+struct InternalRouteDetail: View {
+    @EnvironmentObject private var model: AppModel
+    let route: InternalRoute
+    private var matching: [RequestSample] {
+        model.requests.filter { row in
+            row.internalRequest == true && (row.clientService ?? "Unidentified private peer") == route.caller &&
+            row.host.lowercased() == route.destinationHost && (row.targetService ?? "") == (route.targetService ?? "")
+        }
+    }
+    var body: some View {
+        List {
+            Section("Observed at Nginx") {
+                LabeledContent("Caller", value: route.caller)
+                LabeledContent("Requested host", value: route.destinationHost)
+                LabeledContent("Upstream container", value: route.targetService ?? "Not identified from upstream address")
+                LabeledContent("Requests", value: Int(route.requests).formatted())
+                LabeledContent("Response bytes", value: Format.bytes(route.bytes))
+            }
+            Section("Evidence") {
+                Text("A Docker service is named only when the log IP uniquely matches a running container. Nginx does not observe direct container-to-container calls. Older or expired individual requests cannot be reconstructed.")
+                    .font(.footnote).foregroundStyle(HW.secondary)
+                ForEach(matching) { request in NavigationLink { RequestDetailView(request: request) } label: { RequestRow(request: request) } }
+                if matching.isEmpty { Text("No matching individual request remains in the bounded live buffer.").foregroundStyle(HW.secondary) }
+            }
+        }.scrollContentBackground(.hidden).background(HW.background).navigationTitle(route.caller)
     }
 }
 
@@ -587,7 +656,7 @@ struct RequestRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
             HStack { Text(unparsed ? "UNPARSED" : request.method).font(.caption.bold()).foregroundStyle(unparsed ? HW.amber : HW.teal); Text(unparsed ? "Request target unavailable" : request.path).font(.system(.body, design: .monospaced, weight: .semibold)).lineLimit(1); Spacer(); Text(String(request.status)).foregroundStyle(request.status >= 400 ? HW.red : HW.teal).bold() }
-            Text("\(unparsed ? "Unmapped host" : request.host) · \(request.clientIp) · \(request.city ?? request.country) · \(request.durationMs.formatted()) ms").font(.caption).foregroundStyle(HW.secondary).lineLimit(1)
+            Text("\(request.internalRequest == true ? (request.clientService ?? "Unknown private peer") : request.clientIp) → \(unparsed ? "Unmapped host" : request.host) · \(request.durationMs.formatted()) ms").font(.caption).foregroundStyle(HW.secondary).lineLimit(1)
         }.padding(.vertical, 5)
     }
 }
@@ -613,6 +682,7 @@ struct RequestDetailView: View {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 210))], spacing: 12) {
                     StatCard(title: "Response", value: "\(request.status) \(HTTPURLResponse.localizedString(forStatusCode: request.status).capitalized)", detail: "\(request.durationMs.formatted()) ms · \(Format.bytes(request.bytes))", color: request.status >= 400 ? HW.red : HW.teal, icon: "arrow.left.arrow.right")
                     StatCard(title: "Client", value: request.clientIp, detail: "\(request.city ?? "Unknown"), \(request.country)", icon: "network")
+                    if request.internalRequest == true { StatCard(title: "Calling service", value: request.clientService ?? "Unknown private peer", detail: "Docker IP match when available", icon: "point.3.connected.trianglepath.dotted") }
                     StatCard(title: "Attribution", value: request.source, detail: request.referrerPath ?? "No usable referrer or UTM source", color: HW.amber, icon: "arrow.triangle.branch")
                     StatCard(title: "Agent", value: request.bot ?? "Browser / service", detail: request.userAgent, icon: "person.text.rectangle")
                 }
@@ -659,6 +729,8 @@ struct RequestDetailView: View {
         VStack(spacing: 0) {
             traceRow("Request ID", request.id)
             traceRow("Project", siteName)
+            if request.internalRequest == true { traceRow("Calling service", request.clientService ?? "Unidentified private peer") }
+            traceRow("Upstream service", request.targetService ?? "Not identified")
             traceRow("Destination", hasObservedHost && request.path.hasPrefix("/") ? "\(request.scheme ?? "https")://\(request.host)\(request.path)" : "Unmapped · target \(observedPath)")
             traceRow("Recorded Host", hasObservedHost ? request.host : "\(request.host.isEmpty ? "Missing" : request.host) · fallback / unmapped")
             traceRow("HTTP status", "\(request.status) \(HTTPURLResponse.localizedString(forStatusCode: request.status).capitalized)")

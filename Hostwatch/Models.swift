@@ -180,6 +180,7 @@ struct Site: Codable, Identifiable, Hashable {
 struct TrafficPoint: Codable, Identifiable {
     var id: String { time }
     let time: String; let requests: Double; let bytes: Double; let errors4xx: Double; let errors5xx: Double; let averageMs: Double
+    var classifiedRequests: Double? = nil; var internalRequests: Double? = nil; var externalRequests: Double? = nil
 }
 struct SystemPoint: Codable, Identifiable {
     var id: String { time }
@@ -187,7 +188,16 @@ struct SystemPoint: Codable, Identifiable {
     let rxBytesPerSecond: Double; let txBytesPerSecond: Double; let rxPacketsPerSecond: Double; let txPacketsPerSecond: Double; let riskScore: Double
 }
 struct SourceMetric: Codable, Identifiable, Hashable { var id: String { name }; let name: String; let requests: Double; let bytes: Double }
-struct Sources: Codable { let windowHours: Int; let site: String?; let sources: [SourceMetric]; let countries: [SourceMetric]; let bots: [SourceMetric] }
+struct InternalRoute: Codable, Identifiable {
+    var id: String { "\(caller)|\(destinationHost)|\(targetService ?? "")" }
+    let caller: String; let destinationHost: String; let targetService: String?; let requests: Double; let bytes: Double
+}
+struct Sources: Codable {
+    let windowHours: Int; let site: String?; let sources: [SourceMetric]; let countries: [SourceMetric]; let bots: [SourceMetric]
+    var totalRequests: Double? = nil
+    var classifiedRequests: Double? = nil; var internalRequests: Double? = nil; var externalRequests: Double? = nil
+    var internalRoutes: [InternalRoute]? = nil
+}
 
 struct RequestPath: Codable, Identifiable, Hashable {
     var id: String { path }
@@ -200,10 +210,11 @@ struct RequestSample: Codable, Identifiable, Hashable {
     let bytes: Double; let requestBytes: Double?; let durationMs: Double; let scheme: String?; let protocolName: String?; let tlsProtocol: String?; let tlsCipher: String?
     let upstreamAddr: String?; let upstreamStatus: String?; let upstreamMs: Double?; let cacheStatus: String?
     let clientIp: String; let internalRequest: Bool?; let country: String; let countryCode: String; let region: String?; let city: String?; let latitude: Double?; let longitude: Double?
+    var clientService: String? = nil; var targetService: String? = nil
     let userAgent: String; let source: String; let referrerPath: String?; let bot: String?
 
     enum CodingKeys: String, CodingKey {
-        case id,time,site,host,method,path,status,bytes,requestBytes,durationMs,scheme,tlsProtocol,tlsCipher,upstreamAddr,upstreamStatus,upstreamMs,cacheStatus,clientIp,country,countryCode,region,city,latitude,longitude,userAgent,source,referrerPath,bot
+        case id,time,site,host,method,path,status,bytes,requestBytes,durationMs,scheme,tlsProtocol,tlsCipher,upstreamAddr,upstreamStatus,upstreamMs,cacheStatus,clientIp,clientService,targetService,country,countryCode,region,city,latitude,longitude,userAgent,source,referrerPath,bot
         case protocolName = "protocol"
         case internalRequest = "internal"
     }
