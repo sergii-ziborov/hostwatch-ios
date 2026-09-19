@@ -7,6 +7,8 @@ struct TopologySnapshot {
     let overview: Overview
     let sites: [Site]
     let projects: [ProjectHealth]
+    let routes: [InternalRoute]
+    let services: [DataService]
 }
 
 struct TopologyLayer {
@@ -57,7 +59,7 @@ enum TopologyMode: String, CaseIterable {
 }
 
 enum TopologyCameraAction {
-    case fit, zoomIn, zoomOut, top, isometric
+    case fit, zoomIn, zoomOut, top, isometric, focus, elevate
 }
 
 struct TopologyCommand {
@@ -70,8 +72,12 @@ struct NativeTopologyScene: UIViewRepresentable {
     let mode: TopologyMode
     let command: TopologyCommand
     @Binding var selection: TopologySelection?
+    @Binding var focusedSiteID: String?
+    @Binding var focusedRoad: String?
 
-    func makeCoordinator() -> Coordinator { Coordinator(selection: $selection) }
+    func makeCoordinator() -> Coordinator {
+        Coordinator(selection: $selection, focusedSiteID: $focusedSiteID, focusedRoad: $focusedRoad)
+    }
 
     func makeUIView(context: Context) -> SCNView {
         let view = SCNView(frame: .zero)
@@ -82,7 +88,7 @@ struct NativeTopologyScene: UIViewRepresentable {
         view.autoenablesDefaultLighting = false
         view.scene = SCNScene()
         view.isAccessibilityElement = true
-        view.accessibilityLabel = "Runtime towers. Drag to orbit, pinch to zoom, double tap a tower to focus, tap for details."
+        view.accessibilityLabel = "Runtime cyberboard. Drag to orbit, pinch to zoom, tap a tower to lock the camera, tap a road to highlight it, double tap empty space to reset."
 
         let pan = UIPanGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.pan(_:)))
         let pinch = UIPinchGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.pinch(_:)))
@@ -98,8 +104,11 @@ struct NativeTopologyScene: UIViewRepresentable {
 
     func updateUIView(_ view: SCNView, context: Context) {
         context.coordinator.selection = $selection
+        context.coordinator.focusedSiteID = $focusedSiteID
+        context.coordinator.focusedRoad = $focusedRoad
         view.rendersContinuously = mode == .traffic
         context.coordinator.render(snapshot: snapshot, mode: mode)
+        context.coordinator.applyHighlight()
         if context.coordinator.lastCommand != command.number {
             context.coordinator.lastCommand = command.number
             context.coordinator.apply(command.action)
@@ -109,17 +118,25 @@ struct NativeTopologyScene: UIViewRepresentable {
     final class Coordinator: NSObject {
         weak var view: SCNView?
         var selection: Binding<TopologySelection?>
+        var focusedSiteID: Binding<String?>
+        var focusedRoad: Binding<String?>
         var lastCommand = 0
         private var signature = ""
-        private var yaw: Float = 0.15
-        private var pitch: Float = 0.72
-        private var distance: Float = 17
-        private var fitDistance: Float = 17
-        private var target = SCNVector3(0, 1, 0)
+        private var yaw: Float = 0.42
+        private var pitch: Float = 0.78
+        private var distance: Float = 18
+        private var fitDistance: Float = 18
+        private var target = SCNVector3(0, 1.2, 0)
         private let camera = SCNNode()
         private var towerPositions: [String: SCNVector3] = [:]
+        private var towerHeights: [String: Float] = [:]
+        private var roads: [(from: String, to: String, kind: String, nodes: [SCNNode])] = []
 
-        init(selection: Binding<TopologySelection?>) { self.selection = selection }
+        init(selection: Binding<TopologySelection?>, focusedSiteID: Binding<String?>, focusedRoad: Binding<String?>) {
+            self.selection = selection
+            self.focusedSiteID = focusedSiteID
+            self.focusedRoad = focusedRoad
+        }
 
         func render(snapshot: TopologySnapshot, mode: TopologyMode) {
             guard let view, let scene = view.scene else { return }
@@ -127,13 +144,15 @@ struct NativeTopologyScene: UIViewRepresentable {
                 "\($0.id):\($0.requestsPerMinute):\($0.bytesPerMinute):\($0.errorRate):\($0.containers.map { "\($0.name):\($0.state):\($0.memoryBytes):\($0.cpuPercent)" }.joined(separator: ","))"
             }.joined(separator: "|") + snapshot.projects.map {
                 "\($0.id):\($0.completeness):\($0.graph?.nodes ?? 0):\($0.graph?.edges ?? 0):\($0.graph?.status ?? ""):\($0.vulnerabilities?.map(\.severity).joined(separator: ",") ?? ""):\($0.findings?.count ?? 0):\($0.git?.head ?? ""):\($0.git?.dirty == true)"
-            }.joined(separator: "|")
+            }.joined(separator: "|") + snapshot.routes.map { "\($0.caller)-\($0.targetService ?? $0.destinationHost):\($0.requests)" }.joined()
+                + snapshot.services.map(\.id).joined()
             guard signature != nextSignature else { return }
             signature = nextSignature
             scene.rootNode.childNodes.forEach { if $0 !== camera { $0.removeFromParentNode() } }
+            roads.removeAll()
             if camera.parent == nil {
                 let lens = SCNCamera()
-                lens.fieldOfView = 55
+                lens.fieldOfView = 52
                 lens.zNear = 0.05
                 lens.zFar = 250
                 camera.camera = lens
@@ -141,63 +160,126 @@ struct NativeTopologyScene: UIViewRepresentable {
                 view.pointOfView = camera
             }
             addLights(to: scene)
-            addFloor(to: scene, radius: max(8, Float(snapshot.sites.count) * 1.15))
-            let hub = SCNNode(geometry: SCNCylinder(radius: 0.62, height: 0.55))
-            hub.geometry?.firstMaterial = material(red: 0.13, green: 0.36, blue: 0.39, emission: 0.18)
-            hub.position = SCNVector3(0, 0.28, 3.4)
-            hub.name = "host"
-            scene.rootNode.addChildNode(hub)
-            addRing(at: SCNVector3(0, 0.04, 3.4), radius: 0.95, color: UIColor(red: 0.2, green: 0.78, blue: 0.72, alpha: 1), to: scene)
-            addLabel(snapshot.node.name, at: SCNVector3(0, 0.85, 3.4), to: scene)
+            addFloor(to: scene, radius: max(9, Float(snapshot.sites.count) * 1.2 + 2))
+
+            let hub = TopologyLayout.hubPosition()
+            let hubNode = SCNNode(geometry: SCNCylinder(radius: 0.62, height: 0.55))
+            hubNode.geometry?.firstMaterial = material(red: 0.13, green: 0.36, blue: 0.39, emission: 0.22)
+            hubNode.position = SCNVector3(hub.x, 0.28, hub.z)
+            hubNode.name = "host"
+            scene.rootNode.addChildNode(hubNode)
+            addRing(at: SCNVector3(hub.x, 0.04, hub.z), radius: 0.95, color: UIColor(red: 0.2, green: 0.78, blue: 0.72, alpha: 1), to: scene)
+            addLabel(snapshot.node.name, at: SCNVector3(hub.x, 0.85, hub.z), to: scene)
 
             let previousCount = towerPositions.count
             towerPositions.removeAll()
+            towerHeights.removeAll()
             let count = snapshot.sites.count
-            let columns = min(3, max(1, count))
-            let rows = Int(ceil(Double(count) / Double(columns)))
-            fitDistance = max(17, Float(rows) * 4.5)
-            if previousCount != count { distance = fitDistance; target = SCNVector3(0, 1, -1.2) }
+            let rows = Int(ceil(Double(count) / Double(TopologyLayout.columns(for: count))))
+            fitDistance = max(17, Float(rows) * 5.0 + Float(snapshot.services.count) * 0.5)
+            if previousCount != count { distance = fitDistance; target = SCNVector3(0, 1.2, 0) }
             let maxEgress = max(1, snapshot.sites.map(\.bytesPerMinute).max() ?? 1)
+            var bases: [String: TopologyPoint] = [:]
             for (index, site) in snapshot.sites.enumerated() {
-                let column = index % columns
-                let row = index / columns
-                let position = SCNVector3(Float(column) - Float(columns - 1) / 2, 0,
-                                          Float(row) - Float(rows - 1) / 2)
-                let placed = SCNVector3(position.x * 4.2, 0, position.z * 4.2 - 1.2)
-                let height = Float(1.8 + 4.1 * log1p(max(0, site.bytesPerMinute)) / log1p(maxEgress))
+                let placed = TopologyLayout.gridPosition(index: index, count: count)
+                let height = Float(1.9 + 4.2 * log1p(max(0, site.bytesPerMinute)) / log1p(maxEgress))
                 let project = snapshot.projects.first { $0.id == site.id }
+                bases[site.id] = placed
                 towerPositions[site.id] = SCNVector3(placed.x, height * 0.5, placed.z)
+                towerHeights[site.id] = height
+                addPlate(at: placed, to: scene)
                 addTower(site, project: project, position: placed, height: height, to: scene)
-                if mode == .traffic {
-                    addLink(from: SCNVector3(0, 0.4, 3.4), to: SCNVector3(placed.x, 0.5, placed.z),
-                            volume: site.requestsPerMinute, to: scene)
-                }
             }
+            towerPositions["host"] = SCNVector3(hub.x, 0.4, hub.z)
+            towerHeights["host"] = 0.8
+            let siteXs = bases.values.map(\.x) + [hub.x]
+            let siteZs = bases.values.map(\.z) + [hub.z]
+            for site in snapshot.sites {
+                guard let base = bases[site.id] else { continue }
+                addRoad(from: "host", to: site.id, start: hub, end: base, kind: .feeder,
+                        volume: max(10, site.requestsPerMinute), siteXs: siteXs, siteZs: siteZs, to: scene, animated: mode == .traffic)
+            }
+            addObservedRoads(snapshot.routes, bases: bases, siteXs: siteXs, siteZs: siteZs, to: scene, animated: mode == .traffic)
+            addExternalTowers(snapshot.services, bases: bases, siteXs: siteXs, siteZs: siteZs, to: scene, animated: mode == .traffic)
             updateCamera(animated: false)
+            applyHighlight()
         }
 
-        private func addTower(_ site: Site, project: ProjectHealth?, position: SCNVector3, height: Float, to scene: SCNScene) {
+        private func addPlate(at position: TopologyPoint, to scene: SCNScene) {
+            let plate = SCNNode(geometry: SCNBox(width: 3.2, height: 0.08, length: 3.2, chamferRadius: 0.04))
+            plate.geometry?.firstMaterial = material(red: 0.08, green: 0.16, blue: 0.2, emission: 0.08)
+            plate.position = SCNVector3(position.x, -0.02, position.z)
+            scene.rootNode.addChildNode(plate)
+        }
+
+        private func addObservedRoads(_ routes: [InternalRoute], bases: [String: TopologyPoint], siteXs: [Float], siteZs: [Float], to scene: SCNScene, animated: Bool) {
+            let ids = Set(bases.keys)
+            for route in routes {
+                let from = TopologyLayout.resolveSite(route.caller, in: ids)
+                let to = TopologyLayout.resolveSite(route.targetService ?? route.destinationHost, in: ids)
+                guard let from, let to, from != to, let start = bases[from], let end = bases[to] else { continue }
+                addRoad(from: from, to: to, start: start, end: end, kind: .call, volume: max(12, route.requests),
+                        siteXs: siteXs, siteZs: siteZs, to: scene, animated: animated)
+            }
+        }
+
+        private func addExternalTowers(_ services: [DataService], bases: [String: TopologyPoint], siteXs: [Float], siteZs: [Float], to scene: SCNScene, animated: Bool) {
+            let xs = bases.values.map(\.x)
+            let zs = bases.values.map(\.z)
+            for (index, service) in services.enumerated() {
+                let placed = TopologyLayout.externalPosition(index: index, count: services.count, siteXs: xs, siteZs: zs)
+                let cache = service.type.lowercased().contains("redis") || service.role.lowercased().contains("cache")
+                let color = cache ? UIColor(red: 0.85, green: 0.42, blue: 0.78, alpha: 1) : UIColor(red: 0.35, green: 0.82, blue: 0.62, alpha: 1)
+                let height: Float = 1.45
+                let pillar: SCNNode
+                if cache {
+                    pillar = SCNNode(geometry: SCNBox(width: 0.9, height: CGFloat(height), length: 0.9, chamferRadius: 0.04))
+                } else {
+                    pillar = SCNNode(geometry: SCNCylinder(radius: 0.42, height: CGFloat(height)))
+                }
+                pillar.geometry?.firstMaterial = material(color, emission: 0.32)
+                pillar.position = SCNVector3(placed.x, height / 2, placed.z)
+                pillar.name = "ext:\(service.id)"
+                scene.rootNode.addChildNode(pillar)
+                addRing(at: SCNVector3(placed.x, 0.04, placed.z), radius: 0.68, color: color, to: scene)
+                addLabel(service.type, at: SCNVector3(placed.x, height + 0.38, placed.z), to: scene)
+                towerPositions[pillar.name ?? service.id] = SCNVector3(placed.x, height * 0.5, placed.z)
+                towerHeights[pillar.name ?? service.id] = height
+                if let siteID = service.siteId, let base = bases[siteID] {
+                    addRoad(from: siteID, to: pillar.name ?? service.id, start: base, end: placed, kind: .io,
+                            volume: 18, siteXs: siteXs + [placed.x], siteZs: siteZs + [placed.z], to: scene, animated: animated)
+                }
+            }
+        }
+
+        private func addTower(_ site: Site, project: ProjectHealth?, position: TopologyPoint, height: Float, to scene: SCNScene) {
             let layers = TopologyLayer.layers(for: site, project: project)
             let layerHeight = height / Float(layers.count)
             for (index, layer) in layers.enumerated() {
-                let cylinder = SCNCylinder(radius: 0.55, height: CGFloat(max(0.2, layerHeight - 0.07)))
-                cylinder.radialSegmentCount = 28
-                cylinder.firstMaterial = material(layer.color, emission: 0.22)
-                let node = SCNNode(geometry: cylinder)
+                let slab = index > site.containers.count - 1 && !site.containers.isEmpty
+                let node: SCNNode
+                if slab {
+                    node = SCNNode(geometry: SCNBox(width: 1.05, height: CGFloat(max(0.18, layerHeight - 0.07)), length: 1.05, chamferRadius: 0.03))
+                } else {
+                    let cylinder = SCNCylinder(radius: 0.52, height: CGFloat(max(0.18, layerHeight - 0.07)))
+                    cylinder.radialSegmentCount = 28
+                    node = SCNNode(geometry: cylinder)
+                }
+                node.geometry?.firstMaterial = material(layer.color, emission: 0.24)
                 node.position = SCNVector3(position.x, layerHeight * (Float(index) + 0.5), position.z)
                 node.name = "site:\(site.id):\(index)"
                 scene.rootNode.addChildNode(node)
             }
-            addRing(at: SCNVector3(position.x, 0.04, position.z), radius: 0.82, color: layers.first?.color ?? .cyan, to: scene)
+            addRing(at: SCNVector3(position.x, 0.04, position.z), radius: 0.86, color: layers.first?.color ?? .cyan, to: scene)
             addLabel(site.name, at: SCNVector3(position.x, height + 0.42, position.z), to: scene)
-            let glow = SCNNode(geometry: SCNSphere(radius: 0.12))
+            let glow = SCNNode(geometry: SCNSphere(radius: 0.11))
             glow.geometry?.firstMaterial = material(layers.last?.color ?? .cyan, emission: 0.8)
-            glow.position = SCNVector3(position.x, height + 0.22, position.z)
+            glow.position = SCNVector3(position.x, height + 0.2, position.z)
             scene.rootNode.addChildNode(glow)
         }
 
         private func addFloor(to scene: SCNScene, radius: Float) {
-            let size = CGFloat(radius * 2.5)
+            let size = CGFloat(radius * 2.6)
             let floor = SCNNode(geometry: SCNPlane(width: size, height: size))
             floor.geometry?.firstMaterial = material(red: 0.035, green: 0.065, blue: 0.085)
             floor.eulerAngles.x = -.pi / 2
@@ -205,10 +287,10 @@ struct NativeTopologyScene: UIViewRepresentable {
             scene.rootNode.addChildNode(floor)
             for index in -10...10 {
                 let offset = Float(index) * radius / 8
-                addLink(from: SCNVector3(-radius * 1.2, -0.055, offset), to: SCNVector3(radius * 1.2, -0.055, offset),
-                        radius: 0.003, color: UIColor(red: 0.11, green: 0.24, blue: 0.28, alpha: 1), to: scene)
-                addLink(from: SCNVector3(offset, -0.055, -radius * 1.2), to: SCNVector3(offset, -0.055, radius * 1.2),
-                        radius: 0.003, color: UIColor(red: 0.11, green: 0.24, blue: 0.28, alpha: 1), to: scene)
+                addSegment(from: SCNVector3(-radius * 1.2, -0.055, offset), to: SCNVector3(radius * 1.2, -0.055, offset),
+                           radius: 0.003, color: UIColor(red: 0.11, green: 0.24, blue: 0.28, alpha: 1), name: nil, to: scene)
+                addSegment(from: SCNVector3(offset, -0.055, -radius * 1.2), to: SCNVector3(offset, -0.055, radius * 1.2),
+                           radius: 0.003, color: UIColor(red: 0.11, green: 0.24, blue: 0.28, alpha: 1), name: nil, to: scene)
             }
         }
 
@@ -221,7 +303,7 @@ struct NativeTopologyScene: UIViewRepresentable {
 
         private func addLabel(_ text: String, at position: SCNVector3, to scene: SCNScene) {
             let label = SCNText(string: text, extrusionDepth: 0)
-            label.font = UIFont.systemFont(ofSize: 0.48, weight: .semibold)
+            label.font = UIFont.systemFont(ofSize: 0.42, weight: .semibold)
             label.flatness = 0.04
             label.firstMaterial = material(red: 0.72, green: 0.82, blue: 0.86, emission: 0.25)
             let node = SCNNode(geometry: label)
@@ -252,6 +334,7 @@ struct NativeTopologyScene: UIViewRepresentable {
             result.emission.contents = color.withAlphaComponent(emission)
             result.lightingModel = .physicallyBased
             result.isDoubleSided = true
+            result.transparency = 1
             return result
         }
 
@@ -259,27 +342,74 @@ struct NativeTopologyScene: UIViewRepresentable {
             material(UIColor(red: red, green: green, blue: blue, alpha: 1), emission: emission)
         }
 
-        private func addLink(from start: SCNVector3, to end: SCNVector3, volume: Double, to scene: SCNScene) {
-            let color = UIColor(red: 0.25, green: 0.85, blue: 0.78, alpha: 1)
-            addLink(from: start, to: end, radius: CGFloat(min(0.065, 0.018 + max(0, volume) / 3_000)), color: color, to: scene)
-            guard volume > 0 else { return }
-            let packet = SCNNode(geometry: SCNSphere(radius: 0.08))
-            packet.geometry?.firstMaterial = material(color, emission: 0.85)
-            packet.position = start
-            scene.rootNode.addChildNode(packet)
-            let travel = SCNAction.move(to: end, duration: max(1.2, 4 - min(2.4, volume / 100)))
-            packet.runAction(.repeatForever(.sequence([travel, .move(to: start, duration: 0)])))
+        private func color(for kind: TopologyRoadKind) -> UIColor {
+            switch kind {
+            case .feeder: UIColor(red: 0.25, green: 0.85, blue: 0.78, alpha: 1)
+            case .call: UIColor(red: 1, green: 0.68, blue: 0.31, alpha: 1)
+            case .io: UIColor(red: 0.35, green: 0.82, blue: 0.62, alpha: 1)
+            }
         }
 
-        private func addLink(from start: SCNVector3, to end: SCNVector3, radius: CGFloat, color: UIColor, to scene: SCNScene) {
+        private func addRoad(from: String, to: String, start: TopologyPoint, end: TopologyPoint, kind: TopologyRoadKind,
+                             volume: Double, siteXs: [Float], siteZs: [Float], to scene: SCNScene, animated: Bool) {
+            let points = TopologyLayout.manhattan(from: start, to: end, siteXs: siteXs, siteZs: siteZs)
+            let color = color(for: kind)
+            let radius = CGFloat(min(0.07, 0.018 + max(0, volume) / 3_200))
+            var nodes: [SCNNode] = []
+            let vectors = points.map { SCNVector3($0.x, TopologyLayout.roadY, $0.z) }
+            for index in 1..<vectors.count {
+                let name = "road:\(from):\(to):\(kind.rawValue)"
+                nodes.append(addSegment(from: vectors[index - 1], to: vectors[index], radius: radius, color: color, name: name, to: scene))
+            }
+            roads.append((from, to, kind.rawValue, nodes))
+            guard animated, volume > 0, let first = vectors.first else { return }
+            let packet = SCNNode(geometry: SCNSphere(radius: 0.075))
+            packet.geometry?.firstMaterial = material(color, emission: 0.85)
+            packet.position = first
+            scene.rootNode.addChildNode(packet)
+            let slice = max(0.35, (4 - min(2.4, volume / 100)) / Double(max(1, vectors.count - 1)))
+            var actions = vectors.dropFirst().map { SCNAction.move(to: $0, duration: slice) }
+            actions.append(.move(to: first, duration: 0))
+            packet.runAction(.repeatForever(.sequence(actions)))
+        }
+
+        @discardableResult
+        private func addSegment(from start: SCNVector3, to end: SCNVector3, radius: CGFloat, color: UIColor, name: String?, to scene: SCNScene) -> SCNNode {
             let dx = end.x - start.x, dy = end.y - start.y, dz = end.z - start.z
             let length = sqrt(dx * dx + dy * dy + dz * dz)
-            guard length > 0 else { return }
-            let line = SCNNode(geometry: SCNCylinder(radius: radius, height: CGFloat(length)))
-            line.geometry?.firstMaterial = material(color, emission: 0.2)
+            let line = SCNNode(geometry: SCNCylinder(radius: radius, height: CGFloat(max(0.001, length))))
+            line.geometry?.firstMaterial = material(color, emission: 0.28)
             line.position = SCNVector3((start.x + end.x) / 2, (start.y + end.y) / 2, (start.z + end.z) / 2)
-            line.rotation = SCNVector4(-dz, 0, dx, acos(dy / length))
+            if length > 0 { line.rotation = SCNVector4(-dz, 0, dx, acos(min(1, max(-1, dy / length)))) }
+            line.name = name
             scene.rootNode.addChildNode(line)
+            return line
+        }
+
+        func applyHighlight() {
+            guard let scene = view?.scene else { return }
+            let focus = focusedSiteID.wrappedValue
+            let road = focusedRoad.wrappedValue
+            scene.rootNode.enumerateChildNodes { node, _ in
+                guard let name = node.name, let material = node.geometry?.firstMaterial else { return }
+                let connected: Bool
+                if let road, name.hasPrefix("road:") {
+                    connected = name == road
+                } else if let focus {
+                    if name.hasPrefix("road:") {
+                        connected = roads.contains { ($0.from == focus || $0.to == focus) && $0.nodes.contains(where: { $0 === node }) }
+                    } else if name.hasPrefix("site:") {
+                        connected = name.hasPrefix("site:\(focus):")
+                    } else if name.hasPrefix("ext:") {
+                        connected = name == focus || roads.contains { ($0.from == focus && $0.to == name) || ($0.to == focus && $0.from == name) }
+                    } else {
+                        connected = name == focus || (focus != "host" && name == "host" && roads.contains { $0.from == "host" && $0.to == focus })
+                    }
+                } else {
+                    connected = true
+                }
+                material.transparency = connected ? 1 : 0.22
+            }
         }
 
         private func updateCamera(animated: Bool) {
@@ -295,15 +425,38 @@ struct NativeTopologyScene: UIViewRepresentable {
         func apply(_ action: TopologyCameraAction) {
             switch action {
             case .fit:
-                target = SCNVector3(0, 1, -1.2)
+                target = SCNVector3(0, 1.2, 0)
                 distance = fitDistance
-                yaw = 0.15; pitch = 0.72
+                yaw = 0.42; pitch = 0.78
+                focusedSiteID.wrappedValue = nil
+                focusedRoad.wrappedValue = nil
+                applyHighlight()
             case .zoomIn: distance = max(3.4, distance * 0.76)
             case .zoomOut: distance = min(60, distance * 1.31)
             case .top: target = SCNVector3(0, 0, 0); pitch = 1.52
-            case .isometric: pitch = 0.72; yaw = 0.15
+            case .isometric: pitch = 0.78; yaw = 0.42
+            case .focus, .elevate:
+                if let id = focusedSiteID.wrappedValue, let point = towerPositions[id] {
+                    let height = towerHeights[id] ?? 2
+                    target = SCNVector3(point.x, action == .elevate ? height * 0.45 : point.y, point.z)
+                    distance = action == .elevate ? max(4.2, height * 0.9 + 3.2) : 6.2
+                    pitch = 0.82
+                }
             }
             updateCamera(animated: true)
+        }
+
+        private func lock(_ id: String, elevate: Bool) {
+            focusedSiteID.wrappedValue = id
+            focusedRoad.wrappedValue = nil
+            applyHighlight()
+            if let point = towerPositions[id] {
+                let height = towerHeights[id] ?? 2
+                target = SCNVector3(point.x, elevate ? height * 0.45 : point.y, point.z)
+                distance = elevate ? max(4.2, height * 0.9 + 3.2) : 6.2
+                pitch = 0.82
+                updateCamera(animated: true)
+            }
         }
 
         @objc func pan(_ gesture: UIPanGestureRecognizer) {
@@ -324,25 +477,32 @@ struct NativeTopologyScene: UIViewRepresentable {
         @objc func tap(_ gesture: UITapGestureRecognizer) {
             guard let view else { return }
             let location = gesture.location(in: view)
-            guard let hit = view.hitTest(location, options: [.firstFoundOnly: true]).first,
-                  let name = hit.node.name, name.hasPrefix("site:") else { return }
-            let parts = name.split(separator: ":")
-            guard parts.count == 3, let layer = Int(parts[2]) else { return }
-            selection.wrappedValue = TopologySelection(siteID: String(parts[1]), layer: layer)
+            guard let hit = view.hitTest(location, options: [.firstFoundOnly: true]).first, let name = hit.node.name else { return }
+            if name.hasPrefix("road:") {
+                focusedRoad.wrappedValue = name
+                let parts = name.split(separator: ":")
+                if parts.count >= 3 { focusedSiteID.wrappedValue = String(parts[1]) }
+                applyHighlight()
+                return
+            }
+            if name == "host" { lock("host", elevate: false); return }
+            if name.hasPrefix("ext:") { lock(name, elevate: false); return }
+            if name.hasPrefix("site:") {
+                let parts = name.split(separator: ":")
+                guard parts.count == 3 else { return }
+                lock(String(parts[1]), elevate: false)
+            }
         }
 
         @objc func doubleTap(_ gesture: UITapGestureRecognizer) {
             guard let view else { return }
             let location = gesture.location(in: view)
-            if let hit = view.hitTest(location, options: [.firstFoundOnly: true]).first,
-               let name = hit.node.name, name.hasPrefix("site:") {
-                let parts = name.split(separator: ":")
-                if parts.count == 3, let point = towerPositions[String(parts[1])] {
-                    target = point
-                    distance = 5.5
-                    updateCamera(animated: true)
-                    return
+            if let hit = view.hitTest(location, options: [.firstFoundOnly: true]).first, let name = hit.node.name {
+                if name.hasPrefix("site:") {
+                    let parts = name.split(separator: ":")
+                    if parts.count == 3 { lock(String(parts[1]), elevate: true); return }
                 }
+                if name.hasPrefix("ext:") || name == "host" { lock(name, elevate: true); return }
             }
             apply(.fit)
         }

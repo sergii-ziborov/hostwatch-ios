@@ -2,7 +2,7 @@
 
 Native SwiftUI control-plane client for Hostwatch. The iPhone and iPad app is intended for **public App Store distribution**, while access to a control plane is provisioned by an organization. It uses the same signed-in session and REST API as the web application. There is no public demo or registration flow.
 
-**Release status:** the App Store Connect record and public privacy declaration exist. Xcode Cloud builds the current branch, and Release builds for iPhone and iPad. A local development-signed build also succeeds, but the updated build cannot be installed on the paired iPhone 13 mini until that device becomes available to Xcode; an earlier build is installed there. Physical-device sign-in and Face ID have not yet been verified. An App Store distribution archive, TestFlight upload, authenticated screenshots and public release are still pending.
+**Release status:** the App Store Connect record and public privacy declaration exist. Xcode Cloud builds the current branch, and Release builds for iPhone and iPad. A Debug device build for the paired iPhone 13 mini (`iPhone s`) succeeds; the phone went offline before `devicectl` could install (CoreDevice 4016). Unlock the phone and install the signed `iphoneos` build from Xcode to replace the earlier on-device copy. Physical-device sign-in and Face ID have not yet been verified. An App Store distribution archive, TestFlight upload, authenticated screenshots and public release are still pending.
 
 ## Product structure
 
@@ -14,7 +14,8 @@ Native SwiftUI control-plane client for Hostwatch. The iPhone and iPad app is in
 - **Traffic** — requests, errors, destinations, sources, locations and retained evidence.
 - **Time and error evidence** — charts use local time on the horizontal axis. Unparsed Nginx requests with no usable Host are labeled as unmapped instead of inventing a website URL.
 - **Incidents & risks** — operational incidents, anomaly signals and vulnerabilities in separate tabs.
-- **Runtime topology** — a native SceneKit view of live project towers and node-to-project traffic. Drag to orbit, pinch or use controls to zoom, double tap to focus, and tap a tower or layer for a native inspector.
+- **Runtime topology** — a native SceneKit cyberboard: stacked runtime towers, always-on Manhattan roads (host feeders, observed Nginx calls, DB/cache I/O), perimeter data-service towers, and a TARGET LOCKED dossier. Drag orbits, pinch zooms the camera, tap locks a tower or highlights a road, double-tap elevates a pillar or resets. Opening the inspector is a dossier button, not a zoom sheet.
+- **Fleet** — hybrid edge/home peers, public IP change history, heartbeat freshness, admission (slots, disk, stale), and home load-scaling settings.
 - **Workloads** — project traffic, processes, storage, limits and controls.
 - **Traffic policies** — bandwidth, anomaly and IP/country access rules.
 - **Environment** — per-project environment variable management.
@@ -53,4 +54,10 @@ For App Store review and users, see the [privacy policy](PRIVACY.md) and [suppor
 
 ## App Store screenshots
 
-The old UI-development screenshots used fabricated telemetry and have been removed. These are real **Release simulator captures of the signed-out screen**: [iPhone](docs/screenshots/iphone-sign-in.png) (1284 × 2778) and [iPad](docs/screenshots/ipad-sign-in.png) (2064 × 2752). They do not claim to show traffic. The store listing still needs authenticated captures from a provisioned account with representative real control-plane data; screenshot fields remain incomplete until that review setup is ready.
+Store listing still needs authenticated captures from a provisioned account. Until then, Debug fixture captures (banner **SAMPLE DATA · DEBUG BUILD**) document the current cyberboard and fleet UI:
+
+- [Topology](docs/screenshots/iphone-topology.png) — towers, orthogonal roads, dossier HUD
+- [Fleet](docs/screenshots/iphone-fleet.png) — home heartbeat, IP change, admission
+- [Overview](docs/screenshots/iphone-overview.png) — host resources
+
+They are development previews, not App Store assets. Authenticated Release captures remain required before submission.

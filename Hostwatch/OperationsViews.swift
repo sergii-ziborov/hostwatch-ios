@@ -48,10 +48,11 @@ struct TopologyView: View {
     @State private var mode: TopologyMode = .towers
     @State private var command = TopologyCommand(number: 0, action: .fit)
     @State private var selection: TopologySelection?
+    @State private var focusedSiteID: String?
+    @State private var focusedRoad: String?
+    @State private var showLegend = true
 
-    private var sites: [Site] {
-        model.selectedSite.isEmpty ? model.sites : model.sites.filter { $0.id == model.selectedSite }
-    }
+    private var sites: [Site] { model.sites }
 
     private var projects: [ProjectHealth] {
         let ids = Set(sites.map(\.id))
@@ -66,44 +67,56 @@ struct TopologyView: View {
     var body: some View {
         Group {
             if let overview = model.overview, !sites.isEmpty {
-                VStack(spacing: 10) {
+                VStack(spacing: 8) {
                     HStack(spacing: 8) {
                         Picker("Runtime view", selection: $mode) {
                             ForEach(TopologyMode.allCases, id: \.self) { value in Text(value.rawValue).tag(value) }
                         }
                         .pickerStyle(.segmented)
-                        .frame(maxWidth: 260)
+                        .frame(maxWidth: 220)
                         Spacer(minLength: 0)
-                        Button { send(.top) } label: { Image(systemName: "square.3.layers.3d.top.filled") }
-                            .accessibilityLabel("Top view")
-                        Button { send(.fit) } label: { Image(systemName: "arrow.up.left.and.arrow.down.right") }
-                            .accessibilityLabel("Fit all towers")
+                        Button("TOP") { send(.top) }
+                        Button("ISO") { send(.isometric) }
+                        Button("RESET") { send(.fit); focusedSiteID = nil; focusedRoad = nil }
                     }
                     .buttonStyle(.bordered)
-                    ZStack(alignment: .bottomTrailing) {
-                        NativeTopologyScene(snapshot: .init(node: node, overview: overview, sites: sites, projects: projects),
-                                            mode: mode, command: command, selection: $selection)
-                        VStack(spacing: 8) {
-                            Button { send(.zoomIn) } label: { Image(systemName: "plus.magnifyingglass") }
-                                .accessibilityLabel("Zoom in")
-                            Button { send(.zoomOut) } label: { Image(systemName: "minus.magnifyingglass") }
-                                .accessibilityLabel("Zoom out")
+                    .controlSize(.small)
+                    ZStack(alignment: .topLeading) {
+                        NativeTopologyScene(snapshot: .init(node: node, overview: overview, sites: sites, projects: projects,
+                                                            routes: model.sources.internalRoutes ?? [], services: model.dataServices),
+                                            mode: mode, command: command, selection: $selection,
+                                            focusedSiteID: $focusedSiteID, focusedRoad: $focusedRoad)
+                        HStack(alignment: .top, spacing: 8) {
+                            dossier
+                            Spacer(minLength: 0)
+                            legend
                         }
-                        .buttonStyle(.bordered)
-                        .padding(12)
+                        .padding(10)
+                        VStack {
+                            Spacer()
+                            HStack(alignment: .bottom) {
+                                helpHints
+                                Spacer()
+                                VStack(spacing: 8) {
+                                    Button { send(.zoomIn) } label: { Image(systemName: "plus.magnifyingglass") }
+                                        .accessibilityLabel("Zoom in")
+                                    Button { send(.zoomOut) } label: { Image(systemName: "minus.magnifyingglass") }
+                                        .accessibilityLabel("Zoom out")
+                                }
+                                .buttonStyle(.bordered)
+                            }
+                            .padding(10)
+                        }
                     }
-                    .frame(minHeight: 330)
+                    .frame(minHeight: 440)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
-                    Text(mode == .traffic
-                         ? "Lines show measured node-to-project traffic, not inferred service dependencies."
-                         : "Drag to orbit · pinch to zoom · double tap a tower to focus · tap for details")
-                        .font(.caption2).foregroundStyle(HW.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
                             ForEach(sites) { site in
                                 Button {
-                                    selection = TopologySelection(siteID: site.id, layer: nil)
+                                    focusedSiteID = site.id
+                                    focusedRoad = nil
+                                    send(.focus)
                                 } label: {
                                     HStack(spacing: 6) {
                                         Circle().fill(site.errorRate >= 3 ? HW.red : HW.teal).frame(width: 7, height: 7)
@@ -114,6 +127,12 @@ struct TopologyView: View {
                                 .buttonStyle(.bordered)
                             }
                         }
+                    }
+                }
+                .onAppear {
+                    if focusedSiteID == nil, !model.selectedSite.isEmpty {
+                        focusedSiteID = model.selectedSite
+                        send(.focus)
                     }
                 }
                 .sheet(item: $selection) { picked in
@@ -135,6 +154,94 @@ struct TopologyView: View {
         .background(HW.background)
         .clipShape(RoundedRectangle(cornerRadius: 14))
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(HW.border))
+    }
+
+    @ViewBuilder private var dossier: some View {
+        if let focusedSiteID {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("TARGET LOCKED").font(.caption2.bold()).tracking(1.6).foregroundStyle(HW.teal)
+                if let site = sites.first(where: { $0.id == focusedSiteID }) {
+                    Text(site.name).font(.headline)
+                    Text(site.domains.joined(separator: " · ")).font(.caption2).foregroundStyle(HW.secondary)
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 70), spacing: 6)], alignment: .leading, spacing: 6) {
+                        pip("REQ/MIN", Int(site.requestsPerMinute).formatted())
+                        pip("ERRORS", Format.percent(site.errorRate))
+                        pip("P95", "\(Int(site.p95Ms)) ms")
+                        pip("CPU", Format.percent(site.cpuPercent))
+                        pip("MEM", Format.bytes(site.memoryBytes))
+                        pip("LAYERS", "\(TopologyLayer.layers(for: site, project: projects.first { $0.id == site.id }).count)")
+                    }
+                    if let focusedRoad {
+                        Text(focusedRoad.replacingOccurrences(of: "road:", with: "").replacingOccurrences(of: ":", with: " → "))
+                            .font(.caption2).foregroundStyle(HW.amber)
+                    }
+                    HStack(spacing: 8) {
+                        Button("Details") { selection = TopologySelection(siteID: site.id, layer: nil) }
+                        Button("Elevate") { send(.elevate) }
+                        Button("Release") { send(.fit) }
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                } else if focusedSiteID == "host" {
+                    Text(node.name).font(.headline)
+                    Text("Public edge · feeder roads stay on the board").font(.caption2).foregroundStyle(HW.secondary)
+                    Button("Release") { send(.fit) }.buttonStyle(.bordered).controlSize(.small)
+                } else if focusedSiteID.hasPrefix("ext:"), let service = model.dataServices.first(where: { "ext:\($0.id)" == focusedSiteID }) {
+                    Text(service.type).font(.headline)
+                    Text("\(service.role) · \(service.siteName ?? "host")").font(.caption2).foregroundStyle(HW.secondary)
+                    pip("STATE", service.container.state)
+                    Button("Release") { send(.fit) }.buttonStyle(.bordered).controlSize(.small)
+                }
+            }
+            .padding(12)
+            .frame(maxWidth: 280, alignment: .leading)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+        }
+    }
+
+    private var legend: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Button { showLegend.toggle() } label: {
+                HStack { Text("LEGEND").font(.caption2.bold()).tracking(1.4); Spacer(); Text(showLegend ? "▾" : "▸") }
+            }.buttonStyle(.plain)
+            if showLegend {
+                legendRow(HW.teal, "FEEDER · HOST → SITE")
+                legendRow(HW.amber, "CALL · OBSERVED NGINX")
+                legendRow(Color(red: 0.35, green: 0.82, blue: 0.62), "I/O · DB / CACHE")
+                Text("Roads stay on the board. Tap zooms the camera, not a sheet.")
+                    .font(.caption2).foregroundStyle(HW.secondary)
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: 200, alignment: .leading)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    private var helpHints: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("DRAG orbit / tilt").font(.caption2)
+            Text("PINCH zoom").font(.caption2)
+            Text("TAP lock target").font(.caption2)
+            Text("TAP ROAD highlight path").font(.caption2)
+            Text("DBL-TAP elevation · empty = reset").font(.caption2)
+        }
+        .foregroundStyle(HW.secondary)
+        .padding(10)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
+    }
+
+    private func pip(_ title: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(title).font(.caption2).foregroundStyle(HW.secondary)
+            Text(value).font(.caption.bold())
+        }
+    }
+
+    private func legendRow(_ color: Color, _ text: String) -> some View {
+        HStack(spacing: 6) {
+            Capsule().fill(color).frame(width: 12, height: 4)
+            Text(text).font(.caption2)
+        }
     }
 
     private func send(_ action: TopologyCameraAction) {
@@ -268,8 +375,38 @@ struct TrafficPoliciesView: View {
     @EnvironmentObject private var model: AppModel
     @State private var policy: TrafficGuardPolicy?
     @State private var showAddRule = false
+
+    private var explanation: String {
+        let trafficGuard = model.overview?.trafficGuard ?? model.guardState
+        let attack = trafficGuard?.attackStage ?? "normal"
+        let day = trafficGuard?.dailyStage ?? "healthy"
+        let month = trafficGuard?.monthlyStage ?? "healthy"
+        let meter = trafficGuard?.meterStage ?? "unknown"
+        if attack != "normal" && day == "healthy" && month == "healthy" {
+            return "Attack mitigation is active. Day and month budgets are healthy."
+        }
+        if day != "healthy" && attack == "normal" {
+            return "Restriction is from the day budget. An attack is not the current reason."
+        }
+        if month != "healthy" && attack == "normal" {
+            return "Restriction is from the monthly cutoff. An attack is not the current reason."
+        }
+        if meter == "unknown" || meter == "stale" {
+            return "The usage meter is \(meter). Safe finite policy stays on until the ledger is verified."
+        }
+        return trafficGuard?.reason ?? "Independent attack, day, month, and meter states are shown separately."
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 8) {
+                Eyebrow(text: "Why traffic is limited")
+                Text(explanation).font(.headline)
+                if let trafficGuard = model.overview?.trafficGuard ?? model.guardState {
+                    Text("Attack \(trafficGuard.attackStage ?? "n/a") · Day \(trafficGuard.dailyStage ?? "n/a") · Month \(trafficGuard.monthlyStage ?? "n/a") · Meter \(trafficGuard.meterStage ?? "n/a")")
+                        .font(.caption).foregroundStyle(HW.secondary)
+                }
+            }.padding(18).panel()
             if let value = policy ?? model.guardState?.policy {
                 VStack(alignment: .leading, spacing: 16) {
                     HStack { VStack(alignment: .leading) { Eyebrow(text: "Cost and attack boundary"); Text("Traffic guard").font(.title2.bold()) }; Spacer(); Toggle("Enabled", isOn: Binding(get: { value.enabled }, set: { policy?.enabled = $0 })).labelsHidden() }

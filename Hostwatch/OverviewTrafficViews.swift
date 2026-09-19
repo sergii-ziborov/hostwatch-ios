@@ -20,7 +20,7 @@ struct OverviewView: View {
                 HStack {
                     Label(value.nginxLogHealthy ? "Nginx analytics healthy" : "Nginx analytics unavailable", systemImage: value.nginxLogHealthy ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
                     Spacer()
-                    Label(value.dockerHealthy ? "Docker healthy" : "Docker unavailable", systemImage: value.dockerHealthy ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                    Label((value.runtimeHealthy ?? value.dockerHealthy) ? "Runtime healthy" : "Runtime unavailable", systemImage: (value.runtimeHealthy ?? value.dockerHealthy) ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
                 }
                 .font(.footnote).foregroundStyle(HW.secondary).padding(16).panel()
             }

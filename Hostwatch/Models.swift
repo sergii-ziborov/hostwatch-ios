@@ -74,7 +74,25 @@ struct TrafficGuardPolicy: Codable {
     var anomalyEnabled: Bool; var maxRequestsPerSecond: Double; var maxIngressMbps: Double; var maxPacketsPerSecond: Double
     var anomalyAction: String; var anomalyMbps: Double; var triggerSeconds: Int; var recoverySeconds: Int; var riskThreshold: Double; var updatedAt: String
 }
-struct TrafficGuardState: Codable { let policy: TrafficGuardPolicy; let stage: String; let reason: String; let requestsPerSecond: Double; let ingressMbps: Double; let egressMbps: Double; let packetsPerSecond: Double; let appliedMbps: Double; let managed: Bool; let error: String? }
+struct TrafficGuardState: Codable {
+    let policy: TrafficGuardPolicy
+    let stage: String
+    let reason: String
+    let requestsPerSecond: Double
+    let ingressMbps: Double
+    let egressMbps: Double
+    let packetsPerSecond: Double
+    let appliedMbps: Double
+    let managed: Bool
+    let error: String?
+    var shapingMode: String? = nil
+    var verified: Bool? = nil
+    var constraints: [String]? = nil
+    var attackStage: String? = nil
+    var dailyStage: String? = nil
+    var monthlyStage: String? = nil
+    var meterStage: String? = nil
+}
 
 struct Overview: Codable {
     let timestamp: String
@@ -90,11 +108,28 @@ struct Overview: Codable {
     let budget: Budget
     let nginxLogHealthy: Bool
     let dockerHealthy: Bool
+    var runtimeHealthy: Bool? = nil
+    var platform: String? = nil
+    var trafficGuard: TrafficGuardState? = nil
+
+    enum CodingKeys: String, CodingKey {
+        case timestamp, hostname, uptimeSeconds, cpuPercent, load1, load5, load15
+        case memory, disk, network, budget, nginxLogHealthy, dockerHealthy, runtimeHealthy, platform
+        case trafficGuard = "guard"
+    }
 
     struct Memory: Codable { let total: Double; let used: Double; let available: Double; let swapTotal: Double; let swapUsed: Double }
     struct Disk: Codable { let total: Double; let used: Double; let free: Double }
     struct Network: Codable { let rxBytes: Double; let txBytes: Double; let rxBytesPerSecond: Double; let txBytesPerSecond: Double; let rxPacketsPerSecond: Double; let txPacketsPerSecond: Double }
-    struct Budget: Codable { let period: String; let usedBytes: Double; let includedBytes: Double; let warningBytes: Double; let cutoffBytes: Double; let locked: Bool; let egressMbps: Double; let emergencyMbps: Double; let monthlyMaxAtCapBytes: Double }
+    struct Budget: Codable {
+        let period: String; let usedBytes: Double; let includedBytes: Double; let warningBytes: Double; let cutoffBytes: Double
+        let locked: Bool; let egressMbps: Double; let emergencyMbps: Double; let monthlyMaxAtCapBytes: Double
+        var dailyUsedBytes: Double? = nil
+        var dailySoftBytes: Double? = nil
+        var dailyHardBytes: Double? = nil
+        var rolling24hBytes: Double? = nil
+        var meterStatus: String? = nil
+    }
 }
 
 struct NetworkPort: Codable, Identifiable {
@@ -259,20 +294,62 @@ struct ProjectHealth: Codable, Identifiable, Hashable {
 
 struct JobState: Codable, Identifiable, Hashable { let id: String; let name: String; let timerUnit: String; let runUnit: String; let activeState: String; let unitFileState: String; let nextRun: String; let lastResult: String }
 
+struct HybridSettings: Codable {
+    var homeMaxJobs: Int
+    var homeMinDiskBytes: Int
+    var homeStaleAfterSeconds: Int
+    var keepAliveSeconds: Int
+    var allowUnregisteredHome: Bool?
+}
+
+struct HybridPeer: Codable, Identifiable {
+    let id: String
+    let kind: String
+    var publicIp: String?
+    var previousIp: String?
+    var tunnelIp: String?
+    var lastSeen: String?
+    var fresh: Bool
+    var ipChanged: Bool
+    var diskFreeBytes: Double?
+    var runningJobs: Int?
+    var cpuPercent: Double?
+}
+
+struct HybridAdmission: Codable {
+    let accept: Bool
+    let reason: String
+    let homeFresh: Bool
+    let activeLeases: Int
+    let maxJobs: Int
+    var diskFreeBytes: Double?
+}
+
+struct FleetLinkLayer: Codable {
+    let name: String
+    let status: String
+    var detail: String?
+}
+
+struct FleetLink: Codable, Identifiable {
+    let id: String
+    let layers: [FleetLinkLayer]
+}
+
 enum SidebarPage: String, CaseIterable, Identifiable {
-    case overview, traffic, incidents, topology, workloads, cleanup, policies, environment, codeHealth, automations, access, security, organization
+    case overview, traffic, incidents, topology, workloads, fleet, cleanup, policies, environment, codeHealth, automations, access, security, organization
     var id: String { rawValue }
     var title: String {
         switch self {
         case .overview: "Overview"; case .traffic: "Traffic"; case .incidents: "Incidents & risks"; case .topology: "Runtime topology"
-        case .workloads: "Workloads"; case .cleanup: "Cleanup"; case .policies: "Traffic policies"; case .environment: "Environment"; case .codeHealth: "Code health"
+        case .workloads: "Workloads"; case .fleet: "Fleet"; case .cleanup: "Cleanup"; case .policies: "Traffic policies"; case .environment: "Environment"; case .codeHealth: "Code health"
         case .automations: "Automations"; case .access: "Access"; case .security: "Account security"; case .organization: "Organization"
         }
     }
     var icon: String {
         switch self {
         case .overview: "square.grid.2x2"; case .traffic: "chart.xyaxis.line"; case .incidents: "exclamationmark.shield"; case .topology: "point.3.connected.trianglepath.dotted"
-        case .workloads: "shippingbox"; case .cleanup: "sparkles.rectangle.stack"; case .policies: "shield.lefthalf.filled"; case .environment: "key.horizontal"; case .codeHealth: "waveform.path.ecg.rectangle"
+        case .workloads: "shippingbox"; case .fleet: "laptopcomputer.and.iphone"; case .cleanup: "sparkles.rectangle.stack"; case .policies: "shield.lefthalf.filled"; case .environment: "key.horizontal"; case .codeHealth: "waveform.path.ecg.rectangle"
         case .automations: "clock.arrow.trianglehead.counterclockwise.rotate.90"; case .access: "person.2.badge.gearshape"; case .security: "lock.shield"; case .organization: "building.2"
         }
     }

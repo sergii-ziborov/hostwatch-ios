@@ -41,6 +41,11 @@ final class AppModel: ObservableObject {
     @Published var environment: EnvironmentState?
     @Published var accessRules = AccessRuleState(rules: [], managed: false, updatedAt: nil, error: nil)
     @Published var guardState: TrafficGuardState?
+    @Published var hybridPeers: [HybridPeer] = []
+    @Published var hybridSettings: HybridSettings?
+    @Published var hybridAdmission: HybridAdmission?
+    @Published var fleetLinks: [FleetLink] = []
+    @Published var hybridError: String?
 
     @Published var baseURLText: String {
         didSet { UserDefaults.standard.set(baseURLText, forKey: "controlPlaneURL") }
@@ -103,6 +108,11 @@ final class AppModel: ObservableObject {
         environment = .init(siteId: selectedSite.isEmpty ? Fixtures.sites[0].id : selectedSite, variables: [.init(name: "DATABASE_URL", secret: true), .init(name: "NODE_ENV", secret: false), .init(name: "SENTRY_DSN", secret: true)], managed: true, updatedAt: ISO8601DateFormatter().string(from: .now), error: nil)
         accessRules = .init(rules: [.init(id: "rule-1", site: "applydjinn", kind: "country", value: "RU", label: "Policy review", createdAt: ISO8601DateFormatter().string(from: .now))], managed: true, updatedAt: ISO8601DateFormatter().string(from: .now), error: nil)
         guardState = .init(policy: .init(enabled: true, mode: "automatic", includedBytes: 21_990_232_555_520, warningBytes: 32_985_348_833_280, cutoffBytes: 41_782_136_619_008, normalMbps: 100, warningMbps: 20, emergencyMbps: 1, warningAction: "throttle", anomalyEnabled: true, maxRequestsPerSecond: 800, maxIngressMbps: 180, maxPacketsPerSecond: 10_000, anomalyAction: "throttle", anomalyMbps: 5, triggerSeconds: 20, recoverySeconds: 180, riskThreshold: 72, updatedAt: ISO8601DateFormatter().string(from: .now)), stage: "normal", reason: "No active threshold breach", requestsPerSecond: 62, ingressMbps: 4.8, egressMbps: 2.1, packetsPerSecond: 138, appliedMbps: 100, managed: true, error: nil)
+        hybridPeers = Fixtures.hybridPeers
+        hybridSettings = Fixtures.hybridSettings
+        hybridAdmission = Fixtures.hybridAdmission
+        fleetLinks = Fixtures.fleetLinks
+        hybridError = nil
     }
 #endif
 
@@ -198,6 +208,7 @@ final class AppModel: ObservableObject {
         storageError = nil; cleanupPreview = nil; cleanupError = nil; cleanupNotice = nil
         projects = []; jobs = []; members = []; license = nil; environment = nil
         nodes = []; selectedNode = ""; selectedSite = ""
+        hybridPeers = []; hybridSettings = nil; hybridAdmission = nil; fleetLinks = []; hybridError = nil
     }
 
     private func configureClient() async throws {
@@ -258,8 +269,21 @@ final class AppModel: ObservableObject {
                 let loaded = try await (trafficCall, sourcesCall, requestsCall, errorsCall, pathsCall)
                 traffic = loaded.0; sources = loaded.1; requests = loaded.2; errorEvidence = loaded.3; paths = loaded.4.paths
             case .incidents, .topology, .codeHealth:
-                projects = try await client.projects()
-                if page != .codeHealth { jobs = try await client.jobs() }
+                if page == .topology {
+                    async let projectsCall = client.projects()
+                    async let sourcesCall = client.sources(site: "", hours: hours)
+                    async let jobsCall = client.jobs()
+                    let loaded = try await (projectsCall, sourcesCall, jobsCall)
+                    projects = loaded.0
+                    sources = loaded.1
+                    jobs = loaded.2
+                    await loadDataServices()
+                } else {
+                    projects = try await client.projects()
+                    if page != .codeHealth { jobs = try await client.jobs() }
+                }
+            case .fleet:
+                await loadFleet()
             case .workloads:
                 requests = try await client.requests(site: selectedSite)
                 await loadDataServices()
@@ -381,6 +405,33 @@ final class AppModel: ObservableObject {
     func removeRule(_ rule: AccessRule) async {
         if fixtures { accessRules = .init(rules: accessRules.rules.filter { $0.id != rule.id }, managed: true, updatedAt: accessRules.updatedAt, error: nil); return }
         do { accessRules = try await client.removeAccessRule(id: rule.id) } catch { errorMessage = error.localizedDescription }
+    }
+
+    func saveHybridSettings(_ settings: HybridSettings) async {
+        if fixtures { hybridSettings = settings; return }
+        do { hybridSettings = try await client.updateHybridSettings(settings); hybridError = nil }
+        catch { hybridError = error.localizedDescription; errorMessage = error.localizedDescription }
+    }
+
+    private func loadFleet() async {
+        do {
+            async let peersCall = client.hybridPeers()
+            async let settingsCall = client.hybridSettings()
+            async let admissionCall = client.hybridAdmission()
+            async let linksCall = client.fleetLinks()
+            let loaded = try await (peersCall, settingsCall, admissionCall, linksCall)
+            hybridPeers = loaded.0
+            hybridSettings = loaded.1
+            hybridAdmission = loaded.2
+            fleetLinks = loaded.3
+            hybridError = nil
+        } catch {
+            hybridPeers = []
+            hybridSettings = nil
+            hybridAdmission = nil
+            fleetLinks = []
+            hybridError = error.localizedDescription
+        }
     }
 
     func saveGuard(_ policy: TrafficGuardPolicy) async {

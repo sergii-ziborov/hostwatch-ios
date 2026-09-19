@@ -13,11 +13,28 @@ enum Fixtures {
     )
 
     static let sites: [Site] = [
-        .init(id: "applydjinn", name: "ApplyDjinn", domains: ["applydjinn.com"], sharedNginx: true, containers: [], cpuPercent: 8.2, memoryBytes: 943_718_400, memoryLimit: 1_610_612_736, requestsPerMinute: 38.4, bytesPerMinute: 2_408_448, errorRate: 1.8, p95Ms: 316),
-        .init(id: "kablay-il", name: "Kablay IL", domains: ["kablay.co.il"], sharedNginx: true, containers: [], cpuPercent: 5.4, memoryBytes: 681_574_400, memoryLimit: 1_181_116_006, requestsPerMinute: 24.2, bytesPerMinute: 1_138_688, errorRate: 3.2, p95Ms: 422),
-        .init(id: "kablay-us", name: "Kablay US", domains: ["kablay.us"], sharedNginx: true, containers: [], cpuPercent: 2.1, memoryBytes: 524_288_000, memoryLimit: 1_181_116_006, requestsPerMinute: 13.8, bytesPerMinute: 614_400, errorRate: 0.7, p95Ms: 184),
-        .init(id: "eppy", name: "Eppy", domains: ["eppy.co.il"], sharedNginx: true, containers: [], cpuPercent: 1.2, memoryBytes: 314_572_800, memoryLimit: 1_073_741_824, requestsPerMinute: 4.1, bytesPerMinute: 178_176, errorRate: 0.0, p95Ms: 88)
+        .init(id: "applydjinn", name: "ApplyDjinn", domains: ["applydjinn.com"], sharedNginx: true, containers: [
+            container("ad-app", "applydjinn-app-1", "applydjinn", "running", 6.4, 520_000_000),
+            container("ad-pg", "applydjinn-postgres-1", "applydjinn", "running", 4.6, 417_000_000)
+        ], cpuPercent: 8.2, memoryBytes: 943_718_400, memoryLimit: 1_610_612_736, requestsPerMinute: 38.4, bytesPerMinute: 2_408_448, errorRate: 1.8, p95Ms: 316),
+        .init(id: "kablay-il", name: "Kablay IL", domains: ["kablay.co.il"], sharedNginx: true, containers: [
+            container("kil-app", "kablay-app-1", "kablay", "running", 4.1, 390_000_000),
+            container("kil-redis", "kablay-redis-1", "kablay", "running", 1.2, 112_000_000)
+        ], cpuPercent: 5.4, memoryBytes: 681_574_400, memoryLimit: 1_181_116_006, requestsPerMinute: 24.2, bytesPerMinute: 1_138_688, errorRate: 3.2, p95Ms: 422),
+        .init(id: "kablay-us", name: "Kablay US", domains: ["kablay.us"], sharedNginx: true, containers: [
+            container("kus-app", "kablay-us-app-1", "kablay-us", "running", 1.8, 280_000_000)
+        ], cpuPercent: 2.1, memoryBytes: 524_288_000, memoryLimit: 1_181_116_006, requestsPerMinute: 13.8, bytesPerMinute: 614_400, errorRate: 0.7, p95Ms: 184),
+        .init(id: "eppy", name: "Eppy", domains: ["eppy.co.il"], sharedNginx: true, containers: [
+            container("eppy-api", "eppy-api-1", "eppy", "running", 0.9, 188_000_000)
+        ], cpuPercent: 1.2, memoryBytes: 314_572_800, memoryLimit: 1_073_741_824, requestsPerMinute: 4.1, bytesPerMinute: 178_176, errorRate: 0.0, p95Ms: 88),
+        .init(id: "granttap", name: "GrantTap", domains: ["granttap.internal"], sharedNginx: true, containers: [
+            container("gt-relay", "granttap-relay-1", "granttap", "running", 0.4, 64_000_000)
+        ], cpuPercent: 0.6, memoryBytes: 96_000_000, memoryLimit: 536_870_912, requestsPerMinute: 2.4, bytesPerMinute: 48_000, errorRate: 0.0, p95Ms: 42)
     ]
+
+    private static func container(_ id: String, _ name: String, _ project: String, _ state: String, _ cpu: Double, _ memory: Double) -> ContainerInfo {
+        .init(id: id, name: name, project: project, state: state, status: "Up 3 days", image: "\(project):latest", imageId: "sha256:\(id)", cpuPercent: cpu, memoryBytes: memory, memoryLimit: 1_073_741_824, networkRxBytes: 12_000_000, networkTxBytes: 4_000_000, pids: 12)
+    }
 
     static let traffic: [TrafficPoint] = (0..<48).map { index in
         let wave = sin(Double(index) / 4) * 18 + 48
@@ -44,7 +61,12 @@ enum Fixtures {
     static let sources = Sources(windowHours: 24, site: nil,
         sources: [.init(name: "Direct", requests: 5_854, bytes: 81_920_000), .init(name: "Googlebot", requests: 2_945, bytes: 35_651_584), .init(name: "Google", requests: 1_082, bytes: 9_437_184)],
         countries: [.init(name: "Israel", requests: 6_657, bytes: 73_400_320), .init(name: "United States", requests: 2_180, bytes: 30_408_704), .init(name: "Germany", requests: 859, bytes: 8_601_600)],
-        bots: [.init(name: "Googlebot", requests: 2_945, bytes: 35_651_584), .init(name: "GoogleOther", requests: 872, bytes: 7_340_032), .init(name: "Bingbot", requests: 204, bytes: 1_468_006)])
+        bots: [.init(name: "Googlebot", requests: 2_945, bytes: 35_651_584), .init(name: "GoogleOther", requests: 872, bytes: 7_340_032), .init(name: "Bingbot", requests: 204, bytes: 1_468_006)],
+        internalRoutes: [
+            .init(caller: "applydjinn", destinationHost: "kablay.il", targetService: "kablay-il", requests: 420, bytes: 2_200_000),
+            .init(caller: "kablay-il", destinationHost: "applydjinn.com", targetService: "applydjinn", requests: 180, bytes: 640_000),
+            .init(caller: "granttap", destinationHost: "applydjinn.com", targetService: "applydjinn", requests: 96, bytes: 210_000)
+        ])
 
     static let requests: [RequestSample] = (0..<42).map { index in
         let site = sites[index % sites.count]
@@ -71,6 +93,19 @@ enum Fixtures {
     static let jobs: [JobState] = [
         .init(id: "backup", name: "Database backup", timerUnit: "backup.timer", runUnit: "backup.service", activeState: "active", unitFileState: "enabled", nextRun: "in 2 hours", lastResult: "success"),
         .init(id: "scan", name: "Code health scan", timerUnit: "scan.timer", runUnit: "scan.service", activeState: "active", unitFileState: "enabled", nextRun: "tomorrow 02:00", lastResult: "success")
+    ]
+
+    static let hybridSettings = HybridSettings(homeMaxJobs: 2, homeMinDiskBytes: 10_737_418_240, homeStaleAfterSeconds: 90, keepAliveSeconds: 25, allowUnregisteredHome: false)
+    static let hybridAdmission = HybridAdmission(accept: true, reason: "home can accept deferred work", homeFresh: true, activeLeases: 1, maxJobs: 2, diskFreeBytes: 42_949_672_960)
+    static let hybridPeers: [HybridPeer] = [
+        .init(id: "home-main", kind: "home-compute", publicIp: "203.0.113.44", previousIp: "203.0.113.10", tunnelIp: "10.8.0.2",
+              lastSeen: ISO8601DateFormatter().string(from: .now), fresh: true, ipChanged: true, diskFreeBytes: 42_949_672_960, runningJobs: 1, cpuPercent: 22)
+    ]
+    static let fleetLinks: [FleetLink] = [
+        .init(id: "home-main", layers: [
+            .init(name: "heartbeat", status: "ok", detail: "public IP changed from 203.0.113.10 to 203.0.113.44"),
+            .init(name: "agent", status: "not_applicable", detail: nil)
+        ])
     ]
 }
 #endif

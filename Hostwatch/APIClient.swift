@@ -45,7 +45,7 @@ actor APIClient {
             (path == "/api/session" && method == "GET" ? 12 : 25)
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("Hostwatch iOS/1.0", forHTTPHeaderField: "User-Agent")
-        if path.hasPrefix("/api/v1/"), !selectedNode.isEmpty { request.setValue(selectedNode, forHTTPHeaderField: "X-Hostwatch-Node") }
+        if (path.hasPrefix("/api/v1/") || path.hasPrefix("/api/v2/")), !selectedNode.isEmpty { request.setValue(selectedNode, forHTTPHeaderField: "X-Hostwatch-Node") }
         if !csrf.isEmpty, !["GET", "HEAD"].contains(method) { request.setValue(csrf, forHTTPHeaderField: "X-Hostwatch-CSRF") }
         if let body {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -178,6 +178,11 @@ actor APIClient {
         try await empty("/api/v1/access-rules", method: "POST", body: Rule(site: site, kind: kind, value: value, label: label))
     }
     func runJob(_ id: String) async throws { try await empty("/api/v1/jobs/\(id)/run", method: "POST") }
+    func hybridPeers() async throws -> [HybridPeer] { try await call("/api/v2/peers") }
+    func hybridSettings() async throws -> HybridSettings { try await call("/api/v2/settings") }
+    func updateHybridSettings(_ settings: HybridSettings) async throws -> HybridSettings { try await call("/api/v2/settings", method: "PUT", body: settings) }
+    func hybridAdmission() async throws -> HybridAdmission { try await call("/api/v2/admission") }
+    func fleetLinks() async throws -> [FleetLink] { try await call("/api/v2/links") }
 
     private func scope(site: String, hours: Int) -> String {
         var components = URLComponents()

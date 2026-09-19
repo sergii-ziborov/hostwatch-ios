@@ -6,12 +6,15 @@ struct RootView: View {
     @State private var selection: SidebarPage?
     @State private var columnVisibility: NavigationSplitViewVisibility = .automatic
     @State private var selectedTab: String
+    @State private var morePage: SidebarPage?
 
     init() {
         let requested = ProcessInfo.processInfo.environment["HOSTWATCH_PAGE"]
         let page = requested.flatMap(SidebarPage.init(rawValue:)) ?? .overview
         _selection = State(initialValue: page)
-        _selectedTab = State(initialValue: Self.primaryPages.contains(page) ? page.rawValue : "more")
+        let isPrimary = Self.primaryPages.contains(page)
+        _selectedTab = State(initialValue: isPrimary ? page.rawValue : "more")
+        _morePage = State(initialValue: isPrimary ? nil : page)
     }
 
     var body: some View {
@@ -32,7 +35,7 @@ struct RootView: View {
             }
             NavigationStack {
                 List {
-                    Section("Observe") { mobileMenu(.incidents) }
+                    Section("Observe") { mobileMenu(.incidents); mobileMenu(.fleet) }
                     Section("Control") { mobileMenu(.policies); mobileMenu(.environment); mobileMenu(.cleanup); mobileMenu(.automations) }
                     Section("Analyze") { mobileMenu(.codeHealth) }
                     Section("Company") { mobileMenu(.access); mobileMenu(.security); mobileMenu(.organization) }
@@ -41,6 +44,7 @@ struct RootView: View {
                 .scrollContentBackground(.hidden)
                 .background(HW.background)
                 .navigationTitle("More")
+                .navigationDestination(item: $morePage) { page in PageContainer(page: page) }
             }
             .tabItem { Label("More", systemImage: "ellipsis.circle") }
             .tag("more")
@@ -63,7 +67,7 @@ struct RootView: View {
                 .listRowBackground(Color.clear)
 
                 Section("Observe") {
-                    menu(.overview); menu(.traffic); menu(.incidents); menu(.topology); menu(.workloads)
+                    menu(.overview); menu(.traffic); menu(.incidents); menu(.topology); menu(.workloads); menu(.fleet)
                 }
                 Section("Control") {
                     menu(.policies); menu(.environment); menu(.cleanup); menu(.automations)
@@ -178,6 +182,7 @@ struct PageContainer: View {
             case .incidents: IncidentsView()
             case .topology: TopologyView()
             case .workloads: WorkloadsView()
+            case .fleet: FleetView()
             case .cleanup: CleanupView()
             case .policies: TrafficPoliciesView()
             case .environment: EnvironmentView()

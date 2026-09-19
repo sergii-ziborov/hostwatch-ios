@@ -18,12 +18,14 @@
 		93965628E34EC6B52EFAF658 /* OverviewTrafficViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB8618F607DEE2D2E1E2849A /* OverviewTrafficViews.swift */; };
 		963A540C15DF394F13265CD9 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55C640803FA958183F2FE0C2 /* APIClient.swift */; };
 		A283FF16E0B0559681B2DD92 /* SignInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 876AF943DE6092E87224123B /* SignInView.swift */; };
+		D00FDB393BD55003FAF62733 /* FleetViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80D5EC0AB042459E67AFE0A4 /* FleetViews.swift */; };
 		D2D39C4F1EBFE2ED8C93B8F2 /* HostwatchApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 299F150C6BF694745E48CC76 /* HostwatchApp.swift */; };
 		D8CE39787CB162FF7D6FA697 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12746C62342BD6DFB5CE4414 /* RootView.swift */; };
 		DD74D36910EE8D8F562347AA /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38E240A978385DC293B70166 /* Models.swift */; };
 		E32E989754F3E88256ADC83C /* HostwatchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F82A7AF0AADF24B29949F0F2 /* HostwatchTests.swift */; };
 		F75981AC11F1D1D2C1CCC97B /* OperationsViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D9117ACA765A183085A0EE6 /* OperationsViews.swift */; };
 		F82E3952AF3CCB5D26A5C4E6 /* CleanupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 408661428B0328BF34CC7316 /* CleanupView.swift */; };
+		FF2C5B265B29A1AD59463BA9 /* TopologyLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0268161CF78A514986F3C0B2 /* TopologyLayout.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -37,6 +39,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		0268161CF78A514986F3C0B2 /* TopologyLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TopologyLayout.swift; sourceTree = "<group>"; };
 		03F0CF09D79D998088487B21 /* Hostwatch.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Hostwatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		12746C62342BD6DFB5CE4414 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		18CD1780E2379A0DF2B888DE /* Fixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Fixtures.swift; sourceTree = "<group>"; };
@@ -51,6 +54,7 @@
 		6B5BF4296604636AF818D8AF /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		758A87CE98F4E57324698D19 /* HostwatchTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = HostwatchTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		76D7F5CC61DBDB2ABD270F11 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		80D5EC0AB042459E67AFE0A4 /* FleetViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FleetViews.swift; sourceTree = "<group>"; };
 		876AF943DE6092E87224123B /* SignInView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignInView.swift; sourceTree = "<group>"; };
 		AB8618F607DEE2D2E1E2849A /* OverviewTrafficViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverviewTrafficViews.swift; sourceTree = "<group>"; };
 		B81C8E5DDA41AFCD8723E518 /* AdminViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminViews.swift; sourceTree = "<group>"; };
@@ -89,6 +93,7 @@
 				550BEA74249D51485C13AF3E /* AuthViews.swift */,
 				408661428B0328BF34CC7316 /* CleanupView.swift */,
 				18CD1780E2379A0DF2B888DE /* Fixtures.swift */,
+				80D5EC0AB042459E67AFE0A4 /* FleetViews.swift */,
 				299F150C6BF694745E48CC76 /* HostwatchApp.swift */,
 				FCD6674AE70D2F4CC67FC220 /* Info.plist */,
 				38E240A978385DC293B70166 /* Models.swift */,
@@ -98,6 +103,7 @@
 				12746C62342BD6DFB5CE4414 /* RootView.swift */,
 				876AF943DE6092E87224123B /* SignInView.swift */,
 				2F23EFDCF024E30815A1E55E /* Theme.swift */,
+				0268161CF78A514986F3C0B2 /* TopologyLayout.swift */,
 			);
 			path = Hostwatch;
 			sourceTree = "<group>";
@@ -207,6 +213,7 @@
 				2935BBD561A194C24EC739DA /* AuthViews.swift in Sources */,
 				F82E3952AF3CCB5D26A5C4E6 /* CleanupView.swift in Sources */,
 				549D6E78E5E2DCF33EA8467B /* Fixtures.swift in Sources */,
+				D00FDB393BD55003FAF62733 /* FleetViews.swift in Sources */,
 				D2D39C4F1EBFE2ED8C93B8F2 /* HostwatchApp.swift in Sources */,
 				DD74D36910EE8D8F562347AA /* Models.swift in Sources */,
 				4EA8DD88F0712FE0CEAD618C /* NativeTopologyScene.swift in Sources */,
@@ -215,6 +222,7 @@
 				D8CE39787CB162FF7D6FA697 /* RootView.swift in Sources */,
 				A283FF16E0B0559681B2DD92 /* SignInView.swift in Sources */,
 				7ED8B18934CABF0ACAA3D457 /* Theme.swift in Sources */,
+				FF2C5B265B29A1AD59463BA9 /* TopologyLayout.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -271,7 +279,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 6;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -385,7 +393,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 6;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;

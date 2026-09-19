@@ -51,6 +51,15 @@ final class HostwatchTests: XCTestCase {
         XCTAssertEqual(parts?.queryItems?.first(where: { $0.name == "issuer" })?.value, "HOSTWATCH")
     }
 
+    func testInternalRoutesStayOnTheTopologyContract() throws {
+        let payload = Data("""
+        {"windowHours":24,"sources":[],"countries":[],"bots":[],"internalRoutes":[{"caller":"applydjinn","destinationHost":"kablay.il","targetService":"kablay-il","requests":12,"bytes":4096}]}
+        """.utf8)
+        let sources = try JSONDecoder().decode(Sources.self, from: payload)
+        XCTAssertEqual(sources.internalRoutes?.first?.targetService, "kablay-il")
+        XCTAssertEqual(sources.internalRoutes?.first?.caller, "applydjinn")
+    }
+
     func testNetworkSocketSnapshotDecodesPortEvidence() throws {
         let payload = Data("""
         {"observedAt":"2026-09-14T08:45:00Z","interface":"eth0","tcpConnections":2,"udpConnections":0,"localPorts":[{"protocol":"TCP","port":443,"connections":1,"listening":true}],"remotePorts":[{"protocol":"TCP","port":5432,"connections":1}],"available":true}
@@ -78,6 +87,27 @@ final class HostwatchTests: XCTestCase {
             return
         }
         XCTAssertEqual(end.timeIntervalSince(start), 300.123, accuracy: 0.001)
+    }
+
+    func testManhattanRoadsStayOrthogonalOnTheCyberboard() {
+        let a = TopologyPoint(x: -4.4, z: -1)
+        let b = TopologyPoint(x: 4.4, z: 3.4)
+        let path = TopologyLayout.manhattan(from: a, to: b, siteXs: [-4.4, 0, 4.4], siteZs: [-1, 3.4])
+        XCTAssertGreaterThanOrEqual(path.count, 2)
+        XCTAssertTrue(TopologyLayout.isOrthogonal(path))
+        XCTAssertEqual(path.first, a)
+        XCTAssertEqual(path.last, b)
+    }
+
+    func testHybridFleetContractDecodesAgentJSON() throws {
+        let payload = Data("""
+        {"id":"home-main","kind":"home-compute","publicIp":"203.0.113.44","previousIp":"203.0.113.10","fresh":true,"ipChanged":true,"diskFreeBytes":4096,"runningJobs":1,"cpuPercent":12.5,"lastSeen":"2026-09-19T00:00:00Z"}
+        """.utf8)
+        let peer = try JSONDecoder().decode(HybridPeer.self, from: payload)
+        XCTAssertEqual(peer.id, "home-main")
+        XCTAssertTrue(peer.ipChanged)
+        XCTAssertEqual(peer.publicIp, "203.0.113.44")
+        XCTAssertEqual(SidebarPage.fleet.title, "Fleet")
     }
 
     func testUnmappedNginxHostIsNotAnOpenableDestination() {
