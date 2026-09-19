@@ -14,7 +14,7 @@ Native SwiftUI control-plane client for Hostwatch. The iPhone and iPad app is in
 - **Traffic** — requests, errors, destinations, sources, locations and retained evidence.
 - **Time and error evidence** — charts use local time on the horizontal axis. Unparsed Nginx requests with no usable Host are labeled as unmapped instead of inventing a website URL.
 - **Incidents & risks** — operational incidents, anomaly signals and vulnerabilities in separate tabs.
-- **Runtime topology** — a native SceneKit cyberboard: stacked runtime towers, always-on Manhattan roads (host feeders, observed Nginx calls, DB/cache I/O), perimeter data-service towers, and a TARGET LOCKED dossier. Drag orbits, pinch zooms the camera, tap locks a tower or highlights a road, double-tap elevates a pillar or resets. Opening the inspector is a dossier button, not a zoom sheet.
+- **Runtime topology** — a native SceneKit cyberboard aligned with the Electron RepoLens board. **Towers** shows stacked runtime + Weavatrix layers and structure roads. **Traffic** hides those layers and runs live packets on the same Manhattan roads. Selecting a project explodes it into frontend, backend and data towers. Drag orbits without flipping, two fingers pan, pinch zooms, tap frames a tower from the right.
 - **Fleet** — hybrid edge/home peers, public IP change history, heartbeat freshness, admission (slots, disk, stale), and home load-scaling settings.
 - **Workloads** — project traffic, processes, storage, limits and controls.
 - **Traffic policies** — bandwidth, anomaly and IP/country access rules.
@@ -56,7 +56,10 @@ For App Store review and users, see the [privacy policy](PRIVACY.md) and [suppor
 
 Store listing still needs authenticated captures from a provisioned account. Until then, Debug fixture captures (banner **SAMPLE DATA · DEBUG BUILD**) document the current cyberboard and fleet UI:
 
-- [Topology](docs/screenshots/iphone-topology.png) — towers, orthogonal roads, dossier HUD
+- [Topology](docs/screenshots/iphone-topology.png) — Traffic: live packets, runtime volumes only
+- [Towers](docs/screenshots/iphone-topology-towers.png) — stacked services + Weavatrix layers
+- [Project graph](docs/screenshots/iphone-topology-eppy.png) — Eppy frontend / backend / database
+- [Tower lock](docs/screenshots/iphone-topology-lock.png) — Electron-style right frame + dossier
 - [Fleet](docs/screenshots/iphone-fleet.png) — home heartbeat, IP change, admission
 - [Overview](docs/screenshots/iphone-overview.png) — host resources
 

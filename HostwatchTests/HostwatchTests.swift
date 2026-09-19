@@ -1,3 +1,4 @@
+import SceneKit
 import XCTest
 @testable import Hostwatch
 
@@ -87,6 +88,74 @@ final class HostwatchTests: XCTestCase {
             return
         }
         XCTAssertEqual(end.timeIntervalSince(start), 300.123, accuracy: 0.001)
+    }
+
+    func testTrafficModeShowsPacketsAndTowersModeShowsArchitecture() {
+        XCTAssertTrue(TopologyMode.traffic.showsPackets)
+        XCTAssertFalse(TopologyMode.traffic.showsArchitecture)
+        XCTAssertFalse(TopologyMode.towers.showsPackets)
+        XCTAssertTrue(TopologyMode.towers.showsArchitecture)
+    }
+
+    func testTowerLockFramesFromTheRightLikeElectron() {
+        let pose = TopologyCamera.lock(base: SCNVector3(2, 0, -1), height: 4)
+        let eye = TopologyCamera.eye(of: pose)
+        XCTAssertLessThan(pose.target.x, 2)
+        XCTAssertGreaterThan(eye.x, pose.target.x)
+        XCTAssertGreaterThan(eye.y, pose.target.y)
+        XCTAssertGreaterThan(eye.z, pose.target.z)
+        XCTAssertGreaterThanOrEqual(pose.pitch, TopologyCamera.minPitch)
+        XCTAssertLessThanOrEqual(pose.pitch, TopologyCamera.maxPitch)
+        XCTAssertGreaterThan(pose.distance, 13)
+    }
+
+    func testOrbitCameraStaysUprightAcrossFullYaw() {
+        var pose = TopologyCamera.Pose(target: SCNVector3(0, 1.2, 0), yaw: 0, pitch: 0.62, distance: 18)
+        var yaw: Float = -.pi
+        while yaw <= .pi {
+            pose.yaw = yaw
+            XCTAssertGreaterThan(TopologyCamera.basisUpY(of: pose), 0.35, "yaw \(yaw)")
+            yaw += 0.35
+        }
+        pose.pitch = TopologyCamera.maxPitch
+        XCTAssertGreaterThan(TopologyCamera.basisUpY(of: pose), 0.2)
+    }
+
+    func testProjectFilterExplodesEppyIntoFrontendBackendAndDatabase() {
+        let site = Fixtures.sites.first { $0.id == "eppy" }!
+        let project = Fixtures.projects.first { $0.id == "eppy" }
+        let components = TopologyLayer.explode(site, project: project, services: Fixtures.dataServices)
+        let roles = Set(components.compactMap { TopologyServiceRole.of(siteID: $0.id) })
+        XCTAssertEqual(roles, [.frontend, .backend, .database])
+        XCTAssertEqual(components.map(\.name), ["Frontend", "Backend", "Database"])
+        let roads = TopologyLayer.componentRoads(parent: site, components: components, routes: Fixtures.sources.internalRoutes ?? [])
+        XCTAssertTrue(roads.contains { $0.from.hasSuffix("/frontend") && $0.to.hasSuffix("/backend") && $0.kind == .call })
+        XCTAssertTrue(roads.contains { $0.from.hasSuffix("/backend") && $0.to.hasSuffix("/database") && $0.kind == .io })
+        XCTAssertTrue(roads.contains { $0.from == "host" && $0.to.hasSuffix("/frontend") })
+        let backend = components.first { TopologyServiceRole.of(siteID: $0.id) == .backend }!
+        let layers = TopologyLayer.layers(for: backend, project: project)
+        XCTAssertTrue(layers.contains { $0.kind == .module && $0.title == "api" })
+        XCTAssertFalse(layers.contains { $0.kind == .module && $0.title == "web" })
+    }
+
+    func testProjectFilterSynthesizesFrontendWhenOnlyBackendExists() {
+        let site = Fixtures.sites.first { $0.id == "kablay-us" }!
+        let components = TopologyLayer.explode(site, project: Fixtures.projects.first { $0.id == site.id }, services: [])
+        XCTAssertTrue(components.contains { TopologyServiceRole.of(siteID: $0.id) == .frontend })
+        XCTAssertTrue(components.contains { TopologyServiceRole.of(siteID: $0.id) == .backend })
+    }
+
+    func testWeavatrixModulesBecomeInnerTowerLayers() {
+        let site = Fixtures.sites[0]
+        let project = Fixtures.projects.first { $0.id == site.id }
+        let layers = TopologyLayer.layers(for: site, project: project)
+        XCTAssertTrue(layers.contains { $0.kind == .runtime })
+        XCTAssertTrue(layers.contains { $0.kind == .module && $0.title == "web" })
+        XCTAssertTrue(layers.contains { $0.kind == .community })
+        XCTAssertGreaterThan(layers.filter { $0.kind == .runtime }.count, 1)
+        let hops = TopologyLayer.hops(for: site, project: project, routes: Fixtures.sources.internalRoutes ?? [])
+        XCTAssertTrue(hops.contains { !$0.weavatrix })
+        XCTAssertTrue(hops.contains { $0.weavatrix && $0.title.contains("Weavatrix") })
     }
 
     func testManhattanRoadsStayOrthogonalOnTheCyberboard() {

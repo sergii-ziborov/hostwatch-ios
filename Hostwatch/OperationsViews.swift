@@ -45,18 +45,36 @@ struct VulnerabilityDetail: View {
 
 struct TopologyView: View {
     @EnvironmentObject private var model: AppModel
-    @State private var mode: TopologyMode = .towers
+    @State private var mode: TopologyMode = .traffic
     @State private var command = TopologyCommand(number: 0, action: .fit)
     @State private var selection: TopologySelection?
     @State private var focusedSiteID: String?
     @State private var focusedRoad: String?
-    @State private var showLegend = true
+    @State private var showLegend = false
 
-    private var sites: [Site] { model.sites }
+    private var parentSites: [Site] {
+        model.selectedSite.isEmpty ? model.sites : model.sites.filter { $0.id == model.selectedSite }
+    }
+
+    private var projectScope: Bool { !model.selectedSite.isEmpty }
+
+    private var sites: [Site] {
+        guard projectScope, let site = parentSites.first else { return model.sites }
+        return TopologyLayer.explode(site, project: model.projects.first { $0.id == site.id }, services: model.dataServices)
+    }
 
     private var projects: [ProjectHealth] {
-        let ids = Set(sites.map(\.id))
+        let ids = Set(parentSites.map(\.id))
         return model.projects.filter { ids.contains($0.id) }
+    }
+
+    private func project(for site: Site) -> ProjectHealth? {
+        projects.first { site.id.hasPrefix($0.id) || $0.id == site.id }
+    }
+
+    private var componentLinks: [TopologyLink] {
+        guard projectScope, let parent = parentSites.first else { return [] }
+        return TopologyLayer.componentRoads(parent: parent, components: sites, routes: model.sources.internalRoutes ?? [])
     }
 
     private var node: ManagedNode {
@@ -83,7 +101,9 @@ struct TopologyView: View {
                     .controlSize(.small)
                     ZStack(alignment: .topLeading) {
                         NativeTopologyScene(snapshot: .init(node: node, overview: overview, sites: sites, projects: projects,
-                                                            routes: model.sources.internalRoutes ?? [], services: model.dataServices),
+                                                            routes: model.sources.internalRoutes ?? [],
+                                                            services: projectScope ? [] : model.dataServices,
+                                                            links: componentLinks, projectScope: projectScope),
                                             mode: mode, command: command, selection: $selection,
                                             focusedSiteID: $focusedSiteID, focusedRoad: $focusedRoad)
                         HStack(alignment: .top, spacing: 8) {
@@ -95,7 +115,7 @@ struct TopologyView: View {
                         VStack {
                             Spacer()
                             HStack(alignment: .bottom) {
-                                helpHints
+                                if focusedSiteID == nil { helpHints }
                                 Spacer()
                                 VStack(spacing: 8) {
                                     Button { send(.zoomIn) } label: { Image(systemName: "plus.magnifyingglass") }
@@ -129,18 +149,17 @@ struct TopologyView: View {
                         }
                     }
                 }
-                .onAppear {
-                    if focusedSiteID == nil, !model.selectedSite.isEmpty {
-                        focusedSiteID = model.selectedSite
-                        send(.focus)
-                    }
-                }
                 .sheet(item: $selection) { picked in
                     if let site = sites.first(where: { $0.id == picked.siteID }) {
                         TopologyTowerInspector(site: site,
-                                               project: projects.first(where: { $0.id == site.id }),
+                                               project: projects.first(where: { picked.siteID.hasPrefix($0.id) || $0.id == site.id }),
                                                layer: picked.layer)
                     }
+                }
+                .onChange(of: model.selectedSite) { _, _ in
+                    focusedSiteID = nil
+                    focusedRoad = nil
+                    send(.fit)
                 }
             } else {
                 EmptyState(
@@ -154,6 +173,17 @@ struct TopologyView: View {
         .background(HW.background)
         .clipShape(RoundedRectangle(cornerRadius: 14))
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(HW.border))
+        #if DEBUG
+        .onAppear {
+            if ProcessInfo.processInfo.environment["HOSTWATCH_MODE"] == "towers" {
+                mode = .towers
+            }
+            if ProcessInfo.processInfo.environment["HOSTWATCH_FOCUS"] == "1", focusedSiteID == nil, let first = sites.first {
+                focusedSiteID = first.id
+                send(.focus)
+            }
+        }
+        #endif
     }
 
     @ViewBuilder private var dossier: some View {
@@ -162,26 +192,32 @@ struct TopologyView: View {
                 Text("TARGET LOCKED").font(.caption2.bold()).tracking(1.6).foregroundStyle(HW.teal)
                 if let site = sites.first(where: { $0.id == focusedSiteID }) {
                     Text(site.name).font(.headline)
-                    Text(site.domains.joined(separator: " · ")).font(.caption2).foregroundStyle(HW.secondary)
+                    Text(projectScope
+                         ? "\(parentSites.first?.name ?? site.name) · \(TopologyServiceRole.of(siteID: site.id)?.title ?? "service")"
+                         : site.domains.joined(separator: " · "))
+                        .font(.caption2).foregroundStyle(HW.secondary)
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 70), spacing: 6)], alignment: .leading, spacing: 6) {
                         pip("REQ/MIN", Int(site.requestsPerMinute).formatted())
                         pip("ERRORS", Format.percent(site.errorRate))
-                        pip("P95", "\(Int(site.p95Ms)) ms")
-                        pip("CPU", Format.percent(site.cpuPercent))
-                        pip("MEM", Format.bytes(site.memoryBytes))
-                        pip("LAYERS", "\(TopologyLayer.layers(for: site, project: projects.first { $0.id == site.id }).count)")
+                        pip("LAYERS", "\(TopologyLayer.layers(for: site, project: project(for: site)).count)")
                     }
                     if let focusedRoad {
                         Text(focusedRoad.replacingOccurrences(of: "road:", with: "").replacingOccurrences(of: ":", with: " → "))
                             .font(.caption2).foregroundStyle(HW.amber)
                     }
-                    HStack(spacing: 8) {
+                    ForEach(Array(TopologyLayer.hops(for: site, project: project(for: site), routes: model.sources.internalRoutes ?? []).prefix(3))) { hop in
+                        Text(hop.title)
+                            .font(.caption2)
+                            .foregroundStyle(hop.weavatrix ? Color(red: 0.71, green: 0.55, blue: 1) : HW.amber)
+                    }
+                    HStack(spacing: 6) {
                         Button("Details") { selection = TopologySelection(siteID: site.id, layer: nil) }
                         Button("Elevate") { send(.elevate) }
                         Button("Release") { send(.fit) }
                     }
                     .buttonStyle(.bordered)
-                    .controlSize(.small)
+                    .controlSize(.mini)
+                    .fixedSize(horizontal: true, vertical: true)
                 } else if focusedSiteID == "host" {
                     Text(node.name).font(.headline)
                     Text("Public edge · feeder roads stay on the board").font(.caption2).foregroundStyle(HW.secondary)
@@ -193,8 +229,8 @@ struct TopologyView: View {
                     Button("Release") { send(.fit) }.buttonStyle(.bordered).controlSize(.small)
                 }
             }
-            .padding(12)
-            .frame(maxWidth: 280, alignment: .leading)
+            .padding(10)
+            .frame(maxWidth: 236, alignment: .leading)
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
         }
     }
@@ -205,11 +241,21 @@ struct TopologyView: View {
                 HStack { Text("LEGEND").font(.caption2.bold()).tracking(1.4); Spacer(); Text(showLegend ? "▾" : "▸") }
             }.buttonStyle(.plain)
             if showLegend {
-                legendRow(HW.teal, "FEEDER · HOST → SITE")
-                legendRow(HW.amber, "CALL · OBSERVED NGINX")
-                legendRow(Color(red: 0.35, green: 0.82, blue: 0.62), "I/O · DB / CACHE")
-                Text("Roads stay on the board. Tap zooms the camera, not a sheet.")
-                    .font(.caption2).foregroundStyle(HW.secondary)
+                if mode == .traffic {
+                    legendRow(HW.teal, "PACKETS · LIVE REQUESTS")
+                    legendRow(HW.amber, "ROADS · CALL VOLUME")
+                    legendRow(Color(red: 0.35, green: 0.82, blue: 0.62), "I/O · DB / CACHE")
+                    Text("Traffic lights the roads and moves packets. Architecture layers stay hidden.")
+                        .font(.caption2).foregroundStyle(HW.secondary)
+                } else {
+                    legendRow(HW.teal, "RUNTIME · CONTAINERS")
+                    legendRow(Color(red: 0.71, green: 0.55, blue: 1), "WEAVATRIX · MODULES")
+                    legendRow(HW.amber, "STRUCTURE · ROADS ONLY")
+                    Text(projectScope
+                         ? "Towers show frontend, backend and data as separate pillars. Packets stay off."
+                         : "Towers show stacked services and Weavatrix. Roads are structure, not live flow.")
+                        .font(.caption2).foregroundStyle(HW.secondary)
+                }
             }
         }
         .padding(10)
@@ -219,11 +265,11 @@ struct TopologyView: View {
 
     private var helpHints: some View {
         VStack(alignment: .leading, spacing: 2) {
+            Text(mode == .traffic ? "TRAFFIC · packets = live requests" : "TOWERS · layers = services + Weavatrix").font(.caption2)
             Text("DRAG orbit / tilt").font(.caption2)
+            Text("TWO FINGERS pan").font(.caption2)
             Text("PINCH zoom").font(.caption2)
-            Text("TAP lock target").font(.caption2)
-            Text("TAP ROAD highlight path").font(.caption2)
-            Text("DBL-TAP elevation · empty = reset").font(.caption2)
+            Text("TAP frame tower from the right").font(.caption2)
         }
         .foregroundStyle(HW.secondary)
         .padding(10)
@@ -292,6 +338,35 @@ struct TopologyTowerInspector: View {
                         LabeledContent("Processes", value: container.pids.formatted())
                     }
                 }
+                Section("Services inside") {
+                    ForEach(Array(layers.filter { $0.kind == .runtime }.enumerated()), id: \.offset) { index, layer in
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("\(index + 1) · \(layer.title)")
+                            Text(layer.detail).font(.caption).foregroundStyle(HW.secondary)
+                        }
+                    }
+                }
+                let hops = TopologyLayer.hops(for: site, project: project)
+                if !hops.isEmpty {
+                    Section("Inside the tower") {
+                        ForEach(hops) { hop in
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(hop.title)
+                                Text(hop.weavatrix ? "Weavatrix hop" : "Runtime hop").font(.caption).foregroundStyle(HW.secondary)
+                            }
+                        }
+                    }
+                }
+                if layers.contains(where: { $0.kind == .module || $0.kind == .community || $0.kind == .hotspot }) {
+                    Section("Weavatrix inside") {
+                        ForEach(Array(layers.filter { $0.kind == .module || $0.kind == .community || $0.kind == .hotspot }.enumerated()), id: \.offset) { _, layer in
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(layer.title)
+                                Text(layer.detail).font(.caption).foregroundStyle(HW.secondary)
+                            }
+                        }
+                    }
+                }
                 Section("Tower layers") {
                     ForEach(Array(layers.enumerated()), id: \.offset) { index, layer in
                             VStack(alignment: .leading, spacing: 3) {
@@ -305,6 +380,8 @@ struct TopologyTowerInspector: View {
                     Section("Code evidence") {
                         LabeledContent("Coverage", value: project.completeness)
                         LabeledContent("Revision", value: project.revision)
+                        LabeledContent("Modules", value: (project.analysis?.modules?.count ?? 0).formatted())
+                        LabeledContent("Communities", value: (project.analysis?.communities?.count ?? 0).formatted())
                         NavigationLink("Inspect code health") { CodeProjectDetail(project: project) }
                     }
                 }

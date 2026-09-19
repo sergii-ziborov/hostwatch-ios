@@ -113,6 +113,9 @@ final class AppModel: ObservableObject {
         hybridAdmission = Fixtures.hybridAdmission
         fleetLinks = Fixtures.fleetLinks
         hybridError = nil
+        if let site = ProcessInfo.processInfo.environment["HOSTWATCH_SITE"], sites.contains(where: { $0.id == site }) {
+            selectedSite = site
+        }
     }
 #endif
 
@@ -239,11 +242,38 @@ final class AppModel: ObservableObject {
         liveTask?.cancel(); liveTask = nil
         guard enabled else { return }
         liveTask = Task { [weak self] in
+            var ticks = 0
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(5))
+                try? await Task.sleep(for: .seconds(page == .topology ? 1 : 5))
                 guard let self, !Task.isCancelled else { return }
-                await self.reload(page: page, quiet: true)
+                if page == .topology {
+                    await self.pulseTopology(full: ticks % 15 == 0)
+                    ticks += 1
+                } else {
+                    await self.reload(page: page, quiet: true)
+                }
             }
+        }
+    }
+
+    private func pulseTopology(full: Bool) async {
+#if DEBUG
+        if fixtures { return }
+#endif
+        do {
+            async let overviewCall = client.overview()
+            async let sitesCall = client.sites()
+            async let sourcesCall = client.sources(site: "", hours: hours)
+            let loaded = try await (overviewCall, sitesCall, sourcesCall)
+            overview = loaded.0
+            sites = loaded.1
+            sources = loaded.2
+            if full {
+                projects = try await client.projects()
+                await loadDataServices()
+            }
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 

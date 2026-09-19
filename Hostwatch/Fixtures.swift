@@ -25,8 +25,10 @@ enum Fixtures {
             container("kus-app", "kablay-us-app-1", "kablay-us", "running", 1.8, 280_000_000)
         ], cpuPercent: 2.1, memoryBytes: 524_288_000, memoryLimit: 1_181_116_006, requestsPerMinute: 13.8, bytesPerMinute: 614_400, errorRate: 0.7, p95Ms: 184),
         .init(id: "eppy", name: "Eppy", domains: ["eppy.co.il"], sharedNginx: true, containers: [
-            container("eppy-api", "eppy-api-1", "eppy", "running", 0.9, 188_000_000)
-        ], cpuPercent: 1.2, memoryBytes: 314_572_800, memoryLimit: 1_073_741_824, requestsPerMinute: 4.1, bytesPerMinute: 178_176, errorRate: 0.0, p95Ms: 88),
+            container("eppy-web", "eppy-web-1", "eppy", "running", 0.4, 88_000_000),
+            container("eppy-api", "eppy-api-1", "eppy", "running", 0.9, 188_000_000),
+            container("eppy-pg", "eppy-postgres-1", "eppy", "running", 0.6, 140_000_000)
+        ], cpuPercent: 1.2, memoryBytes: 416_000_000, memoryLimit: 1_073_741_824, requestsPerMinute: 4.1, bytesPerMinute: 178_176, errorRate: 0.0, p95Ms: 88),
         .init(id: "granttap", name: "GrantTap", domains: ["granttap.internal"], sharedNginx: true, containers: [
             container("gt-relay", "granttap-relay-1", "granttap", "running", 0.4, 64_000_000)
         ], cpuPercent: 0.6, memoryBytes: 96_000_000, memoryLimit: 536_870_912, requestsPerMinute: 2.4, bytesPerMinute: 48_000, errorRate: 0.0, p95Ms: 42)
@@ -55,7 +57,9 @@ enum Fixtures {
         .init(type: "PostgreSQL", role: "Relational database", siteId: "applydjinn", siteName: "ApplyDjinn",
               container: .init(id: "postgres-fixture", name: "applydjinn-postgres-1", project: "applydjinn", state: "running", status: "Up 3 days", image: "postgres:16", imageId: "sha256:fixture", cpuPercent: 4.6, memoryBytes: 417_000_000, memoryLimit: 1_073_741_824, networkRxBytes: 42_000_000, networkTxBytes: 18_000_000, pids: 18)),
         .init(type: "Redis / Valkey", role: "Cache & key-value store", siteId: "kablay-il", siteName: "Kablay IL",
-              container: .init(id: "redis-fixture", name: "kablay-redis-1", project: "kablay", state: "running", status: "Up 3 days", image: "redis:7", imageId: "sha256:fixture", cpuPercent: 1.2, memoryBytes: 112_000_000, memoryLimit: 536_870_912, networkRxBytes: 27_000_000, networkTxBytes: 11_000_000, pids: 5))
+              container: .init(id: "redis-fixture", name: "kablay-redis-1", project: "kablay", state: "running", status: "Up 3 days", image: "redis:7", imageId: "sha256:fixture", cpuPercent: 1.2, memoryBytes: 112_000_000, memoryLimit: 536_870_912, networkRxBytes: 27_000_000, networkTxBytes: 11_000_000, pids: 5)),
+        .init(type: "PostgreSQL", role: "Relational database", siteId: "eppy", siteName: "Eppy",
+              container: .init(id: "eppy-pg-fixture", name: "eppy-postgres-1", project: "eppy", state: "running", status: "Up 3 days", image: "postgres:16", imageId: "sha256:fixture", cpuPercent: 0.6, memoryBytes: 140_000_000, memoryLimit: 536_870_912, networkRxBytes: 8_000_000, networkTxBytes: 3_000_000, pids: 11))
     ]
 
     static let sources = Sources(windowHours: 24, site: nil,
@@ -65,7 +69,11 @@ enum Fixtures {
         internalRoutes: [
             .init(caller: "applydjinn", destinationHost: "kablay.il", targetService: "kablay-il", requests: 420, bytes: 2_200_000),
             .init(caller: "kablay-il", destinationHost: "applydjinn.com", targetService: "applydjinn", requests: 180, bytes: 640_000),
-            .init(caller: "granttap", destinationHost: "applydjinn.com", targetService: "applydjinn", requests: 96, bytes: 210_000)
+            .init(caller: "granttap", destinationHost: "applydjinn.com", targetService: "applydjinn", requests: 96, bytes: 210_000),
+            .init(caller: "applydjinn-app", destinationHost: "applydjinn-postgres", targetService: "applydjinn", requests: 86, bytes: 240_000),
+            .init(caller: "kablay-app", destinationHost: "kablay-redis", targetService: "kablay-il", requests: 54, bytes: 96_000),
+            .init(caller: "eppy-web", destinationHost: "api.eppy.co.il", targetService: "eppy-api", requests: 64, bytes: 180_000),
+            .init(caller: "eppy-api", destinationHost: "eppy-postgres", targetService: "eppy-postgres", requests: 48, bytes: 96_000)
         ])
 
     static let requests: [RequestSample] = (0..<42).map { index in
@@ -87,7 +95,7 @@ enum Fixtures {
         ])
 
     static let projects: [ProjectHealth] = sites.map { site in
-        ProjectHealth(id: site.id, name: site.name, root: "/srv/apps/\(site.id)", revision: "c3197f8", version: "1.0", status: "CURRENT", completeness: site.id == "applydjinn" ? "PARTIAL" : "CURRENT", scanner: "native", scannedAt: ISO8601DateFormatter().string(from: .now), git: .init(status: "CURRENT", head: "c3197f8", branch: "main", dirty: site.id == "kablay-il", dirtyFiles: site.id == "kablay-il" ? 12 : 0, untrackedFiles: 0, lastCommitAt: ISO8601DateFormatter().string(from: Date().addingTimeInterval(-7200)), lastMessage: "Update production configuration", evidence: "local"), graph: .init(status: "CURRENT", revision: "c3197f8", nodes: 1800 + site.name.count * 417, edges: 4900 + site.name.count * 801, buildMs: 460), analysis: .init(status: "CURRENT", modules: [.init(path: "src", files: 84, symbols: 526), .init(path: "api", files: 31, symbols: 218)], hotPaths: [.init(label: "request", kind: "function", file: "src/api.ts", line: 7, score: 0.91)], deadCode: [.init(label: "legacyHandler", kind: "function", file: "src/legacy.ts", line: 42, confidence: "high", reason: "No inbound references")]), vulnerabilities: site.id == "eppy" ? [] : [.init(id: "CVE-2026-1142", severity: site.id == "applydjinn" ? "critical" : "high", package: "example-runtime", installedVersion: "2.8.1", fixedVersion: "2.8.4", summary: "Request parsing can consume excessive resources", url: "https://example.invalid/CVE-2026-1142")], findings: [.init(category: "architecture", severity: "medium", message: "Module boundary is crossed by a direct import", file: "src/server.ts", line: 118)])
+        ProjectHealth(id: site.id, name: site.name, root: "/srv/apps/\(site.id)", revision: "c3197f8", version: "1.0", status: "CURRENT", completeness: site.id == "applydjinn" ? "PARTIAL" : "CURRENT", scanner: "native", scannedAt: ISO8601DateFormatter().string(from: .now), git: .init(status: "CURRENT", head: "c3197f8", branch: "main", dirty: site.id == "kablay-il", dirtyFiles: site.id == "kablay-il" ? 12 : 0, untrackedFiles: 0, lastCommitAt: ISO8601DateFormatter().string(from: Date().addingTimeInterval(-7200)), lastMessage: "Update production configuration", evidence: "local"), graph: .init(status: "CURRENT", revision: "c3197f8", nodes: 1800 + site.name.count * 417, edges: 4900 + site.name.count * 801, buildMs: 460), analysis: analysis(for: site), vulnerabilities: site.id == "eppy" ? [] : [.init(id: "CVE-2026-1142", severity: site.id == "applydjinn" ? "critical" : "high", package: "example-runtime", installedVersion: "2.8.1", fixedVersion: "2.8.4", summary: "Request parsing can consume excessive resources", url: "https://example.invalid/CVE-2026-1142")], findings: [.init(category: "architecture", severity: "medium", message: "Module boundary is crossed by a direct import", file: "src/server.ts", line: 118)])
     }
 
     static let jobs: [JobState] = [
@@ -101,6 +109,44 @@ enum Fixtures {
         .init(id: "home-main", kind: "home-compute", publicIp: "203.0.113.44", previousIp: "203.0.113.10", tunnelIp: "10.8.0.2",
               lastSeen: ISO8601DateFormatter().string(from: .now), fresh: true, ipChanged: true, diskFreeBytes: 42_949_672_960, runningJobs: 1, cpuPercent: 22)
     ]
+    private static func analysis(for site: Site) -> CodeAnalysis {
+        switch site.id {
+        case "applydjinn":
+            return .init(status: "CURRENT", modules: [
+                .init(path: "web", files: 64, symbols: 812),
+                .init(path: "api", files: 31, symbols: 418),
+                .init(path: "workers", files: 12, symbols: 146)
+            ], communities: [
+                .init(id: 0, nodes: 86, sample: ["api/search.ts", "api/auth.ts"]),
+                .init(id: 1, nodes: 41, sample: ["workers/ingest.ts"])
+            ], hotPaths: [.init(label: "search", kind: "function", file: "api/search.ts", line: 18, score: 0.94)],
+               deadCode: [.init(label: "legacyHandler", kind: "function", file: "web/legacy.ts", line: 42, confidence: "high", reason: "No inbound references")])
+        case "eppy":
+            return .init(status: "CURRENT", modules: [
+                .init(path: "web", files: 22, symbols: 186),
+                .init(path: "api", files: 19, symbols: 240)
+            ], communities: [
+                .init(id: 0, nodes: 28, sample: ["web/app.ts", "web/pages.ts"]),
+                .init(id: 1, nodes: 24, sample: ["api/bookings.ts"])
+            ], hotPaths: [.init(label: "bookings", kind: "function", file: "api/bookings.ts", line: 14, score: 0.82)],
+               deadCode: [])
+        case "kablay-il":
+            return .init(status: "CURRENT", modules: [
+                .init(path: "app", files: 48, symbols: 620),
+                .init(path: "billing", files: 17, symbols: 210)
+            ], communities: [.init(id: 0, nodes: 54, sample: ["app/checkout.ts", "billing/invoice.ts"])],
+               hotPaths: [.init(label: "checkout", kind: "function", file: "app/checkout.ts", line: 9, score: 0.88)],
+               deadCode: [])
+        default:
+            return .init(status: "CURRENT", modules: [
+                .init(path: "src", files: 28, symbols: 240),
+                .init(path: "api", files: 11, symbols: 96)
+            ], communities: [.init(id: 0, nodes: 22, sample: ["src/server.ts"])],
+               hotPaths: [.init(label: "request", kind: "function", file: "src/server.ts", line: 7, score: 0.71)],
+               deadCode: [])
+        }
+    }
+
     static let fleetLinks: [FleetLink] = [
         .init(id: "home-main", layers: [
             .init(name: "heartbeat", status: "ok", detail: "public IP changed from 203.0.113.10 to 203.0.113.44"),

@@ -281,7 +281,18 @@ struct Vulnerability: Codable, Identifiable, Hashable { let id: String; let seve
 struct HealthFinding: Codable, Identifiable, Hashable { var id: String { "\(file):\(line):\(message)" }; let category: String; let severity: String; let message: String; let file: String; let line: Int }
 struct GraphHealth: Codable { let status: String?; let revision: String?; let nodes: Int?; let edges: Int?; let buildMs: Double? }
 struct GitHealth: Codable { let status: String?; let head: String?; let branch: String?; let dirty: Bool?; let dirtyFiles: Int?; let untrackedFiles: Int?; let lastCommitAt: String?; let lastMessage: String?; let evidence: String? }
-struct CodeAnalysis: Codable { let status: String?; let modules: [CodeModule]?; let hotPaths: [HotPath]?; let deadCode: [DeadCode]? }
+struct CodeCommunity: Codable, Identifiable, Hashable {
+    let id: Int
+    let nodes: Int
+    var sample: [String]? = nil
+}
+struct CodeAnalysis: Codable {
+    let status: String?
+    let modules: [CodeModule]?
+    var communities: [CodeCommunity]? = nil
+    let hotPaths: [HotPath]?
+    let deadCode: [DeadCode]?
+}
 struct CodeModule: Codable, Identifiable { var id: String { path }; let path: String; let files: Int; let symbols: Int }
 struct HotPath: Codable, Identifiable { var id: String { "\(file):\(line)" }; let label: String; let kind: String; let file: String; let line: Int; let score: Double }
 struct DeadCode: Codable, Identifiable { var id: String { "\(file):\(line)" }; let label: String; let kind: String; let file: String; let line: Int; let confidence: String; let reason: String }

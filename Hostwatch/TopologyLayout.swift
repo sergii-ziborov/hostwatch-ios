@@ -11,6 +11,13 @@ enum TopologyRoadKind: String, Equatable {
     case io
 }
 
+struct TopologyLink: Equatable {
+    let from: String
+    let to: String
+    let kind: TopologyRoadKind
+    let volume: Double
+}
+
 enum TopologyAxis {
     case horizontal
     case vertical
@@ -23,7 +30,11 @@ enum TopologyLayout {
     static let snapGrid: Float = 0.4
     static let roadY: Float = 0.18
 
-    static func columns(for count: Int) -> Int { min(3, max(1, count)) }
+    static func columns(for count: Int) -> Int {
+        if count <= 2 { return max(1, count) }
+        if count == 3 { return 2 }
+        return min(3, count)
+    }
 
     static func gridPosition(index: Int, count: Int) -> TopologyPoint {
         let cols = columns(for: count)
