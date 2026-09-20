@@ -46,7 +46,7 @@ struct RootView: View {
                             set: { if !$0 { morePage = nil } }
                         )) { EmptyView() }
                     }
-                    Section("Observe") { mobileMenu(.incidents); mobileMenu(.workloads); mobileMenu(.fleet) }
+                    Section("Observe") { mobileMenu(.incidents); mobileMenu(.errors); mobileMenu(.workloads); mobileMenu(.fleet) }
                     Section("Control") { mobileMenu(.policies); mobileMenu(.environment); mobileMenu(.mcp); mobileMenu(.cleanup); mobileMenu(.automations) }
                     Section("Analyze") { mobileMenu(.codeHealth) }
                     Section("Company") { mobileMenu(.access); mobileMenu(.security); mobileMenu(.organization) }
@@ -74,7 +74,7 @@ struct RootView: View {
                 Section { brand }
                     .listRowBackground(Color.clear)
                 Section("Observe") {
-                    menu(.overview); menu(.traffic); menu(.data); menu(.incidents); menu(.topology); menu(.workloads); menu(.fleet)
+                    menu(.overview); menu(.traffic); menu(.data); menu(.incidents); menu(.errors); menu(.topology); menu(.workloads); menu(.fleet)
                 }
                 Section("Control") {
                     menu(.policies); menu(.environment); menu(.mcp); menu(.cleanup); menu(.automations)
@@ -193,6 +193,7 @@ struct PageContainer: View {
             case .traffic: TrafficView()
             case .data: DataView()
             case .incidents: IncidentsView()
+            case .errors: ErrorsView()
             case .topology: TopologyView()
             case .workloads: WorkloadsView()
             case .fleet: FleetView()

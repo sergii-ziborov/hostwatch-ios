@@ -38,6 +38,7 @@ struct VulnerabilityDetail: View {
         List {
             Section("Finding") { HWLabeled("Project", value: project.name); HWLabeled("Severity", value: vulnerability.severity.uppercased()); HWLabeled("Package", value: vulnerability.package); HWLabeled("Installed", value: vulnerability.installedVersion); HWLabeled("Fixed", value: vulnerability.fixedVersion) }
             Section("Description") { Text(vulnerability.summary) }
+            Section("Markdown") { Text("- \(vulnerability.id) (\(vulnerability.severity)) `\(vulnerability.package)` \(vulnerability.installedVersion) → \(vulnerability.fixedVersion) — \(vulnerability.summary)").font(.system(.caption, design: .monospaced)).textSelection(.enabled) }
             if let url = URL(string: vulnerability.url), url.scheme == "https", url.host != "example.invalid" { Section { Link("Open advisory", destination: url) } }
         }.hwHiddenScrollBackground().background(HW.background).navigationTitle(vulnerability.id)
     }

@@ -208,9 +208,10 @@ struct StorageInspectorView: View {
                             .font(.footnote.weight(.semibold)).foregroundStyle(ratio > 0.9 ? HW.red : ratio > 0.75 ? HW.amber : HW.teal)
                     }.padding(18).panel()
 
-                    Picker("Breakdown", selection: $tab) { Text("Sites").tag("Sites"); Text("Types").tag("Types"); Text("Paths").tag("Paths") }.pickerStyle(.segmented)
+                    Picker("Breakdown", selection: $tab) { Text("Sites").tag("Sites"); Text("Types").tag("Types"); Text("Paths").tag("Paths"); Text("Reclaim").tag("Reclaim") }.pickerStyle(.segmented)
                     if tab == "Sites" { groupList(storage.sites, hostBytes: storage.unattributedBytes) }
                     else if tab == "Types" { groupList(storage.categories, hostBytes: 0) }
+                    else if tab == "Reclaim" { ReclaimAdviceList(advice: storage.advice ?? ReclaimPolicy.advise(storage.entries)) }
                     else { entryList(storage.entries) }
                     NavigationLink { CleanupView() } label: { Label("Safe cleanup · preview cached files", systemImage: "sparkles.rectangle.stack") }
                         .buttonStyle(.bordered)
@@ -273,6 +274,8 @@ struct StoragePathDetail: View {
                     StatCard(title: "Size", value: Format.bytes(entry.bytes), icon: "internaldrive")
                     StatCard(title: "Owner", value: entry.siteName ?? "Host & shared", detail: entry.siteId ?? "Operating system, containers or shared data", color: HW.amber, icon: "person.crop.square")
                     StatCard(title: "Type", value: entry.category, detail: entry.kind, icon: "folder")
+                    let reclaim = (model.storage?.advice ?? ReclaimPolicy.advise([entry])).first { $0.path == entry.path } ?? ReclaimPolicy.advise([entry])[0]
+                    StatCard(title: "Reclaim", value: reclaim.className.capitalized, detail: reclaim.reason, color: ReclaimPolicy.color(for: reclaim.className), icon: "trash.slash")
                 }
                 if entry.direct != true {
                     Button("Open directory contents", systemImage: "folder.badge.gearshape") { Task { await model.browseStorage(path: entry.category == "Unclassified host space" ? "unclassified:\(entry.path)" : entry.path) } }
@@ -306,7 +309,7 @@ struct TrafficView: View {
             TrafficMapCard(requests: model.requests)
             HStack(spacing: 12) {
                 NavigationLink { RequestExplorerView() } label: { StatCard(title: "Retained requests", value: model.requests.count.formatted(), detail: "IP, location, destination and full trace", icon: "list.bullet.rectangle") }
-                NavigationLink { ErrorExplorerView() } label: { StatCard(title: "Errors", value: historicalErrors.formatted(), detail: "Selected window · inspect status, path and evidence", color: HW.red, icon: "exclamationmark.triangle") }
+                NavigationLink { ErrorsView() } label: { StatCard(title: "Errors", value: historicalErrors.formatted(), detail: "By project · logs and previous matches", color: HW.red, icon: "exclamationmark.triangle") }
             }
             .buttonStyle(.plain)
             AttributionGrid()
@@ -510,6 +513,7 @@ struct RequestDetailView: View {
     @EnvironmentObject private var model: AppModel
     let request: RequestSample
     @State private var confirmBlock = false
+    @State private var context: ErrorContext?
     private var mappedSite: Site? { model.sites.first { $0.id == request.site } }
     private var hasObservedHost: Bool { RequestEvidence.usableHost(request.host) }
     private var observedPath: String {
@@ -540,6 +544,7 @@ struct RequestDetailView: View {
                     Text("Project: \(siteName) · target: \(observedPath) · upstream: \(request.upstreamAddr.flatMap { $0 == "-" ? nil : $0 } ?? "not recorded")")
                         .font(.caption.monospaced()).foregroundStyle(HW.secondary).textSelection(.enabled)
                 }.padding(16).frame(maxWidth: .infinity, alignment: .leading).panel()
+                if request.status >= 400 { RequestErrorContextCard(context: context) }
                 trace
                 if let destinationURL {
                     Link(destination: destinationURL) { Label("Open destination in browser", systemImage: "arrow.up.right.square") }
@@ -558,6 +563,7 @@ struct RequestDetailView: View {
                 }
             }.padding(20)
         }.background(HW.background).navigationTitle("Request").navigationBarTitleDisplayMode(.inline)
+        .task { if request.status >= 400 { context = await model.errorContext(for: request) } }
         .confirmationDialog("Block \(request.clientIp)?", isPresented: $confirmBlock, titleVisibility: .visible) {
             Button("Block IP", role: .destructive) { Task { await model.block(site: request.site, kind: "ip", value: request.clientIp) } }
         } message: { Text("A project-scoped access rule will be applied to \(siteName).") }
@@ -820,7 +826,8 @@ struct RequestMap: View {
                 .frame(minHeight: 160)
             } else {
                 RequestMapCanvas(pins: pins) { selected = $0 }
-                    .frame(minHeight: 260)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 260)
                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
             Text("\(located.formatted()) located · \(ours.formatted()) our services · \(unknown.formatted()) no geo")

@@ -41,10 +41,44 @@ struct AddEnvironmentVariableView: View {
 
 struct CodeHealthView: View {
     @EnvironmentObject private var model: AppModel
+    @State private var importing = false
+    @State private var importProject = ""
+    @State private var draft = ""
+    @State private var exportText = ""
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack { VStack(alignment: .leading) { Eyebrow(text: "Repository evidence"); Text("Code intelligence, Git & vulnerabilities").font(.title2.bold()) }; Spacer(); Text("Bounded evidence").font(.caption).foregroundStyle(HW.secondary) }
+            HStack {
+                VStack(alignment: .leading) { Eyebrow(text: "Repository evidence"); Text("Code intelligence, Git & vulnerabilities").font(.title2.bold()) }
+                Spacer()
+                Menu("Markdown") {
+                    Button("Import advisories") { importProject = model.selectedSite; importing = true }
+                    Button("Copy vulnerability Markdown") { Task { if let value = await model.exportMarkdown(kind: "vulnerability") { exportText = value } } }
+                }.buttonStyle(.bordered)
+            }
+            if !exportText.isEmpty {
+                Text(exportText).font(.system(.caption, design: .monospaced)).textSelection(.enabled).lineLimit(10).padding(12).panel()
+            }
             ForEach(model.projects) { project in NavigationLink { CodeProjectDetail(project: project) } label: { CodeProjectRow(project: project) }.buttonStyle(.plain) }
+        }
+        .sheet(isPresented: $importing) {
+            HWStackNavigation {
+                Form {
+                    Picker("Project", selection: $importProject) {
+                        Text("Unscoped").tag("")
+                        ForEach(model.sites) { site in Text(site.name).tag(site.id) }
+                        ForEach(model.projects.filter { project in !model.sites.contains { $0.id == project.id } }) { project in Text(project.name).tag(project.id) }
+                    }
+                    TextEditor(text: $draft).font(.system(.caption, design: .monospaced)).frame(minHeight: 220)
+                    Section { Text("Paste Hostwatch vulnerability Markdown or lines such as `CVE-2026-1142 (critical)`.").font(.caption).foregroundStyle(HW.secondary) }
+                }
+                .navigationTitle("Import advisories")
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) { Button("Cancel") { importing = false } }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Import") { Task { await model.importMarkdown(kind: "vulnerability", project: importProject, markdown: draft); importing = false; draft = "" } }.disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || draft.utf8.count > 12_000)
+                    }
+                }
+            }
         }
     }
 }

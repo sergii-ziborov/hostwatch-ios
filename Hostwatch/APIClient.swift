@@ -189,6 +189,19 @@ actor APIClient {
         return try await call("/api/v1/requests\(query)")
     }
     func errors(site: String, hours: Int) async throws -> ErrorEvidence { try await call("/api/v1/error-requests?\(scope(site: site, hours: hours))") }
+    func errorGroups(site: String, hours: Int) async throws -> [ErrorProjectGroup] { try await call("/api/v1/errors?\(scope(site: site, hours: hours))") }
+    func errorContext(id: String) async throws -> ErrorContext {
+        try await call("/api/v1/errors/\(id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? id)")
+    }
+    func importedNotes(kind: String, site: String) async throws -> [ImportedNote] {
+        try await call("/api/v1/imports?\(queryItems(["kind": kind, "site": site]))")
+    }
+    func importMarkdown(kind: String, site: String, markdown: String) async throws -> ImportResult {
+        try await call("/api/v1/imports", method: "POST", body: MarkdownImport(kind: kind, site: site, markdown: markdown))
+    }
+    func exportMarkdown(kind: String, site: String) async throws -> MarkdownExport {
+        try await call("/api/v1/export.md?\(queryItems(["kind": kind, "site": site]))")
+    }
     func paths(site: String, hours: Int) async throws -> RequestPaths { try await call("/api/v1/paths?\(scope(site: site, hours: hours))") }
     func storage(path: String? = nil, refresh: Bool = false) async throws -> StorageResponse {
         var items: [URLQueryItem] = []
@@ -265,6 +278,7 @@ private struct Rule: Encodable { let site: String; let kind: String; let value: 
 private struct EnvironmentValue: Encodable { let value: String }
 private struct NewUser: Encodable { let name: String; let email: String; let password: String; let role: String }
 private struct LicenseValue: Encodable { let license: String }
+private struct MarkdownImport: Encodable { let kind: String; let site: String; let markdown: String }
 private struct ServerError: Decodable { let error: String? }
 private struct EmptyResponse: Decodable {}
 

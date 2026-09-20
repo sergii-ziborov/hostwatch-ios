@@ -14,7 +14,7 @@ struct CleanupView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Eyebrow(text: "Host maintenance")
                     Text("Safe cleanup").font(.title2.bold())
-                    Text("Preview fixed, allowlisted caches before removing them.").font(.footnote).foregroundStyle(HW.secondary)
+                    Text("Preview fixed, allowlisted caches before removing them. Reclaim advice classifies the rest of host storage as safe, review, or protected.").font(.footnote).foregroundStyle(HW.secondary)
                 }
                 Spacer()
                 Button { Task { await model.refreshCleanup() } } label: { Image(systemName: "arrow.clockwise") }
@@ -33,6 +33,7 @@ struct CleanupView: View {
             if let preview = model.cleanupPreview {
                 let fileBytes = preview.targets.filter { $0.kind != "docker-build-cache" && $0.available }.reduce(0.0) { $0 + $1.bytes }
                 StatCard(title: "Eligible package & manual caches", value: Format.bytes(fileBytes), detail: "Docker virtual layer sizes are excluded from this total", icon: "internaldrive")
+                ReclaimAdviceList(advice: preview.advice ?? ReclaimPolicy.advise(model.storage?.entries ?? []))
                 ForEach(preview.targets) { target in
                     VStack(alignment: .leading, spacing: 10) {
                         HStack(alignment: .top) {

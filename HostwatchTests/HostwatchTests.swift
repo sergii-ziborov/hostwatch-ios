@@ -1,3 +1,5 @@
+import CoreLocation
+import MapKit
 import SceneKit
 import XCTest
 @testable import Hostwatch
@@ -102,8 +104,31 @@ final class HostwatchTests: XCTestCase {
         XCTAssertNotNil(GeoPlace.coordinate(for: visitor))
         XCTAssertNil(GeoPlace.coordinate(for: Fixtures.requests.first { $0.origin == .ourService }!))
         XCTAssertFalse(GeoPlace.isUsable(latitude: 0, longitude: 0))
+        XCTAssertFalse(GeoPlace.isUsable(latitude: .nan, longitude: 34))
         XCTAssertNotNil(GeoPlace.centroid(code: "IL", country: "Israel"))
         XCTAssertGreaterThan(GeoPlace.pins(from: Fixtures.requests).count, 0)
+    }
+
+    func testVisitorMapRegionStaysValidForWorldwidePins() {
+        let worldwide = [
+            CLLocationCoordinate2D(latitude: -41.29, longitude: 174.78),
+            CLLocationCoordinate2D(latitude: 38.91, longitude: -77.04),
+            CLLocationCoordinate2D(latitude: 35.68, longitude: 139.69)
+        ]
+        let region = GeoPlace.regionCovering(worldwide)
+        XCTAssertNotNil(region)
+        XCTAssertLessThanOrEqual(region?.span.latitudeDelta ?? 999, 80)
+        XCTAssertLessThanOrEqual(region?.span.longitudeDelta ?? 999, 140)
+        let tall = GeoPlace.sanitized(region!, fitting: CGSize(width: 1, height: 260))
+        XCTAssertLessThanOrEqual(tall.span.latitudeDelta, 80)
+        XCTAssertLessThanOrEqual(tall.span.longitudeDelta, 140)
+        XCTAssertTrue(CLLocationCoordinate2DIsValid(tall.center))
+        let phone = GeoPlace.sanitized(region!, fitting: CGSize(width: 390, height: 260))
+        XCTAssertLessThanOrEqual(phone.span.latitudeDelta, 80)
+        XCTAssertLessThanOrEqual(phone.span.longitudeDelta, 140)
+        let polar = GeoPlace.sanitized(MKCoordinateRegion(center: CLLocationCoordinate2D(latitude: 89, longitude: 179), span: MKCoordinateSpan(latitudeDelta: 30, longitudeDelta: 60)), fitting: CGSize(width: 390, height: 260))
+        XCTAssertLessThanOrEqual(polar.center.latitude + polar.span.latitudeDelta / 2, 90)
+        XCTAssertLessThanOrEqual(polar.center.longitude + polar.span.longitudeDelta / 2, 180)
     }
 
     func testTrafficRoadsDistinguishPublicClientsFromOurServices() {
@@ -257,6 +282,46 @@ final class HostwatchTests: XCTestCase {
         XCTAssertEqual(snap.knownTools[0].name, "overview")
         XCTAssertEqual(SidebarPage.mcp.title, "MCP")
         XCTAssertEqual(SidebarPage.mcp.icon, "antenna.radiowaves.left.and.right")
+        XCTAssertEqual(SidebarPage.errors.title, "Errors")
+    }
+
+    func testErrorContextAndGroupsDecodeAgentJSON() throws {
+        let payload = Data("""
+        {"request":{"id":"req-1","time":"2026-09-20T12:00:00Z","site":"applydjinn","host":"applydjinn.com","method":"GET","path":"/api","status":502,"bytes":120,"durationMs":40,"clientIp":"203.0.113.10","country":"Germany","countryCode":"DE","userAgent":"Safari","source":"Direct"},"projectId":"applydjinn","projectName":"ApplyDjinn","previous":[],"logs":[{"time":"2026-09-20T12:00:00Z","stream":"stderr","text":"panic: boom","crash":true}],"logSource":"applydjinn/app","crashHint":"panic: boom"}
+        """.utf8)
+        let context = try JSONDecoder().decode(ErrorContext.self, from: payload)
+        XCTAssertEqual(context.projectName, "ApplyDjinn")
+        XCTAssertEqual(context.logs.first?.crash, true)
+        XCTAssertEqual(context.crashHint, "panic: boom")
+        let groups = try JSONDecoder().decode([ErrorProjectGroup].self, from: Data("""
+        [{"projectId":"applydjinn","projectName":"ApplyDjinn","count":2,"lastTime":"2026-09-20T12:00:00Z","statuses":{"502":2},"requests":[]}]
+        """.utf8))
+        XCTAssertEqual(groups.first?.projectId, "applydjinn")
+        XCTAssertEqual(groups.first?.count, 2)
+    }
+
+    func testMarkdownNotesImportAndExportAdvisories() {
+        let notes = MarkdownNotes.parse(kind: "vulnerability", project: "applydjinn", markdown: "- CVE-2026-1142 (critical) example-runtime\n- not an advisory")
+        XCTAssertEqual(notes.map(\.title), ["CVE-2026-1142"])
+        XCTAssertEqual(notes.first?.severity, "critical")
+        let errors = MarkdownNotes.parse(kind: "error", project: "applydjinn", markdown: "- 502 GET /api applydjinn.com")
+        XCTAssertEqual(errors.first?.title, "502 GET /api")
+        let exported = MarkdownNotes.export(kind: "vulnerability", projects: Fixtures.projects, groups: [])
+        XCTAssertTrue(exported.contains("CVE-2026-1142"))
+        XCTAssertTrue(exported.contains("# Hostwatch vulnerabilities"))
+    }
+
+    func testReclaimAdvisorProtectsDatabasesAndAllowsCaches() {
+        let advice = ReclaimPolicy.advise([
+            .init(path: "/var/lib/postgresql", kind: "directory", category: "Databases", siteId: nil, siteName: "Host", bytes: 100, direct: false),
+            .init(path: "/var/cache/apt/archives", kind: "directory", category: "Caches", siteId: nil, siteName: "Host", bytes: 20, direct: false),
+            .init(path: "/var/lib/containerd", kind: "Docker images, snapshots, writable layers and build cache", category: "Container runtime", siteId: nil, siteName: "Host", bytes: 200, direct: false),
+            .init(path: "/srv/apps/applydjinn/uploads", kind: "directory", category: "Images & media", siteId: "applydjinn", siteName: "ApplyDjinn", bytes: 50, direct: false)
+        ])
+        XCTAssertEqual(advice.first { $0.path.hasSuffix("postgresql") }?.className, "protected")
+        XCTAssertEqual(advice.first { $0.path.contains("apt") }?.className, "safe")
+        XCTAssertEqual(advice.first { $0.path.contains("containerd") }?.className, "protected")
+        XCTAssertEqual(advice.first { $0.path.contains("uploads") }?.className, "review")
     }
 
     func testSessionCookieSnapshotCanBeRestoredAfterAppDeath() throws {

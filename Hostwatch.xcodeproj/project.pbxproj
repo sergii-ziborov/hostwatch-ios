@@ -15,11 +15,15 @@
 		25EF6D0152F34639E478A0CC /* SessionVault.swift in Sources */ = {isa = PBXBuildFile; fileRef = D70AB601C45C76CEF7A402A2 /* SessionVault.swift */; };
 		2935BBD561A194C24EC739DA /* AuthViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 550BEA74249D51485C13AF3E /* AuthViews.swift */; };
 		2D3749D562C2A34E6D9BD700 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76D7F5CC61DBDB2ABD270F11 /* AppModel.swift */; };
+		31E364EE31EB63BED483BBC6 /* MarkdownNotes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8730F512DE914609A39FE766 /* MarkdownNotes.swift */; };
+		3CBB7D0228F9F24E30D90436 /* ReclaimAdviceList.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A81A85715F0FC5BE6B2CD5D /* ReclaimAdviceList.swift */; };
 		4EA8DD88F0712FE0CEAD618C /* NativeTopologyScene.swift in Sources */ = {isa = PBXBuildFile; fileRef = 453A7A03CCB0E61006B35768 /* NativeTopologyScene.swift */; };
+		4F83AB309A514BBABBB5C77C /* ErrorViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CECD0202623ADF793C7D3E2 /* ErrorViews.swift */; };
 		549D6E78E5E2DCF33EA8467B /* Fixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18CD1780E2379A0DF2B888DE /* Fixtures.swift */; };
 		55D3FF00DDB04F139AB67093 /* MCPViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16D175BC1AA14335EDE2073E /* MCPViews.swift */; };
 		6E47246DBFB26F7F4AD8C448 /* AppGateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0A19281CBF3A735B2F45C0C /* AppGateView.swift */; };
 		7ED8B18934CABF0ACAA3D457 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F23EFDCF024E30815A1E55E /* Theme.swift */; };
+		8EAD16067175979A2DF3BBB9 /* ReclaimPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = E16B1858ED7B656C6848240B /* ReclaimPolicy.swift */; };
 		93965628E34EC6B52EFAF658 /* OverviewTrafficViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB8618F607DEE2D2E1E2849A /* OverviewTrafficViews.swift */; };
 		963A540C15DF394F13265CD9 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55C640803FA958183F2FE0C2 /* APIClient.swift */; };
 		A283FF16E0B0559681B2DD92 /* SignInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 876AF943DE6092E87224123B /* SignInView.swift */; };
@@ -52,8 +56,10 @@
 		12746C62342BD6DFB5CE4414 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		16D175BC1AA14335EDE2073E /* MCPViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPViews.swift; sourceTree = "<group>"; };
 		18CD1780E2379A0DF2B888DE /* Fixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Fixtures.swift; sourceTree = "<group>"; };
+		1A81A85715F0FC5BE6B2CD5D /* ReclaimAdviceList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReclaimAdviceList.swift; sourceTree = "<group>"; };
 		1D9117ACA765A183085A0EE6 /* OperationsViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OperationsViews.swift; sourceTree = "<group>"; };
 		299F150C6BF694745E48CC76 /* HostwatchApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostwatchApp.swift; sourceTree = "<group>"; };
+		2CECD0202623ADF793C7D3E2 /* ErrorViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorViews.swift; sourceTree = "<group>"; };
 		2F23EFDCF024E30815A1E55E /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		38E240A978385DC293B70166 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		408661428B0328BF34CC7316 /* CleanupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CleanupView.swift; sourceTree = "<group>"; };
@@ -65,6 +71,7 @@
 		758A87CE98F4E57324698D19 /* HostwatchTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = HostwatchTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		76D7F5CC61DBDB2ABD270F11 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
 		80D5EC0AB042459E67AFE0A4 /* FleetViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FleetViews.swift; sourceTree = "<group>"; };
+		8730F512DE914609A39FE766 /* MarkdownNotes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownNotes.swift; sourceTree = "<group>"; };
 		876AF943DE6092E87224123B /* SignInView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignInView.swift; sourceTree = "<group>"; };
 		AB39624746B6B3C851E807D8 /* TopologyLayers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TopologyLayers.swift; sourceTree = "<group>"; };
 		AB8618F607DEE2D2E1E2849A /* OverviewTrafficViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverviewTrafficViews.swift; sourceTree = "<group>"; };
@@ -72,6 +79,7 @@
 		C25C3FE01E0B2D3B00975C39 /* GeoLocation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeoLocation.swift; sourceTree = "<group>"; };
 		D70AB601C45C76CEF7A402A2 /* SessionVault.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionVault.swift; sourceTree = "<group>"; };
 		D8DE859739CA33276FF42DAE /* TopologyCamera.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TopologyCamera.swift; sourceTree = "<group>"; };
+		E16B1858ED7B656C6848240B /* ReclaimPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReclaimPolicy.swift; sourceTree = "<group>"; };
 		F0A19281CBF3A735B2F45C0C /* AppGateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppGateView.swift; sourceTree = "<group>"; };
 		F82A7AF0AADF24B29949F0F2 /* HostwatchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostwatchTests.swift; sourceTree = "<group>"; };
 		FCD6674AE70D2F4CC67FC220 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -108,16 +116,20 @@
 				408661428B0328BF34CC7316 /* CleanupView.swift */,
 				11DBB53B9174FB9548074A20 /* Compat.swift */,
 				5D4506FD3F7EB41B64B8CB32 /* DataViews.swift */,
+				2CECD0202623ADF793C7D3E2 /* ErrorViews.swift */,
 				18CD1780E2379A0DF2B888DE /* Fixtures.swift */,
 				80D5EC0AB042459E67AFE0A4 /* FleetViews.swift */,
 				C25C3FE01E0B2D3B00975C39 /* GeoLocation.swift */,
 				299F150C6BF694745E48CC76 /* HostwatchApp.swift */,
 				FCD6674AE70D2F4CC67FC220 /* Info.plist */,
+				8730F512DE914609A39FE766 /* MarkdownNotes.swift */,
 				16D175BC1AA14335EDE2073E /* MCPViews.swift */,
 				38E240A978385DC293B70166 /* Models.swift */,
 				453A7A03CCB0E61006B35768 /* NativeTopologyScene.swift */,
 				1D9117ACA765A183085A0EE6 /* OperationsViews.swift */,
 				AB8618F607DEE2D2E1E2849A /* OverviewTrafficViews.swift */,
+				1A81A85715F0FC5BE6B2CD5D /* ReclaimAdviceList.swift */,
+				E16B1858ED7B656C6848240B /* ReclaimPolicy.swift */,
 				12746C62342BD6DFB5CE4414 /* RootView.swift */,
 				D70AB601C45C76CEF7A402A2 /* SessionVault.swift */,
 				876AF943DE6092E87224123B /* SignInView.swift */,
@@ -235,15 +247,19 @@
 				F82E3952AF3CCB5D26A5C4E6 /* CleanupView.swift in Sources */,
 				12B7D017099F6381B5EDF7F9 /* Compat.swift in Sources */,
 				092FB80D1163628AE680C79F /* DataViews.swift in Sources */,
+				4F83AB309A514BBABBB5C77C /* ErrorViews.swift in Sources */,
 				549D6E78E5E2DCF33EA8467B /* Fixtures.swift in Sources */,
 				D00FDB393BD55003FAF62733 /* FleetViews.swift in Sources */,
 				C5CB06A63E826D0B7023C7CD /* GeoLocation.swift in Sources */,
 				D2D39C4F1EBFE2ED8C93B8F2 /* HostwatchApp.swift in Sources */,
 				55D3FF00DDB04F139AB67093 /* MCPViews.swift in Sources */,
+				31E364EE31EB63BED483BBC6 /* MarkdownNotes.swift in Sources */,
 				DD74D36910EE8D8F562347AA /* Models.swift in Sources */,
 				4EA8DD88F0712FE0CEAD618C /* NativeTopologyScene.swift in Sources */,
 				F75981AC11F1D1D2C1CCC97B /* OperationsViews.swift in Sources */,
 				93965628E34EC6B52EFAF658 /* OverviewTrafficViews.swift in Sources */,
+				3CBB7D0228F9F24E30D90436 /* ReclaimAdviceList.swift in Sources */,
+				8EAD16067175979A2DF3BBB9 /* ReclaimPolicy.swift in Sources */,
 				D8CE39787CB162FF7D6FA697 /* RootView.swift in Sources */,
 				25EF6D0152F34639E478A0CC /* SessionVault.swift in Sources */,
 				A283FF16E0B0559681B2DD92 /* SignInView.swift in Sources */,

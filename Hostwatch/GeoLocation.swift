@@ -17,6 +17,7 @@ struct GeoPin: Identifiable {
 enum GeoPlace {
     static func isUsable(latitude: Double?, longitude: Double?) -> Bool {
         guard let latitude, let longitude else { return false }
+        guard latitude.isFinite, longitude.isFinite else { return false }
         if latitude == 0 && longitude == 0 { return false }
         return (-90...90).contains(latitude) && (-180...180).contains(longitude)
     }
@@ -58,24 +59,65 @@ enum GeoPlace {
     }
 
     static func region(for pins: [GeoPin]) -> MKCoordinateRegion? {
-        guard let first = pins.first else { return nil }
-        var minLat = first.coordinate.latitude
-        var maxLat = first.coordinate.latitude
-        var minLon = first.coordinate.longitude
-        var maxLon = first.coordinate.longitude
-        for pin in pins {
-            minLat = min(minLat, pin.coordinate.latitude)
-            maxLat = max(maxLat, pin.coordinate.latitude)
-            minLon = min(minLon, pin.coordinate.longitude)
-            maxLon = max(maxLon, pin.coordinate.longitude)
+        regionCovering(pins.map(\.coordinate))
+    }
+
+    static func regionCovering(_ coordinates: [CLLocationCoordinate2D]) -> MKCoordinateRegion? {
+        let valid = coordinates.filter { CLLocationCoordinate2DIsValid($0) && $0.latitude.isFinite && $0.longitude.isFinite }
+        guard let first = valid.first else { return nil }
+        var minLat = first.latitude
+        var maxLat = first.latitude
+        var minLon = first.longitude
+        var maxLon = first.longitude
+        for coordinate in valid {
+            minLat = min(minLat, coordinate.latitude)
+            maxLat = max(maxLat, coordinate.latitude)
+            minLon = min(minLon, coordinate.longitude)
+            maxLon = max(maxLon, coordinate.longitude)
         }
-        let span = MKCoordinateSpan(
-            latitudeDelta: max(8, (maxLat - minLat) * 1.8 + 2),
-            longitudeDelta: max(8, (maxLon - minLon) * 1.8 + 2)
-        )
+        let latSpread = maxLat - minLat
+        let lonSpread = maxLon - minLon
+        if latSpread > 50 || lonSpread > 90 {
+            return MKCoordinateRegion(
+                center: CLLocationCoordinate2D(latitude: 22, longitude: 12),
+                span: MKCoordinateSpan(latitudeDelta: 72, longitudeDelta: 120)
+            )
+        }
         return MKCoordinateRegion(
             center: CLLocationCoordinate2D(latitude: (minLat + maxLat) / 2, longitude: (minLon + maxLon) / 2),
-            span: span
+            span: MKCoordinateSpan(
+                latitudeDelta: min(72, max(6, latSpread * 1.6 + 2)),
+                longitudeDelta: min(120, max(6, lonSpread * 1.6 + 2))
+            )
+        )
+    }
+
+    static func sanitized(_ region: MKCoordinateRegion, fitting size: CGSize) -> MKCoordinateRegion {
+        let maxLat = 80.0
+        let maxLon = 140.0
+        var lat = region.span.latitudeDelta.isFinite ? region.span.latitudeDelta : 20
+        var lon = region.span.longitudeDelta.isFinite ? region.span.longitudeDelta : 30
+        lat = min(maxLat, max(0.05, lat))
+        lon = min(maxLon, max(0.05, lon))
+        var center = region.center
+        if !CLLocationCoordinate2DIsValid(center) || !center.latitude.isFinite || !center.longitude.isFinite {
+            center = CLLocationCoordinate2D(latitude: 22, longitude: 12)
+        }
+        let width = max(size.width, 1)
+        let height = max(size.height, 1)
+        let aspect = width / height
+        if aspect >= 1 {
+            if lat * aspect > maxLon { lat = maxLon / aspect }
+            lon = min(maxLon, max(lon, lat * aspect))
+        } else {
+            if lon / aspect > maxLat { lon = maxLat * aspect }
+            lat = min(maxLat, max(lat, lon / aspect))
+        }
+        center.latitude = min(90 - lat / 2, max(-90 + lat / 2, center.latitude))
+        center.longitude = min(180 - lon / 2, max(-180 + lon / 2, center.longitude))
+        return MKCoordinateRegion(
+            center: center,
+            span: MKCoordinateSpan(latitudeDelta: lat, longitudeDelta: lon)
         )
     }
 
@@ -129,14 +171,29 @@ private final class GeoAnnotation: NSObject, MKAnnotation {
     init(pin: GeoPin) { self.pin = pin }
 }
 
+final class HostwatchMapView: MKMapView {
+    var pendingRegion: MKCoordinateRegion?
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        applyPendingRegion()
+    }
+
+    func applyPendingRegion() {
+        guard bounds.width >= 40, bounds.height >= 40, let pending = pendingRegion else { return }
+        pendingRegion = nil
+        setRegion(GeoPlace.sanitized(pending, fitting: bounds.size), animated: false)
+    }
+}
+
 struct RequestMapCanvas: UIViewRepresentable {
     let pins: [GeoPin]
     var onSelect: (RequestSample) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(onSelect: onSelect) }
 
-    func makeUIView(context: Context) -> MKMapView {
-        let map = MKMapView(frame: .zero)
+    func makeUIView(context: Context) -> HostwatchMapView {
+        let map = HostwatchMapView(frame: .zero)
         map.delegate = context.coordinator
         map.isRotateEnabled = false
         map.showsCompass = false
@@ -149,17 +206,16 @@ struct RequestMapCanvas: UIViewRepresentable {
         return map
     }
 
-    func updateUIView(_ map: MKMapView, context: Context) {
+    func updateUIView(_ map: HostwatchMapView, context: Context) {
         context.coordinator.onSelect = onSelect
         let existing = Set(map.annotations.compactMap { $0 as? GeoAnnotation }.map(\.pin.id))
         let next = Set(pins.map(\.id))
         if existing != next {
-            map.removeAnnotations(map.annotations)
+            map.removeAnnotations(map.annotations.compactMap { $0 as? GeoAnnotation })
             map.addAnnotations(pins.map(GeoAnnotation.init))
+            map.pendingRegion = GeoPlace.region(for: pins)
         }
-        if let region = GeoPlace.region(for: pins) {
-            map.setRegion(region, animated: false)
-        }
+        map.applyPendingRegion()
     }
 
     final class Coordinator: NSObject, MKMapViewDelegate {

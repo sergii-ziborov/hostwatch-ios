@@ -356,6 +356,31 @@ enum TrafficOrigin: String, Equatable {
     }
 }
 struct ErrorEvidence: Codable { let windowHours: Int; let site: String?; let interval: String?; let requests: [RequestSample]; let retainedErrors: Int; let retainedFrom: String?; let capped: Bool }
+struct ErrorProjectGroup: Codable, Identifiable {
+    var id: String { projectId }
+    let projectId: String; let projectName: String; let count: Int; let lastTime: String?
+    let statuses: [String: Int]?; let requests: [RequestSample]
+}
+struct ErrorLogLine: Codable, Identifiable, Hashable {
+    var id: String { "\(time ?? "")|\(stream)|\(text)" }
+    let time: String?; let stream: String; let text: String; let crash: Bool?
+}
+struct ErrorContext: Codable {
+    let request: RequestSample; let projectId: String; let projectName: String
+    let previous: [RequestSample]; let logs: [ErrorLogLine]
+    let logSource: String?; let logError: String?; let crashHint: String?
+}
+struct ImportedNote: Codable, Identifiable, Hashable {
+    let id: String; let kind: String; let projectId: String?; let title: String
+    let detail: String?; let severity: String?; let url: String?; let createdAt: String
+}
+struct ImportResult: Codable { let kind: String?; let added: [ImportedNote]; let skipped: Int }
+struct MarkdownExport: Codable { let kind: String; let markdown: String; let itemCount: Int; let generatedAt: String }
+struct ReclaimAdvice: Codable, Identifiable, Hashable {
+    var id: String { "\(className)|\(path)" }
+    let className: String; let path: String; let kind: String; let bytes: Double; let reason: String
+    enum CodingKeys: String, CodingKey { case className = "class", path, kind, bytes, reason }
+}
 
 struct StorageGroup: Codable, Identifiable, Hashable { let id: String; let name: String; let bytes: Double; let items: Int }
 struct StorageEntry: Codable, Identifiable, Hashable {
@@ -366,6 +391,7 @@ struct StorageResponse: Codable {
     let mode: String; let scannedAt: String; let root: String; let path: String; let parent: String?; let disk: Overview.Disk
     let totalBytes: Double; let analyzedBytes: Double; let unattributedBytes: Double
     let sites: [StorageGroup]; let categories: [StorageGroup]; let areas: [StorageEntry]; let entries: [StorageEntry]
+    var advice: [ReclaimAdvice]? = nil
 }
 
 struct CleanupTarget: Codable, Identifiable {
@@ -374,7 +400,7 @@ struct CleanupTarget: Codable, Identifiable {
     let bytes: Double; let items: Int; let available: Bool
     let description: String; let consequence: String; let error: String?
 }
-struct CleanupPreview: Codable { let targets: [CleanupTarget]; let scannedAt: String }
+struct CleanupPreview: Codable { let targets: [CleanupTarget]; let advice: [ReclaimAdvice]?; let scannedAt: String }
 struct CleanupResult: Codable { let kind: String; let reclaimedBytes: Double; let deletedItems: Int; let completedAt: String }
 struct CleanupRun: Codable { let results: [CleanupResult]; let errors: [String: String]?; let completedAt: String }
 
@@ -449,11 +475,11 @@ struct FleetLink: Codable, Identifiable {
 }
 
 enum SidebarPage: String, CaseIterable, Identifiable {
-    case overview, traffic, data, incidents, topology, workloads, fleet, cleanup, policies, environment, mcp, codeHealth, automations, access, security, organization
+    case overview, traffic, data, incidents, errors, topology, workloads, fleet, cleanup, policies, environment, mcp, codeHealth, automations, access, security, organization
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .overview: "Overview"; case .traffic: "Traffic"; case .data: "Database"; case .incidents: "Incidents & risks"; case .topology: "Runtime topology"
+        case .overview: "Overview"; case .traffic: "Traffic"; case .data: "Database"; case .incidents: "Incidents & risks"; case .errors: "Errors"; case .topology: "Runtime topology"
         case .workloads: "Workloads"; case .fleet: "Fleet"; case .cleanup: "Cleanup"; case .policies: "Traffic policies"; case .environment: "Environment"; case .mcp: "MCP"
         case .codeHealth: "Code health"
         case .automations: "Automations"; case .access: "Access"; case .security: "Account security"; case .organization: "Organization"
@@ -461,7 +487,7 @@ enum SidebarPage: String, CaseIterable, Identifiable {
     }
     var icon: String {
         switch self {
-        case .overview: "square.grid.2x2"; case .traffic: "chart.xyaxis.line"; case .data: "cylinder.split.1x2"; case .incidents: "exclamationmark.shield"; case .topology: "point.3.connected.trianglepath.dotted"
+        case .overview: "square.grid.2x2"; case .traffic: "chart.xyaxis.line"; case .data: "cylinder.split.1x2"; case .incidents: "exclamationmark.shield"; case .errors: "exclamationmark.octagon"; case .topology: "point.3.connected.trianglepath.dotted"
         case .workloads: "shippingbox"; case .fleet: "laptopcomputer.and.iphone"; case .cleanup: "sparkles.rectangle.stack"; case .policies: "shield.lefthalf.filled"; case .environment: "key.horizontal"; case .mcp: "antenna.radiowaves.left.and.right"
         case .codeHealth: "waveform.path.ecg.rectangle"
         case .automations: "clock.arrow.circlepath"; case .access: "person.2"; case .security: "lock.shield"; case .organization: "building.2"

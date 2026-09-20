@@ -120,7 +120,11 @@ enum Fixtures {
             .init(name: "secret_put", kind: "mutate", title: "Put secret"),
             .init(name: "site_action", kind: "mutate", title: "Site action"),
             .init(name: "deploy", kind: "mutate", title: "Deploy"),
-            .init(name: "job_action", kind: "mutate", title: "Job action")
+            .init(name: "job_action", kind: "mutate", title: "Job action"),
+            .init(name: "list_errors", kind: "observe", title: "Errors by project"),
+            .init(name: "error_context", kind: "observe", title: "Error context"),
+            .init(name: "export_markdown", kind: "observe", title: "Export Markdown"),
+            .init(name: "import_markdown", kind: "mutate", title: "Import Markdown")
         ]
     )
 
@@ -196,6 +200,36 @@ enum Fixtures {
                deadCode: [])
         }
     }
+
+    static func errorContext(for request: RequestSample) -> ErrorContext {
+        let project = sites.first { $0.id == request.site }
+        let previous = requests.filter { $0.id != request.id && $0.path == request.path && $0.host == request.host && $0.status >= 400 && $0.time < request.time }
+        let crash = request.status >= 500
+        let logs: [ErrorLogLine] = crash ? [
+            .init(time: request.time, stream: "stdout", text: "GET \(request.path) \(request.status)", crash: false),
+            .init(time: request.time, stream: "stderr", text: "panic: upstream closed connection", crash: true),
+            .init(time: request.time, stream: "stderr", text: "exiting worker", crash: false)
+        ] : []
+        return ErrorContext(
+            request: request,
+            projectId: request.site.isEmpty ? "unmapped" : request.site,
+            projectName: project?.name ?? (request.site.isEmpty ? "Unmapped traffic" : request.site),
+            previous: previous,
+            logs: logs,
+            logSource: crash ? "\(request.site)/app" : nil,
+            logError: crash ? nil : "No unique running container is attributed to this request.",
+            crashHint: crash ? "panic: upstream closed connection" : nil
+        )
+    }
+
+    static let cleanupPreview = CleanupPreview(
+        targets: [
+            .init(kind: "docker-build-cache", name: "Unused Docker build cache", path: "docker:build-cache", bytes: 1_073_741_824, items: 12, available: true, description: "Docker-reported build records that are not in use.", consequence: "Subsequent builds may take longer.", error: nil),
+            .init(kind: "apt-archives", name: "APT package archives", path: "/var/cache/apt/archives", bytes: 84_000_000, items: 6, available: true, description: "Downloaded .deb archives older than 24 hours.", consequence: "A future reinstall may need to download packages again.", error: nil)
+        ],
+        advice: ReclaimPolicy.advise(storage.entries),
+        scannedAt: ISO8601DateFormatter().string(from: .now)
+    )
 
     static let fleetLinks: [FleetLink] = [
         .init(id: "home-main", layers: [

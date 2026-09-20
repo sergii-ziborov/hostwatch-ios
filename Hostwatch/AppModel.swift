@@ -26,6 +26,9 @@ final class AppModel: ObservableObject {
     @Published var sources = Sources(windowHours: 24, site: nil, sources: [], countries: [], bots: [])
     @Published var requests: [RequestSample] = []
     @Published var errorEvidence: ErrorEvidence?
+    @Published var errorGroups: [ErrorProjectGroup] = []
+    @Published var importedNotes: [ImportedNote] = []
+    @Published var importNotice: String?
     @Published var paths: [RequestPath] = []
     @Published var storage: StorageResponse?
     @Published var storageBrowse: StorageResponse?
@@ -124,7 +127,10 @@ final class AppModel: ObservableObject {
     private func installFixtures() {
         overview = Fixtures.overview; sites = Fixtures.sites; dataServices = Fixtures.dataServices; dataFiles = Fixtures.dataFiles; dataServicesError = nil; mcpSnapshot = Fixtures.mcp
         history = Fixtures.history; traffic = Fixtures.traffic; sources = Fixtures.sources
-        requests = Fixtures.requests; errorEvidence = .init(windowHours: 24, site: nil, interval: nil, requests: Fixtures.requests.filter { $0.status >= 400 }, retainedErrors: Fixtures.requests.filter { $0.status >= 400 }.count, retainedFrom: Fixtures.requests.last?.time, capped: false)
+        requests = Fixtures.requests
+        errorEvidence = .init(windowHours: 24, site: nil, interval: nil, requests: Fixtures.requests.filter { $0.status >= 400 }, retainedErrors: Fixtures.requests.filter { $0.status >= 400 }.count, retainedFrom: Fixtures.requests.last?.time, capped: false)
+        errorGroups = []; importedNotes = []; importNotice = nil
+        cleanupPreview = Fixtures.cleanupPreview
         let grouped = Dictionary(grouping: Fixtures.requests, by: \RequestSample.path)
         var fixturePaths: [RequestPath] = []
         for (path, rows) in grouped {
@@ -277,7 +283,7 @@ final class AppModel: ObservableObject {
     private func clearPrivateData() {
         liveTask?.cancel(); liveTask = nil
         overview = nil; sites = []; dataServices = []; dataFiles = []; dataServicesScannedAt = nil; dataServicesScanError = nil; dataServicesError = nil; history = []; traffic = []
-        requests = []; errorEvidence = nil; paths = []; storage = nil; storageBrowse = nil
+        requests = []; errorEvidence = nil; errorGroups = []; importedNotes = []; importNotice = nil; paths = []; storage = nil; storageBrowse = nil
         storageError = nil; cleanupPreview = nil; cleanupError = nil; cleanupNotice = nil
         projects = []; jobs = []; members = []; license = nil; environment = nil
         nodes = []; selectedNode = ""; selectedSite = ""
@@ -387,7 +393,7 @@ final class AppModel: ObservableObject {
                     let loaded = try await (trafficCall, sourcesCall, requestsCall, errorsCall, pathsCall)
                     traffic = loaded.0; sources = loaded.1; requests = loaded.2; errorEvidence = loaded.3; paths = loaded.4.paths
                 }
-            case .incidents, .topology, .codeHealth:
+            case .incidents, .errors, .topology, .codeHealth:
                 if page == .topology {
                     async let projectsCall = client.projects()
                     async let sourcesCall = client.sources(site: "", hours: hours)
@@ -398,8 +404,20 @@ final class AppModel: ObservableObject {
                     jobs = loaded.2
                     await loadDataServices()
                 } else {
-                    projects = try await client.projects()
-                    if page != .codeHealth { jobs = try await client.jobs() }
+                    if page == .errors {
+                        async let projectsCall = client.projects()
+                        async let errorsCall = client.errors(site: selectedSite, hours: hours)
+                        async let groupsCall = client.errorGroups(site: selectedSite, hours: hours)
+                        async let notesCall = client.importedNotes(kind: "", site: selectedSite)
+                        let loaded = try await (projectsCall, errorsCall, groupsCall, notesCall)
+                        projects = loaded.0
+                        errorEvidence = loaded.1
+                        errorGroups = loaded.2
+                        importedNotes = loaded.3
+                    } else {
+                        projects = try await client.projects()
+                        if page != .codeHealth { jobs = try await client.jobs() }
+                    }
                 }
             case .fleet:
                 await loadFleet()
@@ -432,6 +450,7 @@ final class AppModel: ObservableObject {
         switch page {
         case .overview: return overview != nil
         case .traffic: return !traffic.isEmpty || !requests.isEmpty
+        case .errors: return !(errorEvidence?.requests.isEmpty ?? true) || !errorGroups.isEmpty
         case .data: return !dataServices.isEmpty || !dataFiles.isEmpty || dataServicesError != nil
         case .workloads: return !sites.isEmpty
         case .topology: return !sites.isEmpty || !projects.isEmpty
@@ -512,7 +531,10 @@ final class AppModel: ObservableObject {
     }
 
     func refreshCleanup() async {
-        guard !fixtures, !cleanupLoading else { return }
+#if DEBUG
+        if fixtures { cleanupPreview = Fixtures.cleanupPreview; cleanupError = nil; return }
+#endif
+        guard !cleanupLoading else { return }
         cleanupLoading = true; cleanupError = nil
         defer { cleanupLoading = false }
         do { cleanupPreview = try await client.cleanupPreview() }
@@ -617,5 +639,73 @@ final class AppModel: ObservableObject {
     func installLicense(_ value: String) async {
         guard !fixtures else { return }
         do { license = try await client.installLicense(value) } catch { errorMessage = error.localizedDescription }
+    }
+
+    func errorContext(for request: RequestSample) async -> ErrorContext {
+#if DEBUG
+        if fixtures { return Fixtures.errorContext(for: request) }
+#endif
+        do { return try await client.errorContext(id: request.id) }
+        catch { return localErrorContext(for: request, error: error.localizedDescription) }
+    }
+
+    func importMarkdown(kind: String, project: String, markdown: String) async {
+#if DEBUG
+        if fixtures {
+            let parsed = MarkdownNotes.parse(kind: kind, project: project, markdown: markdown)
+            importedNotes.append(contentsOf: parsed)
+            importNotice = "Imported \(parsed.count) \(kind) notes from Markdown."
+            return
+        }
+#endif
+        do {
+            let result = try await client.importMarkdown(kind: kind, site: project, markdown: markdown)
+            importedNotes.append(contentsOf: result.added)
+            importNotice = "Imported \(result.added.count), skipped \(result.skipped)."
+            errorMessage = nil
+        } catch { errorMessage = error.localizedDescription }
+    }
+
+    func exportMarkdown(kind: String) async -> String? {
+#if DEBUG
+        if fixtures { return MarkdownNotes.export(kind: kind, projects: projects, groups: groupedErrors()) }
+#endif
+        do { return try await client.exportMarkdown(kind: kind, site: selectedSite).markdown }
+        catch { errorMessage = error.localizedDescription; return nil }
+    }
+
+    func refreshErrors() async {
+#if DEBUG
+        if fixtures { return }
+#endif
+        do {
+            async let errorsCall = client.errors(site: selectedSite, hours: hours)
+            async let groupsCall = client.errorGroups(site: selectedSite, hours: hours)
+            async let notesCall = client.importedNotes(kind: "", site: selectedSite)
+            let loaded = try await (errorsCall, groupsCall, notesCall)
+            errorEvidence = loaded.0; errorGroups = loaded.1; importedNotes = loaded.2
+        } catch { errorMessage = error.localizedDescription }
+    }
+
+    func groupedErrors() -> [ErrorProjectGroup] {
+        if !errorGroups.isEmpty { return errorGroups }
+        let rows = errorEvidence?.requests.filter { $0.status >= 400 } ?? []
+        let names = Dictionary(uniqueKeysWithValues: sites.map { ($0.id, $0.name) })
+        return Dictionary(grouping: rows, by: { $0.site.isEmpty ? "unmapped" : $0.site }).map { id, items in
+            ErrorProjectGroup(projectId: id, projectName: names[id] ?? (id == "unmapped" ? "Unmapped traffic" : id),
+                              count: items.count, lastTime: items.map(\.time).max(),
+                              statuses: Dictionary(grouping: items, by: { String($0.status) }).mapValues(\.count),
+                              requests: items)
+        }.sorted { $0.count > $1.count }
+    }
+
+    private func localErrorContext(for request: RequestSample, error: String) -> ErrorContext {
+        let project = sites.first { $0.id == request.site }
+        let previous = (errorEvidence?.requests ?? []).filter {
+            $0.id != request.id && $0.path == request.path && $0.host == request.host && $0.status >= 400 && $0.time < request.time
+        }
+        return ErrorContext(request: request, projectId: request.site.isEmpty ? "unmapped" : request.site,
+                            projectName: project?.name ?? (request.site.isEmpty ? "Unmapped traffic" : request.site),
+                            previous: previous, logs: [], logSource: nil, logError: error, crashHint: nil)
     }
 }
