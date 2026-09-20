@@ -121,7 +121,7 @@ struct NativeTopologyScene: UIViewRepresentable {
             self.view = view
             labels.frame = view.bounds
             labels.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-            labels.isUserInteractionEnabled = false
+            labels.isUserInteractionEnabled = true
             view.addSubview(labels)
         }
 
@@ -186,6 +186,7 @@ struct NativeTopologyScene: UIViewRepresentable {
             towerBases["host"] = SCNVector3(hub.x, 0, hub.z)
             towerHeights["host"] = 0.8
             anchors.append(.init(id: "host", siteID: "host", world: SCNVector3(hub.x, 0.7, hub.z),
+                                 localY: 0.7, usesTower: false,
                                  text: snapshot.node.name, detail: "public edge", color: TopologyLayer.healthy, rank: .name))
 
             let count = snapshot.sites.count
@@ -283,6 +284,7 @@ struct NativeTopologyScene: UIViewRepresentable {
                 towerBases[key] = SCNVector3(placed.x, 0, placed.z)
                 towerHeights[key] = height
                 anchors.append(.init(id: key, siteID: key, world: SCNVector3(placed.x, height * 0.55, placed.z),
+                                     localY: height * 0.55, usesTower: false,
                                      text: service.type, detail: service.role, color: color, rank: .name))
                 if let siteID = service.siteId, let base = bases[siteID] {
                     addRoad(from: siteID, to: key, start: base, end: placed, kind: .io,
@@ -322,6 +324,7 @@ struct NativeTopologyScene: UIViewRepresentable {
                 if rank != .name {
                     anchors.append(.init(id: "site:\(site.id):\(index)", siteID: site.id,
                                          world: SCNVector3(position.x, midY, position.z),
+                                         localY: midY, usesTower: true,
                                          text: layer.title, detail: layer.kind == .runtime ? layer.detail : String(layer.detail.prefix(42)),
                                          color: layer.color, rank: rank))
                 }
@@ -347,6 +350,7 @@ struct NativeTopologyScene: UIViewRepresentable {
             addRing(at: SCNVector3(position.x, 0.04, position.z), radius: 0.86, color: layers.first?.color ?? .cyan, to: scene)
             anchors.append(.init(id: "name:\(site.id)", siteID: site.id,
                                  world: SCNVector3(position.x, max(0.7, height), position.z),
+                                 localY: max(0.7, cursor), usesTower: true,
                                  text: site.name, detail: "\(Int(site.requestsPerMinute))/min", color: TopologyLayer.healthy, rank: .name))
         }
 
@@ -421,14 +425,51 @@ struct NativeTopologyScene: UIViewRepresentable {
                 nodes.append(addSegment(from: vectors[index - 1], to: vectors[index], radius: radius, color: color, name: name, to: scene))
             }
             roads.append((from, to, kind.rawValue, nodes))
+            addSourceMarker(from: from, to: to, kind: kind, along: vectors, to: scene)
+            if let mid = flowLabelPoint(vectors) {
+                anchors.append(.init(id: "flow:\(from):\(to):\(kind.rawValue)", siteID: from,
+                                     world: mid, localY: mid.y, usesTower: false,
+                                     text: flowLabel(from: from, to: to, kind: kind),
+                                     detail: kind.origin.title, color: color, rank: .flow))
+            }
             guard animated, volume > 0, vectors.count > 1 else { return }
             let count = max(1, min(4, Int(volume / 35)))
             for index in 0..<count {
-                let packet = LivePacket(from: from, to: to, volume: volume, points: vectors,
-                                        color: index.isMultiple(of: 2) ? color : TopologyLayer.warning)
+                let packet = LivePacket(from: from, to: to, volume: volume, points: vectors, color: color)
                 packet.attach(to: scene, phase: Double(index) / Double(count))
                 packets.append(packet)
             }
+        }
+
+        private func flowLabel(from: String, to: String, kind: TopologyRoadKind) -> String {
+            let source = from == "host" ? "Public" : shortBoardName(from)
+            let dest = to.hasPrefix("ext:") ? shortBoardName(to) : shortBoardName(to)
+            return "\(source) → \(dest)"
+        }
+
+        private func shortBoardName(_ id: String) -> String {
+            if id == "host" { return "Public" }
+            if id.hasPrefix("ext:") { return String(id.dropFirst(4)).split(separator: "-").first.map(String.init) ?? id }
+            return id.split(separator: "/").last.map(String.init) ?? id
+        }
+
+        private func flowLabelPoint(_ points: [SCNVector3]) -> SCNVector3? {
+            guard points.count > 1 else { return points.first }
+            let a = points[0], b = points[1]
+            return SCNVector3((a.x * 2 + b.x) / 3, TopologyLayout.roadY + 0.28, (a.z * 2 + b.z) / 3)
+        }
+
+        private func addSourceMarker(from: String, to: String, kind: TopologyRoadKind, along points: [SCNVector3], to scene: SCNScene) {
+            guard points.count > 1 else { return }
+            let start = points[0], next = points[1]
+            let marker = SCNNode(geometry: SCNCone(topRadius: 0, bottomRadius: 0.13, height: 0.34))
+            marker.geometry?.firstMaterial = material(color(for: kind), emission: 0.78)
+            marker.position = SCNVector3(start.x, TopologyLayout.roadY + 0.24, start.z)
+            marker.name = "src:\(from):\(to):\(kind.rawValue)"
+            let dx = next.x - start.x, dz = next.z - start.z
+            marker.eulerAngles.x = .pi / 2
+            marker.eulerAngles.y = atan2(dx, dz)
+            scene.rootNode.addChildNode(marker)
         }
 
         @discardableResult
@@ -451,11 +492,13 @@ struct NativeTopologyScene: UIViewRepresentable {
             scene.rootNode.enumerateChildNodes { node, _ in
                 guard let name = node.name, let material = node.geometry?.firstMaterial, !name.hasPrefix("hit:") else { return }
                 let connected: Bool
-                if let road, name.hasPrefix("road:") {
-                    connected = name == road
+                if let road, name.hasPrefix("road:") || name.hasPrefix("src:") {
+                    connected = TopologyFlow.parse(roadName: name.hasPrefix("src:") ? "road:" + String(name.dropFirst(4)) : name)
+                        .map { flow in TopologyFlow.parse(roadName: road).map { $0.from == flow.from && $0.to == flow.to && $0.kind == flow.kind } ?? false }
+                        ?? (name == road)
                 } else if let focus {
-                    if name.hasPrefix("road:") {
-                        connected = roads.contains { ($0.from == focus || $0.to == focus) && $0.nodes.contains(where: { $0 === node }) }
+                    if name.hasPrefix("road:") || name.hasPrefix("src:") {
+                        connected = roads.contains { ($0.from == focus || $0.to == focus) && ($0.nodes.contains(where: { $0 === node }) || name.contains(":\($0.from):\($0.to):")) }
                     } else if name.hasPrefix("site:") || name.hasPrefix("tower:") {
                         connected = name.contains(":\(focus)") || name.hasPrefix("site:\(focus):") || name == "tower:\(focus)"
                     } else if name.hasPrefix("ext:") {
@@ -480,7 +523,7 @@ struct NativeTopologyScene: UIViewRepresentable {
             guard let scene = view?.scene else { return }
             scene.rootNode.enumerateChildNodes { node, _ in
                 guard let name = node.name, let material = node.geometry?.firstMaterial, !name.hasPrefix("hit:") else { return }
-                if name.hasPrefix("packet") {
+                if name.hasPrefix("packet") || name.hasPrefix("src:") {
                     node.isHidden = !traffic
                     return
                 }
@@ -502,14 +545,23 @@ struct NativeTopologyScene: UIViewRepresentable {
                     node.isHidden = traffic
                     material.transparency = traffic ? 0.08 : material.transparency
                 }
+                if name == "host", traffic {
+                    material.emission.contents = TopologyLayer.healthy.withAlphaComponent(0.55)
+                }
             }
+        }
+
+        private func resolvedWorld(_ anchor: LabelAnchor) -> SCNVector3 {
+            guard anchor.usesTower, let group = towerGroups[anchor.siteID] else { return anchor.world }
+            return group.convertPosition(SCNVector3(0, anchor.localY, 0), to: nil)
         }
 
         private func syncLabels() {
             guard let view else { return }
             let focus = focusedSiteID.wrappedValue
             let chips = anchors.compactMap { anchor -> TopologyLabelCanvas.Item? in
-                let projected = view.projectPoint(anchor.world)
+                let world = resolvedWorld(anchor)
+                let projected = view.projectPoint(world)
                 let onScreen = projected.z >= 0
                     && projected.x > -40 && projected.y > 8
                     && projected.x < Float(view.bounds.maxX) + 40
@@ -518,26 +570,68 @@ struct NativeTopologyScene: UIViewRepresentable {
                 switch anchor.rank {
                 case .name:
                     visible = focus == nil || anchor.siteID == focus
+                case .flow:
+                    visible = mode.showsPackets && flowLabelVisible(anchor, focus: focus)
                 case .runtime, .analysis:
                     visible = mode.showsArchitecture && focus == anchor.siteID
                 }
                 guard onScreen, visible else { return nil }
-                let detail = anchor.rank == .name && focus == anchor.siteID ? "\(anchor.detail)" : ""
-                return .init(id: anchor.id, text: anchor.text, detail: detail,
-                             point: calloutOrigin(for: anchor.world), color: anchor.color, rank: anchor.rank)
+                let titled = titledAnchor(anchor)
+                return .init(id: anchor.id, text: titled.text, detail: titled.detail,
+                             point: calloutOrigin(for: world), color: titled.color, rank: anchor.rank)
             }
-            let names = chips.filter { $0.rank == .name }
-            let layers = chips.filter { $0.rank != .name }
+            let names = chips.filter { $0.rank == .name || $0.rank == .flow }
+            let layers = chips.filter { $0.rank == .runtime || $0.rank == .analysis }
             var band: ClosedRange<CGFloat>?
-            if let focus, let base = towerBases[focus] {
-                let height = towerHeights[focus] ?? 2
-                let top = calloutOrigin(for: SCNVector3(base.x, height, base.z)).y
-                let bottom = calloutOrigin(for: SCNVector3(base.x, 0.12, base.z)).y
+            if let focus {
+                let topLocal = towerBaseHeights[focus] ?? towerHeights[focus] ?? 2
+                let topWorld: SCNVector3
+                let bottomWorld: SCNVector3
+                if let group = towerGroups[focus] {
+                    topWorld = group.convertPosition(SCNVector3(0, topLocal, 0), to: nil)
+                    bottomWorld = group.convertPosition(SCNVector3(0, 0.12, 0), to: nil)
+                } else if let base = towerBases[focus] {
+                    topWorld = SCNVector3(base.x, topLocal, base.z)
+                    bottomWorld = SCNVector3(base.x, 0.12, base.z)
+                } else {
+                    topWorld = SCNVector3Zero
+                    bottomWorld = SCNVector3Zero
+                }
+                let top = calloutOrigin(for: topWorld).y
+                let bottom = calloutOrigin(for: bottomWorld).y
                 let lo = min(top, bottom)
                 let hi = max(top, bottom)
                 if hi - lo > 12 { band = lo...hi }
             }
-            labels.render(names + layers, band: band)
+            labels.render(names: names, layers: layers, band: band, focusID: focus)
+        }
+
+        private func titledAnchor(_ anchor: LabelAnchor) -> (text: String, detail: String, color: UIColor) {
+            let focus = focusedSiteID.wrappedValue
+            if anchor.rank == .flow {
+                return (anchor.text, focus == nil ? "" : anchor.detail, anchor.color)
+            }
+            if mode.showsPackets, anchor.rank == .name {
+                if anchor.siteID == "host" {
+                    return ("PUBLIC", "external clients", TopologyLayer.healthy)
+                }
+                if anchor.siteID.hasPrefix("ext:") {
+                    return (anchor.text, "our data", UIColor(red: 0.35, green: 0.82, blue: 0.62, alpha: 1))
+                }
+                return (anchor.text, "our service", TopologyLayer.warning)
+            }
+            let detail = focus == anchor.siteID ? anchor.detail : ""
+            return (anchor.text, detail, anchor.color)
+        }
+
+        private func flowLabelVisible(_ anchor: LabelAnchor, focus: String?) -> Bool {
+            if let road = focusedRoad.wrappedValue, let selected = TopologyFlow.parse(roadName: road) {
+                return anchor.id == "flow:\(selected.from):\(selected.to):\(selected.kind.rawValue)"
+            }
+            if let focus {
+                return anchor.id.hasPrefix("flow:\(focus):") || anchor.id.contains(":\(focus):")
+            }
+            return anchor.id.hasSuffix(":feeder")
         }
 
         private func calloutOrigin(for world: SCNVector3) -> CGPoint {
@@ -566,6 +660,7 @@ struct NativeTopologyScene: UIViewRepresentable {
                 pose = TopologyCamera.Pose(target: SCNVector3(0, 1.2, 0), yaw: 0.55, pitch: 0.62, distance: fitDistance)
                 focusedSiteID.wrappedValue = nil
                 focusedRoad.wrappedValue = nil
+                labels.resetWindow()
                 applyHighlight()
                 applyPresentation()
             case .zoomIn: pose.distance = max(TopologyCamera.minDistance, pose.distance * 0.76)
@@ -588,6 +683,7 @@ struct NativeTopologyScene: UIViewRepresentable {
         }
 
         private func lock(_ id: String, elevate: Bool) {
+            if focusedSiteID.wrappedValue != id { labels.resetWindow() }
             focusedSiteID.wrappedValue = id
             focusedRoad.wrappedValue = nil
             applyHighlight()
@@ -629,8 +725,9 @@ struct NativeTopologyScene: UIViewRepresentable {
             if name.hasPrefix("ext:") { lock(name, elevate: false); return }
             if name.hasPrefix("road:") {
                 focusedRoad.wrappedValue = name
-                let parts = name.split(separator: ":")
-                if parts.count >= 3 { focusedSiteID.wrappedValue = String(parts[1]) }
+                if let flow = TopologyFlow.parse(roadName: name) {
+                    focusedSiteID.wrappedValue = flow.from
+                }
                 applyHighlight()
                 syncLabels()
             }
@@ -681,10 +778,12 @@ struct NativeTopologyScene: UIViewRepresentable {
 }
 
 private struct LabelAnchor {
-    enum Rank { case name, runtime, analysis }
+    enum Rank { case name, flow, runtime, analysis }
     let id: String
     let siteID: String
     let world: SCNVector3
+    let localY: Float
+    let usesTower: Bool
     let text: String
     let detail: String
     let color: UIColor
@@ -775,14 +874,33 @@ private final class TopologyLabelCanvas: UIView {
 
     private var chips: [String: UILabel] = [:]
     private var leaders: [(CGPoint, CGPoint, UIColor)] = []
+    private var windowStart = 0
+    private var lastFocus: String?
+    private var lastNames: [Item] = []
+    private var lastLayers: [Item] = []
+    private var lastBand: ClosedRange<CGFloat>?
+    private var lastVisible = 4
+    private let moreAbove = UIButton(type: .system)
+    private let moreBelow = UIButton(type: .system)
 
     override init(frame: CGRect) {
         super.init(frame: frame)
         isOpaque = false
         backgroundColor = .clear
+        configureMore(moreAbove)
+        configureMore(moreBelow)
+        moreAbove.addTarget(self, action: #selector(pageUp), for: .touchUpInside)
+        moreBelow.addTarget(self, action: #selector(pageDown), for: .touchUpInside)
+        addSubview(moreAbove)
+        addSubview(moreBelow)
     }
 
     required init?(coder: NSCoder) { nil }
+
+    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        let hit = super.hitTest(point, with: event)
+        return hit === self ? nil : hit
+    }
 
     override func draw(_ rect: CGRect) {
         guard let context = UIGraphicsGetCurrentContext() else { return }
@@ -790,52 +908,127 @@ private final class TopologyLabelCanvas: UIView {
             context.setStrokeColor(color.withAlphaComponent(0.7).cgColor)
             context.setLineWidth(1)
             context.move(to: start)
+            context.addLine(to: CGPoint(x: (start.x + end.x) / 2, y: start.y))
             context.addLine(to: end)
             context.strokePath()
         }
     }
 
-    func render(_ items: [Item], band: ClosedRange<CGFloat>? = nil) {
-        let keep = Set(items.map(\.id))
+    func resetWindow() {
+        windowStart = 0
+    }
+
+    func render(names: [Item], layers: [Item], band: ClosedRange<CGFloat>?, focusID: String?) {
+        if focusID != lastFocus {
+            windowStart = 0
+            lastFocus = focusID
+        }
+        lastNames = names
+        lastLayers = layers
+        lastBand = band
+        let keep = Set((names + layers).map(\.id))
         chips.keys.filter { !keep.contains($0) }.forEach {
             chips[$0]?.removeFromSuperview()
             chips[$0] = nil
         }
-        let ordered = items.sorted { $0.point.y < $1.point.y }
-        let measured: [(item: Item, chip: UILabel, width: CGFloat, height: CGFloat)] = ordered.map { item in
-            let chip = chips[item.id] ?? makeChip()
-            let text = item.detail.isEmpty ? "  \(item.text)  " : "  \(item.text)   \(item.detail)  "
-            chip.text = text
-            chip.textColor = item.color
-            chip.sizeToFit()
-            return (item, chip, min(172, chip.intrinsicContentSize.width + 14), chip.intrinsicContentSize.height + 6)
-        }
-        let tops: [CGFloat]
-        if let band, !measured.isEmpty {
-            tops = TopologyLayout.packLabels(heights: measured.map(\.height), minY: band.lowerBound, maxY: band.upperBound)
-        } else {
-            var cursor: CGFloat = -1_000
-            tops = measured.map { row in
-                var y = row.item.point.y - row.height / 2
-                if y < cursor + 3 { y = cursor + 3 }
-                cursor = y + row.height
-                return y
-            }
-        }
+        chips.values.forEach { $0.isHidden = true }
         var nextLeaders: [(CGPoint, CGPoint, UIColor)] = []
-        for (index, row) in measured.enumerated() {
-            let maxX = bounds.maxX - row.width - 8
-            let x = min(max(8, row.item.point.x + 14), max(8, maxX))
-            let y = tops.indices.contains(index) ? tops[index] : row.item.point.y
-            row.chip.frame = CGRect(x: x, y: y, width: row.width, height: row.height)
-            row.chip.isHidden = false
-            if row.chip.superview == nil { addSubview(row.chip) }
-            chips[row.item.id] = row.chip
-            let midY = row.chip.frame.midY
-            nextLeaders.append((CGPoint(x: row.item.point.x, y: midY), CGPoint(x: row.chip.frame.minX, y: midY), row.item.color))
+        place(names.sorted { $0.point.y < $1.point.y }, band: nil, into: &nextLeaders)
+        if let band {
+            let ordered = layers.sorted { $0.point.y < $1.point.y }
+            let measured = measure(ordered)
+            let preferred = measured.map { $0.item.point.y - $0.height / 2 }
+            let window = TopologyLayout.arrangeLabels(
+                preferredTops: preferred,
+                heights: measured.map(\.height),
+                minY: band.lowerBound + 18,
+                maxY: band.upperBound - 18,
+                start: windowStart
+            )
+            windowStart = window.start
+            lastVisible = max(1, window.count)
+            let visible = Array(measured.dropFirst(window.start).prefix(window.count))
+            for (index, row) in visible.enumerated() {
+                let top = window.tops.indices.contains(index) ? window.tops[index] : row.item.point.y - row.height / 2
+                place(row, top: top, into: &nextLeaders)
+            }
+            layoutMore(moreAbove, text: "▲ \(window.moreAbove) more", visible: window.moreAbove > 0, y: band.lowerBound)
+            layoutMore(moreBelow, text: "▼ \(window.moreBelow) more", visible: window.moreBelow > 0, y: band.upperBound - 22)
+        } else {
+            place(layers.sorted { $0.point.y < $1.point.y }, band: nil, into: &nextLeaders)
+            moreAbove.isHidden = true
+            moreBelow.isHidden = true
         }
         leaders = nextLeaders
         setNeedsDisplay()
+    }
+
+    @objc private func pageUp() {
+        windowStart = max(0, windowStart - pageSize)
+        render(names: lastNames, layers: lastLayers, band: lastBand, focusID: lastFocus)
+    }
+
+    @objc private func pageDown() {
+        windowStart += pageSize
+        render(names: lastNames, layers: lastLayers, band: lastBand, focusID: lastFocus)
+    }
+
+    private var pageSize: Int { max(1, lastVisible - 2) }
+
+    private func measure(_ items: [Item]) -> [(item: Item, chip: UILabel, width: CGFloat, height: CGFloat)] {
+        items.map { item in
+            let chip = chips[item.id] ?? makeChip()
+            chip.text = item.detail.isEmpty ? "  \(item.text)  " : "  \(item.text)   \(item.detail)  "
+            chip.textColor = item.color
+            chip.sizeToFit()
+            chips[item.id] = chip
+            return (item, chip, min(172, chip.intrinsicContentSize.width + 14), chip.intrinsicContentSize.height + 6)
+        }
+    }
+
+    private func place(_ items: [Item], band: ClosedRange<CGFloat>?, into leaders: inout [(CGPoint, CGPoint, UIColor)]) {
+        let measured = measure(items)
+        var cursor: CGFloat = -1_000
+        for row in measured {
+            var top = row.item.point.y - row.height / 2
+            if top < cursor + 3 { top = cursor + 3 }
+            if let band {
+                top = min(max(band.lowerBound, top), band.upperBound - row.height)
+            }
+            cursor = top + row.height
+            place(row, top: top, into: &leaders)
+        }
+    }
+
+    private func place(_ row: (item: Item, chip: UILabel, width: CGFloat, height: CGFloat), top: CGFloat, into leaders: inout [(CGPoint, CGPoint, UIColor)]) {
+        let maxX = bounds.maxX - row.width - 8
+        let x = min(max(8, row.item.point.x + 14), max(8, maxX))
+        row.chip.frame = CGRect(x: x, y: top, width: row.width, height: row.height)
+        row.chip.isHidden = false
+        if row.chip.superview == nil { addSubview(row.chip) }
+        chips[row.item.id] = row.chip
+        leaders.append((row.item.point, CGPoint(x: row.chip.frame.minX, y: row.chip.frame.midY), row.item.color))
+    }
+
+    private func configureMore(_ button: UIButton) {
+        button.titleLabel?.font = .systemFont(ofSize: 11, weight: .semibold)
+        button.setTitleColor(UIColor(red: 1, green: 0.83, blue: 0.47, alpha: 1), for: .normal)
+        button.backgroundColor = UIColor(red: 0.04, green: 0.08, blue: 0.1, alpha: 0.86)
+        button.layer.cornerRadius = 5
+        button.layer.borderWidth = 0.5
+        button.layer.borderColor = UIColor(red: 1, green: 0.7, blue: 0.33, alpha: 0.45).cgColor
+        button.contentEdgeInsets = UIEdgeInsets(top: 3, left: 8, bottom: 3, right: 8)
+        button.isHidden = true
+    }
+
+    private func layoutMore(_ button: UIButton, text: String, visible: Bool, y: CGFloat) {
+        button.setTitle(text, for: .normal)
+        button.isHidden = !visible
+        guard visible else { return }
+        button.sizeToFit()
+        let width = min(160, button.bounds.width + 6)
+        button.frame = CGRect(x: bounds.maxX - width - 10, y: y, width: width, height: 22)
+        bringSubviewToFront(button)
     }
 
     private func makeChip() -> UILabel {

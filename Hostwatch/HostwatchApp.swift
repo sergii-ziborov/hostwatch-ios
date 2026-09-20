@@ -66,7 +66,7 @@ struct HostwatchApp: App {
     private var keepsSession: Bool { model.session.authenticated || model.hasSavedSession }
 
     private var showsUnlock: Bool {
-        !DeviceUnlock.isRunningTests && keepsSession && !unlocked && biometricUnlockEnabled && DeviceUnlock.isAvailable()
+        !model.fixtures && !DeviceUnlock.isRunningTests && keepsSession && !unlocked && biometricUnlockEnabled && DeviceUnlock.isAvailable()
     }
 
     private var showsLockCover: Bool { showsUnlock || (keepsSession && biometricUnlockEnabled && !unlocked) }

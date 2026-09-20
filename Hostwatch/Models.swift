@@ -330,6 +330,30 @@ struct RequestSample: Codable, Identifiable, Hashable {
         case protocolName = "protocol"
         case internalRequest = "internal"
     }
+
+    var origin: TrafficOrigin { TrafficOrigin(self) }
+}
+
+enum TrafficOrigin: String, Equatable {
+    case external
+    case ourService
+
+    init(_ request: RequestSample) {
+        self = request.internalRequest == true ? .ourService : .external
+    }
+
+    var badge: String { self == .ourService ? "OUR" : "EXT" }
+    var title: String { self == .ourService ? "Our service" : "External" }
+    var detail: String {
+        self == .ourService ? "Call from one of our services" : "Public client after forwarding"
+    }
+
+    func sourceLabel(for request: RequestSample) -> String {
+        switch self {
+        case .ourService: return request.clientService ?? "Unknown private peer"
+        case .external: return request.clientIp
+        }
+    }
 }
 struct ErrorEvidence: Codable { let windowHours: Int; let site: String?; let interval: String?; let requests: [RequestSample]; let retainedErrors: Int; let retainedFrom: String?; let capped: Bool }
 

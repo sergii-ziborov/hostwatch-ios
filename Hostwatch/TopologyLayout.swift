@@ -6,10 +6,78 @@ struct TopologyPoint: Equatable {
     var z: Float
 }
 
-enum TopologyRoadKind: String, Equatable {
+enum TopologyRoadKind: String, Equatable, CaseIterable {
     case feeder
     case call
     case io
+
+    var origin: TopologyOrigin {
+        switch self {
+        case .feeder: return .external
+        case .call: return .ourService
+        case .io: return .ourData
+        }
+    }
+}
+
+enum TopologyOrigin: String, Equatable {
+    case external
+    case ourService
+    case ourData
+
+    var title: String {
+        switch self {
+        case .external: return "External"
+        case .ourService: return "Our service"
+        case .ourData: return "Our data"
+        }
+    }
+
+    var legend: String {
+        switch self {
+        case .external: return "EXTERNAL · PUBLIC CLIENTS"
+        case .ourService: return "OUR SERVICES · INTERNAL CALLS"
+        case .ourData: return "OUR DATA · DB / CACHE"
+        }
+    }
+}
+
+struct TopologyFlow: Equatable {
+    let from: String
+    let to: String
+    let kind: TopologyRoadKind
+
+    var origin: TopologyOrigin { kind.origin }
+
+    static func parse(roadName name: String) -> TopologyFlow? {
+        guard name.hasPrefix("road:") else { return nil }
+        let body = String(name.dropFirst(5))
+        guard let kind = TopologyRoadKind.allCases.first(where: { body.hasSuffix(":" + $0.rawValue) }) else { return nil }
+        let pair = String(body.dropLast(kind.rawValue.count + 1))
+        let nodes = splitNodes(pair)
+        guard !nodes.from.isEmpty, !nodes.to.isEmpty else { return nil }
+        return TopologyFlow(from: nodes.from, to: nodes.to, kind: kind)
+    }
+
+    private static func splitNodes(_ pair: String) -> (from: String, to: String) {
+        if pair.hasPrefix("ext:") {
+            let rest = String(pair.dropFirst(4))
+            if let range = rest.range(of: ":ext:") {
+                return ("ext:" + String(rest[..<range.lowerBound]), String(rest[rest.index(after: range.lowerBound)...]))
+            }
+            if let index = rest.lastIndex(of: ":") {
+                return ("ext:" + String(rest[..<index]), String(rest[rest.index(after: index)...]))
+            }
+            return ("ext:" + rest, "")
+        }
+        if let range = pair.range(of: ":ext:") {
+            return (String(pair[..<range.lowerBound]), String(pair[pair.index(after: range.lowerBound)...]))
+        }
+        if let index = pair.firstIndex(of: ":") {
+            return (String(pair[..<index]), String(pair[pair.index(after: index)...]))
+        }
+        return (pair, "")
+    }
 }
 
 struct TopologyLink: Equatable {
@@ -155,19 +223,82 @@ enum TopologyLayout {
         return true
     }
 
-    /// Tight column of label tops inside `[minY, maxY]`. UIKit Y grows downward.
-    static func packLabels(heights: [CGFloat], minY: CGFloat, maxY: CGFloat, gap: CGFloat = 2) -> [CGFloat] {
+    struct LabelWindow: Equatable {
+        var tops: [CGFloat]
+        var start: Int
+        var count: Int
+        var moreAbove: Int
+        var moreBelow: Int
+    }
+
+    /// Pin each chip to its section. If they cannot fit without overlap, show a scroll window
+    /// instead of squeezing them into a smear. UIKit Y grows downward.
+    static func arrangeLabels(
+        preferredTops: [CGFloat],
+        heights: [CGFloat],
+        minY: CGFloat,
+        maxY: CGFloat,
+        gap: CGFloat = 3,
+        start: Int = 0
+    ) -> LabelWindow {
+        let count = heights.count
+        guard count > 0, count == preferredTops.count else {
+            return LabelWindow(tops: [], start: 0, count: 0, moreAbove: 0, moreBelow: 0)
+        }
+        let median = heights.sorted()[count / 2]
+        let slot = max(median + gap, 18)
+        let capacity = max(1, Int(floor((max(maxY - minY, slot) + gap) / slot)))
+        if count <= capacity, let pinned = pinLabels(preferredTops: preferredTops, heights: heights, minY: minY, maxY: maxY, gap: gap) {
+            return LabelWindow(tops: pinned, start: 0, count: count, moreAbove: 0, moreBelow: 0)
+        }
+        let visible = min(count, capacity)
+        let lo = min(max(0, start), max(0, count - visible))
+        let hi = lo + visible
+        let sliceTops = Array(preferredTops[lo..<hi])
+        let sliceHeights = Array(heights[lo..<hi])
+        let tops = pinLabels(preferredTops: sliceTops, heights: sliceHeights, minY: minY, maxY: maxY, gap: gap)
+            ?? evenSpace(heights: sliceHeights, minY: minY, maxY: maxY)
+        return LabelWindow(tops: tops, start: lo, count: visible, moreAbove: lo, moreBelow: count - hi)
+    }
+
+    static func pinLabels(preferredTops: [CGFloat], heights: [CGFloat], minY: CGFloat, maxY: CGFloat, gap: CGFloat) -> [CGFloat]? {
+        guard !heights.isEmpty, heights.count == preferredTops.count else { return [] }
+        var tops = preferredTops
+        for index in 1..<tops.count {
+            tops[index] = max(tops[index], tops[index - 1] + heights[index - 1] + gap)
+        }
+        if tops[0] < minY {
+            let shift = minY - tops[0]
+            tops = tops.map { $0 + shift }
+        }
+        if let last = tops.last, let height = heights.last, last + height > maxY {
+            let shift = last + height - maxY
+            tops = tops.map { $0 - shift }
+            if tops[0] < minY - 0.5 { return nil }
+        }
+        return tops
+    }
+
+    static func evenSpace(heights: [CGFloat], minY: CGFloat, maxY: CGFloat) -> [CGFloat] {
         guard !heights.isEmpty else { return [] }
+        if heights.count == 1 {
+            let top = min(max(minY, (minY + maxY - heights[0]) / 2), maxY - heights[0])
+            return [top]
+        }
         let body = heights.reduce(0, +)
-        let available = max(heights[0], maxY - minY)
-        let slack = available - body
-        let spacing = heights.count > 1 ? min(gap, slack / CGFloat(heights.count - 1)) : 0
+        let slack = max(0, maxY - minY - body)
+        let spacing = slack / CGFloat(heights.count - 1)
         var y = minY
         return heights.map { height in
             let top = y
             y += height + spacing
             return top
         }
+    }
+
+    /// Tight column of label tops inside `[minY, maxY]`. Prefer `arrangeLabels` for live callouts.
+    static func packLabels(heights: [CGFloat], minY: CGFloat, maxY: CGFloat, gap: CGFloat = 2) -> [CGFloat] {
+        arrangeLabels(preferredTops: evenSpace(heights: heights, minY: minY, maxY: maxY), heights: heights, minY: minY, maxY: maxY, gap: gap).tops
     }
 
     static func resolveSite(_ raw: String, in ids: Set<String>) -> String? {

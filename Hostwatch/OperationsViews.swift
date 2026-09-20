@@ -50,7 +50,7 @@ struct TopologyView: View {
     @State private var selection: TopologySelection?
     @State private var focusedSiteID: String?
     @State private var focusedRoad: String?
-    @State private var showLegend = false
+    @State private var showLegend = true
 
     private var parentSites: [Site] {
         model.selectedSite.isEmpty ? model.sites : model.sites.filter { $0.id == model.selectedSite }
@@ -109,13 +109,12 @@ struct TopologyView: View {
                         HStack(alignment: .top, spacing: 8) {
                             dossier
                             Spacer(minLength: 0)
-                            legend
                         }
                         .padding(10)
                         VStack {
                             Spacer()
                             HStack(alignment: .bottom) {
-                                if focusedSiteID == nil { helpHints }
+                                legend
                                 Spacer()
                                 VStack(spacing: 8) {
                                     Button { send(.zoomIn) } label: { Image(systemName: "plus.magnifyingglass") }
@@ -190,8 +189,18 @@ struct TopologyView: View {
         if let focusedSiteID {
             VStack(alignment: .leading, spacing: 8) {
                 Text("TARGET LOCKED").font(.caption2.bold()).kerning(1.6).foregroundStyle(HW.teal)
+                if let flow = focusedRoad.flatMap({ TopologyFlow.parse(roadName: $0) }) {
+                    originPip(flow.origin)
+                    Text("\(boardTitle(flow.from)) → \(boardTitle(flow.to))")
+                        .font(.caption.bold())
+                    Text(flowCaption(flow))
+                        .font(.caption2).foregroundStyle(HW.secondary)
+                }
                 if let site = sites.first(where: { $0.id == focusedSiteID }) {
-                    Text(site.name).font(.headline)
+                    if focusedRoad == nil {
+                        originPip(.ourService)
+                        Text(site.name).font(.headline)
+                    }
                     Text(projectScope
                          ? "\(parentSites.first?.name ?? site.name) · \(TopologyServiceRole.of(siteID: site.id)?.title ?? "service")"
                          : site.domains.joined(separator: " · "))
@@ -201,10 +210,6 @@ struct TopologyView: View {
                         pip("ERRORS", Format.percent(site.errorRate))
                         pip("LAYERS", "\(TopologyLayer.layers(for: site, project: project(for: site)).count)")
                     }
-                    if let focusedRoad {
-                        Text(focusedRoad.replacingOccurrences(of: "road:", with: "").replacingOccurrences(of: ":", with: " → "))
-                            .font(.caption2).foregroundStyle(HW.amber)
-                    }
                     HStack(spacing: 6) {
                         Button("Details") { selection = TopologySelection(siteID: site.id, layer: nil) }
                         Button("Release") { send(.fit) }
@@ -212,20 +217,46 @@ struct TopologyView: View {
                     .buttonStyle(.bordered)
                     .controlSize(.mini)
                 } else if focusedSiteID == "host" {
-                    Text(node.name).font(.headline)
-                    Text("Public edge · feeder roads stay on the board").font(.caption2).foregroundStyle(HW.secondary)
+                    if focusedRoad == nil { originPip(.external) }
+                    Text(focusedRoad == nil ? "Public clients" : node.name).font(.headline)
+                    Text("External traffic enters here. Teal roads are public clients, not our services.")
+                        .font(.caption2).foregroundStyle(HW.secondary)
                     Button("Release") { send(.fit) }.buttonStyle(.bordered).controlSize(.small)
                 } else if focusedSiteID.hasPrefix("ext:"), let service = model.dataServices.first(where: { "ext:\($0.id)" == focusedSiteID }) {
+                    if focusedRoad == nil { originPip(.ourData) }
                     Text(service.type).font(.headline)
-                    Text("\(service.role) · \(service.siteName ?? "host")").font(.caption2).foregroundStyle(HW.secondary)
+                    Text("Our data · \(service.role) · \(service.siteName ?? "host")").font(.caption2).foregroundStyle(HW.secondary)
                     pip("STATE", service.container.state)
                     Button("Release") { send(.fit) }.buttonStyle(.bordered).controlSize(.small)
                 }
             }
             .padding(8)
-            .frame(maxWidth: 168, alignment: .leading)
+            .frame(maxWidth: 176, alignment: .leading)
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
         }
+    }
+
+    private func boardTitle(_ id: String) -> String {
+        if id == "host" { return "Public clients" }
+        if id.hasPrefix("ext:"), let service = model.dataServices.first(where: { "ext:\($0.id)" == id }) {
+            return service.type
+        }
+        return sites.first { $0.id == id }?.name ?? id
+    }
+
+    private func flowCaption(_ flow: TopologyFlow) -> String {
+        switch flow.origin {
+        case .external: return "Public clients enter through the edge"
+        case .ourService: return "One of our services calling another"
+        case .ourData: return "Our service talking to our data"
+        }
+    }
+
+    private func originPip(_ origin: TopologyOrigin) -> some View {
+        Text(origin.title.uppercased())
+            .font(.caption2.bold())
+            .kerning(0.8)
+            .foregroundStyle(origin == .external ? HW.teal : origin == .ourData ? Color(red: 0.35, green: 0.82, blue: 0.62) : HW.amber)
     }
 
     private var legend: some View {
@@ -235,10 +266,10 @@ struct TopologyView: View {
             }.buttonStyle(.plain)
             if showLegend {
                 if mode == .traffic {
-                    legendRow(HW.teal, "PACKETS · LIVE REQUESTS")
-                    legendRow(HW.amber, "ROADS · CALL VOLUME")
-                    legendRow(Color(red: 0.35, green: 0.82, blue: 0.62), "I/O · DB / CACHE")
-                    Text("Traffic lights the roads and moves packets. Architecture layers stay hidden.")
+                    legendRow(HW.teal, TopologyOrigin.external.legend)
+                    legendRow(HW.amber, TopologyOrigin.ourService.legend)
+                    legendRow(Color(red: 0.35, green: 0.82, blue: 0.62), TopologyOrigin.ourData.legend)
+                    Text("Teal starts at PUBLIC. Amber is our services. Green is our data. Packets keep the color of their source.")
                         .font(.caption2).foregroundStyle(HW.secondary)
                 } else {
                     legendRow(HW.teal, "RUNTIME · CONTAINERS")
@@ -249,24 +280,13 @@ struct TopologyView: View {
                          : "Towers show stacked services and Weavatrix. Roads are structure, not live flow.")
                         .font(.caption2).foregroundStyle(HW.secondary)
                 }
+                Text("DRAG orbit · TWO FINGERS pan · PINCH zoom · TAP a tower")
+                    .font(.caption2).foregroundStyle(HW.secondary)
             }
         }
         .padding(10)
-        .frame(maxWidth: 200, alignment: .leading)
+        .frame(maxWidth: 220, alignment: .leading)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
-    }
-
-    private var helpHints: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(mode == .traffic ? "TRAFFIC · packets = live requests" : "TOWERS · layers = services + Weavatrix").font(.caption2)
-            Text("DRAG orbit / tilt").font(.caption2)
-            Text("TWO FINGERS pan").font(.caption2)
-            Text("PINCH zoom").font(.caption2)
-            Text("TAP frame tower from the right").font(.caption2)
-        }
-        .foregroundStyle(HW.secondary)
-        .padding(10)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
     }
 
     private func pip(_ title: String, _ value: String) -> some View {

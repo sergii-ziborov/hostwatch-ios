@@ -97,6 +97,35 @@ final class HostwatchTests: XCTestCase {
         XCTAssertTrue(TopologyMode.towers.showsArchitecture)
     }
 
+    func testVisitorMapDropsInternalAndZeroCoordinates() {
+        let visitor = Fixtures.requests.first { $0.origin == .external && $0.latitude != nil }!
+        XCTAssertNotNil(GeoPlace.coordinate(for: visitor))
+        XCTAssertNil(GeoPlace.coordinate(for: Fixtures.requests.first { $0.origin == .ourService }!))
+        XCTAssertFalse(GeoPlace.isUsable(latitude: 0, longitude: 0))
+        XCTAssertNotNil(GeoPlace.centroid(code: "IL", country: "Israel"))
+        XCTAssertGreaterThan(GeoPlace.pins(from: Fixtures.requests).count, 0)
+    }
+
+    func testTrafficRoadsDistinguishPublicClientsFromOurServices() {
+        XCTAssertEqual(TopologyRoadKind.feeder.origin, .external)
+        XCTAssertEqual(TopologyRoadKind.call.origin, .ourService)
+        XCTAssertEqual(TopologyRoadKind.io.origin, .ourData)
+        let publicEdge = TopologyFlow.parse(roadName: "road:host:applydjinn:feeder")
+        XCTAssertEqual(publicEdge?.from, "host")
+        XCTAssertEqual(publicEdge?.to, "applydjinn")
+        XCTAssertEqual(publicEdge?.origin, .external)
+        let serviceCall = TopologyFlow.parse(roadName: "road:applydjinn:kablay-il:call")
+        XCTAssertEqual(serviceCall?.from, "applydjinn")
+        XCTAssertEqual(serviceCall?.to, "kablay-il")
+        XCTAssertEqual(serviceCall?.origin, .ourService)
+        let data = TopologyFlow.parse(roadName: "road:applydjinn:ext:pg-1:io")
+        XCTAssertEqual(data?.from, "applydjinn")
+        XCTAssertEqual(data?.to, "ext:pg-1")
+        XCTAssertEqual(data?.origin, .ourData)
+        XCTAssertEqual(TrafficOrigin(Fixtures.requests.first { $0.internalRequest == true }!), .ourService)
+        XCTAssertEqual(TrafficOrigin(Fixtures.requests.first { $0.internalRequest != true }!), .external)
+    }
+
     func testTowerLockFramesFromTheRightLikeElectron() {
         let pose = TopologyCamera.lock(base: SCNVector3(2, 0, -1), height: 4)
         let eye = TopologyCamera.eye(of: pose)
@@ -160,13 +189,29 @@ final class HostwatchTests: XCTestCase {
         XCTAssertTrue(hops.contains { $0.weavatrix && $0.title.contains("Weavatrix") })
     }
 
-    func testTowerLabelsPackTightlyInsideTheTowerBand() {
-        let tops = TopologyLayout.packLabels(heights: [20, 20, 20], minY: 100, maxY: 200, gap: 2)
-        XCTAssertEqual(tops, [100, 122, 144])
-        XCTAssertLessThanOrEqual((tops.last ?? 0) + 20, 200)
-        let squeezed = TopologyLayout.packLabels(heights: Array(repeating: 20, count: 10), minY: 0, maxY: 100, gap: 2)
-        XCTAssertEqual(squeezed.first ?? -1, 0, accuracy: 0.5)
-        XCTAssertLessThanOrEqual((squeezed.last ?? 0) + 20, 100.5)
+    func testTowerLabelsStayPinnedToTheirSections() {
+        let pinned = TopologyLayout.arrangeLabels(
+            preferredTops: [100, 150, 200], heights: [20, 20, 20], minY: 80, maxY: 240, gap: 3
+        )
+        XCTAssertEqual(pinned.tops, [100, 150, 200])
+        XCTAssertEqual(pinned.moreAbove, 0)
+        XCTAssertEqual(pinned.moreBelow, 0)
+        let collided = TopologyLayout.arrangeLabels(
+            preferredTops: [100, 104, 108], heights: [20, 20, 20], minY: 80, maxY: 240, gap: 3
+        )
+        XCTAssertGreaterThanOrEqual(collided.tops[1], collided.tops[0] + 23)
+        XCTAssertGreaterThanOrEqual(collided.tops[2], collided.tops[1] + 23)
+        let overflow = TopologyLayout.arrangeLabels(
+            preferredTops: (0..<14).map { CGFloat($0) * 12 },
+            heights: Array(repeating: 20, count: 14),
+            minY: 0, maxY: 100, gap: 3, start: 0
+        )
+        XCTAssertGreaterThan(overflow.moreBelow, 0)
+        XCTAssertLessThan(overflow.count, 14)
+        XCTAssertEqual(overflow.tops.count, overflow.count)
+        for index in 1..<overflow.tops.count {
+            XCTAssertGreaterThanOrEqual(overflow.tops[index], overflow.tops[index - 1] + 18)
+        }
     }
 
     func testManhattanRoadsStayOrthogonalOnTheCyberboard() {

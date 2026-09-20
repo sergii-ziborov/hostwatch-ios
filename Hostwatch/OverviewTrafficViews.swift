@@ -303,6 +303,7 @@ struct TrafficView: View {
         VStack(alignment: .leading, spacing: 18) {
             TrafficChart()
             InternalTrafficSection()
+            TrafficMapCard(requests: model.requests)
             HStack(spacing: 12) {
                 NavigationLink { RequestExplorerView() } label: { StatCard(title: "Retained requests", value: model.requests.count.formatted(), detail: "IP, location, destination and full trace", icon: "list.bullet.rectangle") }
                 NavigationLink { ErrorExplorerView() } label: { StatCard(title: "Errors", value: historicalErrors.formatted(), detail: "Selected window · inspect status, path and evidence", color: HW.red, icon: "exclamationmark.triangle") }
@@ -350,11 +351,11 @@ struct AttributionGrid: View {
     let columns = [GridItem(.adaptive(minimum: 245), spacing: 12)]
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Eyebrow(text: "HTTP attribution"); Text("Referrers & access groups").font(.title2.bold())
-            Text("Referer/UTM identifies a page or campaign, not the calling service. “Direct” only means no usable referrer was sent. These historical totals include internal Nginx calls.")
+            Eyebrow(text: "HTTP attribution"); Text("Referrers, not callers").font(.title2.bold())
+            Text("These names are Referer/UTM campaigns. They do not say whether the caller is a public client or one of our services. Origin is the split above: External vs Our services. “Direct” only means no usable referrer was sent.")
                 .font(.caption).foregroundStyle(HW.secondary)
             LazyVGrid(columns: columns, spacing: 12) {
-                metricGroup("Sources & referrers", items: model.sources.sources, kind: "source")
+                metricGroup("Referrers & campaigns", items: model.sources.sources, kind: "source")
                 metricGroup("Countries", items: model.sources.countries, kind: "country")
                 metricGroup("Bots", items: model.sources.bots, kind: "bot")
             }
@@ -384,11 +385,11 @@ struct InternalTrafficSection: View {
     private var total: Int { Int(model.sources.totalRequests ?? Double(model.traffic.reduce(0) { $0 + Int($1.requests) })) }
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Eyebrow(text: "Nginx request split")
-            Text("Public clients & internal services").font(.title2.bold())
+            Eyebrow(text: "Where traffic comes from")
+            Text("External clients vs our services").font(.title2.bold())
             HStack(spacing: 10) {
-                StatCard(title: "External", value: Int(model.sources.externalRequests ?? 0).formatted(), detail: "Public client IP after forwarding", icon: "globe")
-                StatCard(title: "Internal", value: Int(model.sources.internalRequests ?? 0).formatted(), detail: "Private client IP · may include an unknown proxy", icon: "point.3.connected.trianglepath.dotted")
+                StatCard(title: "External clients", value: Int(model.sources.externalRequests ?? 0).formatted(), detail: "Public internet · not our services", icon: "globe")
+                StatCard(title: "Our services", value: Int(model.sources.internalRequests ?? 0).formatted(), detail: "Private IP matched to a container", color: HW.amber, icon: "point.3.connected.trianglepath.dotted")
             }
             if total > classified {
                 Text("\((total - classified).formatted()) older Nginx requests have no internal/external classification. Service identity was not recorded then.")
@@ -403,8 +404,13 @@ struct InternalTrafficSection: View {
                 ForEach(model.sources.internalRoutes ?? []) { route in
                     NavigationLink { InternalRouteDetail(route: route) } label: {
                         VStack(alignment: .leading, spacing: 5) {
-                            HStack { Text(route.caller).font(.subheadline.bold()); Spacer(); Text(Int(route.requests).formatted()).font(.body.weight(.bold)) }
-                            Text("→ \(route.destinationHost)\(route.targetService.map { " · upstream \($0)" } ?? " · upstream unverified")")
+                            HStack {
+                                OriginBadge(origin: .ourService)
+                                Text(route.caller).font(.subheadline.bold())
+                                Spacer()
+                                Text(Int(route.requests).formatted()).font(.body.weight(.bold))
+                            }
+                            Text("Our service → \(route.destinationHost)\(route.targetService.map { " · upstream \($0)" } ?? " · upstream unverified")")
                                 .font(.caption).foregroundStyle(HW.secondary)
                             Text("\(Format.bytes(route.bytes)) · inspect retained requests →")
                                 .font(.caption2).foregroundStyle(HW.teal)
@@ -448,19 +454,38 @@ struct RequestExplorerView: View {
     @EnvironmentObject private var model: AppModel
     @State private var query = ""
     @State private var status = "All"
+    @State private var origin = "All"
     private var filtered: [RequestSample] {
         model.requests.filter { row in
-            (query.isEmpty || [row.path, row.clientIp, row.country, row.host, row.source].joined(separator: " ").localizedCaseInsensitiveContains(query)) &&
-            (status == "All" || (status == "Errors" ? row.status >= 400 : row.status < 400))
+            (query.isEmpty || [row.path, row.clientIp, row.country, row.host, row.source, row.clientService ?? ""].joined(separator: " ").localizedCaseInsensitiveContains(query)) &&
+            (status == "All" || (status == "Errors" ? row.status >= 400 : row.status < 400)) &&
+            (origin == "All" || (origin == "Our services" ? row.origin == .ourService : row.origin == .external))
         }
     }
     var body: some View {
         List {
-            Section { TextField("Search IP, path, host, country…", text: $query); Picker("Status", selection: $status) { Text("All").tag("All"); Text("Successful").tag("Successful"); Text("Errors").tag("Errors") }.pickerStyle(.segmented) }
+            Section {
+                TextField("Search IP, path, host, country, service…", text: $query)
+                Picker("Status", selection: $status) { Text("All").tag("All"); Text("Successful").tag("Successful"); Text("Errors").tag("Errors") }.pickerStyle(.segmented)
+                Picker("Origin", selection: $origin) { Text("All").tag("All"); Text("External").tag("External"); Text("Our services").tag("Our services") }.pickerStyle(.segmented)
+            }
             Section("\(filtered.count) retained requests") {
                 PagedRows(items: filtered) { request in NavigationLink { RequestDetailView(request: request) } label: { RequestRow(request: request) } }
             }
         }.hwHiddenScrollBackground().background(HW.background).navigationTitle("Requests")
+    }
+}
+
+struct OriginBadge: View {
+    let origin: TrafficOrigin
+    var body: some View {
+        Text(origin.badge)
+            .font(.caption2.bold())
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .foregroundStyle(origin == .ourService ? HW.amber : HW.teal)
+            .background((origin == .ourService ? HW.amber : HW.teal).opacity(0.16))
+            .clipShape(Capsule())
     }
 }
 
@@ -469,8 +494,14 @@ struct RequestRow: View {
     private var unparsed: Bool { request.method == "UNKNOWN" && !RequestEvidence.usableHost(request.host) }
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
-            HStack { Text(unparsed ? "UNPARSED" : request.method).font(.caption.bold()).foregroundStyle(unparsed ? HW.amber : HW.teal); Text(unparsed ? "Request target unavailable" : request.path).font(.hw(.body, design: .monospaced, weight: .semibold)).lineLimit(1); Spacer(); Text(String(request.status)).font(.body.weight(.bold)).foregroundStyle(request.status >= 400 ? HW.red : HW.teal) }
-            Text("\(request.internalRequest == true ? (request.clientService ?? "Unknown private peer") : request.clientIp) → \(unparsed ? "Unmapped host" : request.host) · \(request.durationMs.formatted()) ms").font(.caption).foregroundStyle(HW.secondary).lineLimit(1)
+            HStack {
+                OriginBadge(origin: request.origin)
+                Text(unparsed ? "UNPARSED" : request.method).font(.caption.bold()).foregroundStyle(unparsed ? HW.amber : HW.teal)
+                Text(unparsed ? "Request target unavailable" : request.path).font(.hw(.body, design: .monospaced, weight: .semibold)).lineLimit(1)
+                Spacer()
+                Text(String(request.status)).font(.body.weight(.bold)).foregroundStyle(request.status >= 400 ? HW.red : HW.teal)
+            }
+            Text("\(request.origin.title): \(request.origin.sourceLabel(for: request)) → \(unparsed ? "Unmapped host" : request.host) · \(request.durationMs.formatted()) ms").font(.caption).foregroundStyle(HW.secondary).lineLimit(1)
         }.padding(.vertical, 5)
     }
 }
@@ -494,10 +525,11 @@ struct RequestDetailView: View {
                 Text("\(ChartTime.parse(request.time)?.formatted(date: .abbreviated, time: .standard) ?? request.time) · \(hasObservedHost ? request.host : "unmapped host")")
                     .foregroundStyle(HW.secondary)
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 210))], spacing: 12) {
+                    StatCard(title: "Origin", value: request.origin.title, detail: "\(request.origin.detail) · \(request.origin.sourceLabel(for: request))", color: request.origin == .ourService ? HW.amber : HW.teal, icon: request.origin == .ourService ? "point.3.connected.trianglepath.dotted" : "globe")
                     StatCard(title: "Response", value: "\(request.status) \(HTTPURLResponse.localizedString(forStatusCode: request.status).capitalized)", detail: "\(request.durationMs.formatted()) ms · \(Format.bytes(request.bytes))", color: request.status >= 400 ? HW.red : HW.teal, icon: "arrow.left.arrow.right")
                     StatCard(title: "Client", value: request.clientIp, detail: "\(request.city ?? "Unknown"), \(request.country)", icon: "network")
-                    if request.internalRequest == true { StatCard(title: "Calling service", value: request.clientService ?? "Unknown private peer", detail: "Docker IP match when available", icon: "point.3.connected.trianglepath.dotted") }
-                    StatCard(title: "Attribution", value: request.source, detail: request.referrerPath ?? "No usable referrer or UTM source", color: HW.amber, icon: "arrow.triangle.branch")
+                    if request.origin == .ourService { StatCard(title: "Calling service", value: request.clientService ?? "Unknown private peer", detail: "Docker IP match when available", color: HW.amber, icon: "point.3.connected.trianglepath.dotted") }
+                    StatCard(title: "Referrer", value: request.source, detail: request.referrerPath ?? "Campaign / Referer — not the calling service", color: HW.amber, icon: "arrow.triangle.branch")
                     StatCard(title: "Agent", value: request.bot ?? "Browser / service", detail: request.userAgent, icon: "person.text.rectangle")
                 }
                 VStack(alignment: .leading, spacing: 8) {
@@ -730,6 +762,8 @@ struct SourceDetailView: View {
                         HWLabeled("Requests", value: Int(source.requests).formatted())
                         HWLabeled("Transfer", value: Format.bytes(source.bytes))
                         HWLabeled("Retained requests", value: matching.count.formatted())
+                        HWLabeled("External clients", value: matching.filter { $0.origin == .external }.count.formatted())
+                        HWLabeled("Our services", value: matching.filter { $0.origin == .ourService }.count.formatted())
                     }
                     if kind == "source", source.name == "Direct" { Section { Text("Direct means no usable referrer or UTM source was sent. Destinations, IPs, locations and user agents below identify what the traffic actually did.").foregroundStyle(HW.amber) } }
                     if kind == "country", model.selectedSite.isEmpty { Section { Text("Choose a site in the traffic scope before blocking a country. Country rules always apply to one project.").foregroundStyle(HW.amber) } }
@@ -754,76 +788,121 @@ struct SourceDetailView: View {
     private var destinationGroups: [DestinationGroup] { DestinationGroup.groups(from: matching) }
 }
 
-private struct RequestPin: Identifiable {
-    let request: RequestSample
-    var id: String { request.id }
-    var coordinate: CLLocationCoordinate2D {
-        CLLocationCoordinate2D(latitude: request.latitude ?? 0, longitude: request.longitude ?? 0)
+struct TrafficMapCard: View {
+    let requests: [RequestSample]
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Eyebrow(text: "Visitor map")
+            Text("Where external clients come from").font(.title2.bold())
+            RequestMap(requests: requests)
+        }
+        .padding(16)
+        .panel()
     }
 }
 
 struct RequestMap: View {
     let requests: [RequestSample]
-    @State private var region = MKCoordinateRegion(
-        center: CLLocationCoordinate2D(latitude: 30, longitude: 10),
-        span: MKCoordinateSpan(latitudeDelta: 80, longitudeDelta: 80)
-    )
-
-    private var pins: [RequestPin] {
-        requests.filter { $0.latitude != nil && $0.longitude != nil }.map(RequestPin.init)
-    }
+    @State private var selected: RequestSample?
+    private var pins: [GeoPin] { GeoPlace.pins(from: requests) }
+    private var located: Int { pins.reduce(0) { $0 + $1.count } }
+    private var ours: Int { requests.filter { $0.origin == .ourService }.count }
+    private var unknown: Int { max(0, requests.count - located - ours) }
 
     var body: some View {
-        Map(coordinateRegion: $region, annotationItems: pins) { pin in
-            MapAnnotation(coordinate: pin.coordinate) {
-                NavigationLink {
-                    RequestDetailView(request: pin.request)
-                } label: {
-                    Image(systemName: pin.request.status >= 400 ? "exclamationmark.circle.fill" : "circle.fill")
-                        .foregroundStyle(pin.request.status >= 400 ? HW.red : HW.teal)
-                        .padding(8)
-                        .background(.ultraThinMaterial)
-                        .clipShape(Circle())
-                }
+        VStack(alignment: .leading, spacing: 8) {
+            if pins.isEmpty {
+                EmptyState(
+                    icon: "map",
+                    title: locatedTitle,
+                    detail: emptyDetail
+                )
+                .frame(minHeight: 160)
+            } else {
+                RequestMapCanvas(pins: pins) { selected = $0 }
+                    .frame(minHeight: 260)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
-        }
-        .overlay(alignment: .bottom) {
-            Text("Tap a point for complete request evidence")
+            Text("\(located.formatted()) located · \(ours.formatted()) our services · \(unknown.formatted()) no geo")
                 .font(.caption)
-                .padding(9)
-                .background(.ultraThinMaterial)
-                .clipShape(Capsule())
-                .padding()
+                .foregroundStyle(HW.secondary)
         }
-        .onAppear {
-            if let first = pins.first {
-                region.center = first.coordinate
-                region.span = MKCoordinateSpan(latitudeDelta: 24, longitudeDelta: 24)
-            }
+        .sheet(item: $selected) { request in
+            HWStackNavigation { RequestDetailView(request: request) }
         }
+    }
+
+    private var locatedTitle: String {
+        if requests.isEmpty { return "No retained requests" }
+        if ours == requests.count { return "0 located · only our services" }
+        return "0 located requests"
+    }
+
+    private var emptyDetail: String {
+        if requests.isEmpty {
+            return "Visitor coordinates appear after Nginx keeps a public client IP."
+        }
+        if ours == requests.count {
+            return "These calls are our services. They have private addresses and are not placed on the visitor map."
+        }
+        return "Retained requests have no usable city coordinates yet. Country-only traffic is placed at the country center when the code is known."
     }
 }
 
 struct TrafficFlowView: View {
     let requests: [RequestSample]; let source: String
     var destinations: [(String, Int)] { Array(Dictionary(grouping: requests, by: \.host).map { ($0.key, $0.value.count) }.sorted { $0.1 > $1.1 }.prefix(16)) }
+    private var ourCount: Int { requests.filter { $0.origin == .ourService }.count }
+    private var externalCount: Int { requests.count - ourCount }
     var body: some View {
         GeometryReader { proxy in
             ZStack {
                 HW.background
                 Canvas { context, size in
                     let start = CGPoint(x: size.width * 0.18, y: size.height * 0.5)
-                    for (index, _) in destinations.enumerated() {
+                    for (index, dest) in destinations.enumerated() {
                         let y = size.height * (Double(index + 1) / Double(destinations.count + 1))
                         var path = Path(); path.move(to: start); path.addCurve(to: CGPoint(x: size.width * 0.82, y: y), control1: CGPoint(x: size.width * 0.45, y: start.y), control2: CGPoint(x: size.width * 0.56, y: y))
-                        context.stroke(path, with: .color(index % 2 == 0 ? HW.teal : HW.amber), lineWidth: CGFloat(2 + min(8, destinations[index].1 / 3)))
+                        context.stroke(path, with: .color(lineColor(for: dest.0)), lineWidth: CGFloat(2 + min(8, dest.1 / 3)))
                     }
                 }
-                Text(source).font(.headline).padding(12).background(HW.panelRaised).clipShape(Capsule()).position(x: proxy.size.width * 0.18, y: proxy.size.height * 0.5)
+                VStack(spacing: 4) {
+                    Text(source).font(.headline)
+                    Text(originCaption).font(.caption2).foregroundStyle(HW.secondary)
+                }.padding(12).background(HW.panelRaised).clipShape(RoundedRectangle(cornerRadius: 12)).position(x: proxy.size.width * 0.18, y: proxy.size.height * 0.5)
                 ForEach(Array(destinations.enumerated()), id: \.offset) { index, item in
-                    VStack(spacing: 2) { Text(item.0).font(.caption.bold()).lineLimit(1); Text("\(item.1) req").font(.caption2).foregroundStyle(HW.secondary) }.padding(9).background(HW.panelRaised).clipShape(RoundedRectangle(cornerRadius: 9)).position(x: proxy.size.width * 0.82, y: proxy.size.height * (Double(index + 1) / Double(destinations.count + 1)))
+                    VStack(spacing: 2) {
+                        Text(item.0).font(.caption.bold()).lineLimit(1)
+                        Text("\(item.1) req · \(lineCaption(for: item.0))").font(.caption2).foregroundStyle(HW.secondary)
+                    }.padding(9).background(HW.panelRaised).clipShape(RoundedRectangle(cornerRadius: 9)).position(x: proxy.size.width * 0.82, y: proxy.size.height * (Double(index + 1) / Double(destinations.count + 1)))
                 }
             }
         }
+    }
+
+    private var originCaption: String {
+        if ourCount == 0 { return "External clients" }
+        if externalCount == 0 { return "Our services" }
+        return "External \(externalCount) · Our \(ourCount)"
+    }
+
+    private func rows(for host: String) -> [RequestSample] { requests.filter { $0.host == host } }
+
+    private func lineColor(for host: String) -> Color {
+        let items = rows(for: host)
+        let ours = items.contains { $0.origin == .ourService }
+        let external = items.contains { $0.origin == .external }
+        if ours && !external { return HW.amber }
+        if external && !ours { return HW.teal }
+        return Color(red: 0.71, green: 0.55, blue: 1)
+    }
+
+    private func lineCaption(for host: String) -> String {
+        let items = rows(for: host)
+        let ours = items.contains { $0.origin == .ourService }
+        let external = items.contains { $0.origin == .external }
+        if ours && !external { return "our" }
+        if external && !ours { return "ext" }
+        return "mixed"
     }
 }
