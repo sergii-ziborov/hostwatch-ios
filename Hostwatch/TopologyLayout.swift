@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 
 struct TopologyPoint: Equatable {
@@ -152,6 +153,21 @@ enum TopologyLayout {
             if !horizontal && !vertical { return false }
         }
         return true
+    }
+
+    /// Tight column of label tops inside `[minY, maxY]`. UIKit Y grows downward.
+    static func packLabels(heights: [CGFloat], minY: CGFloat, maxY: CGFloat, gap: CGFloat = 2) -> [CGFloat] {
+        guard !heights.isEmpty else { return [] }
+        let body = heights.reduce(0, +)
+        let available = max(heights[0], maxY - minY)
+        let slack = available - body
+        let spacing = heights.count > 1 ? min(gap, slack / CGFloat(heights.count - 1)) : 0
+        var y = minY
+        return heights.map { height in
+            let top = y
+            y += height + spacing
+            return top
+        }
     }
 
     static func resolveSite(_ raw: String, in ids: Set<String>) -> String? {

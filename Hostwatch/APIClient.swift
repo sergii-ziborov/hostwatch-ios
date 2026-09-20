@@ -5,12 +5,14 @@ enum APIError: LocalizedError {
     case invalidURL
     case server(String)
     case invalidResponse
+    case unauthorized
 
     var errorDescription: String? {
         switch self {
         case .invalidURL: "The control-plane URL is invalid."
         case .server(let message): message
         case .invalidResponse: "The server returned an invalid response."
+        case .unauthorized: "The saved session is no longer valid. Sign in again."
         }
     }
 }
@@ -54,6 +56,7 @@ actor APIClient {
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
         guard (200..<300).contains(http.statusCode) else {
+            if http.statusCode == 401 || http.statusCode == 403 { throw APIError.unauthorized }
             let server = try? decoder.decode(ServerError.self, from: data)
             throw APIError.server(server?.error ?? "Request failed (HTTP \(http.statusCode)).")
         }
@@ -67,25 +70,31 @@ actor APIClient {
     func sessionState() async throws -> SessionState {
         let value: SessionState = try await call("/api/session")
         csrf = value.csrf ?? ""
+        if value.authenticated { persistAuthenticated(value) }
         return value
     }
 
     func signIn(email: String, password: String) async throws -> SessionState {
         let value: SessionState = try await call("/api/session", method: "POST", body: Credentials(email: email, password: password))
         csrf = value.csrf ?? ""
+        if value.authenticated { persistAuthenticated(value) }
         return value
     }
 
     func verify(otp: String) async throws -> SessionState {
         let value: SessionState = try await call("/api/session/totp", method: "POST", body: OTP(otp: otp))
         csrf = value.csrf ?? ""
+        if value.authenticated { persistAuthenticated(value) }
         return value
     }
 
     func startQR(kind: String) async throws -> QRStart { try await call("/api/session/qr", method: "POST", body: QRKind(kind: kind)) }
     func redeemQR(_ ticket: QRStart) async throws -> SessionState {
         let value: SessionState = try await call("/api/session/qr/\(ticket.id)/redeem", method: "POST", body: QRSecret(secret: ticket.secret))
-        if value.authenticated { csrf = value.csrf ?? "" }
+        if value.authenticated {
+            csrf = value.csrf ?? ""
+            persistAuthenticated(value)
+        }
         return value
     }
     func claimDeviceQR(_ ticket: DeviceQRTicket, proof: String) async throws -> QRApproval {
@@ -93,7 +102,10 @@ actor APIClient {
     }
     func redeemDeviceQR(_ ticket: DeviceQRTicket, proof: String) async throws -> SessionState {
         let value: SessionState = try await call("/api/session/qr/\(ticket.id)/redeem", method: "POST", body: DeviceQRProof(secret: ticket.secret, proof: proof))
-        if value.authenticated { csrf = value.csrf ?? "" }
+        if value.authenticated {
+            csrf = value.csrf ?? ""
+            persistAuthenticated(value)
+        }
         return value
     }
     func inspectQR(_ value: String) async throws -> QRApproval {
@@ -124,13 +136,51 @@ actor APIClient {
         csrf = ""; selectedNode = ""
         let storage = HTTPCookieStorage.shared
         for cookie in storage.cookies(for: baseURL) ?? [] { storage.deleteCookie(cookie) }
+        SessionVault.delete()
     }
+
+    func hasSavedSession() -> Bool {
+        SessionVault.load()?.snapshot.authenticated == true
+    }
+
+    func cachedSnapshot() -> SessionState? {
+        let stored = SessionVault.load()
+        return stored?.snapshot.authenticated == true ? stored?.snapshot : nil
+    }
+
+    func persistAuthenticated(_ state: SessionState) {
+        guard state.authenticated else { return }
+        csrf = state.csrf ?? csrf
+        SessionVault.save(StoredSession(
+            baseURL: baseURL.absoluteString,
+            csrf: csrf,
+            cookies: StoredCookie.snapshot(from: .shared, url: baseURL),
+            snapshot: state,
+            savedAt: Date()
+        ))
+    }
+
+    func applySavedSession() -> SessionState? {
+        guard let stored = SessionVault.load(), stored.snapshot.authenticated else { return nil }
+        if let url = URL(string: stored.baseURL) { baseURL = url }
+        csrf = stored.csrf
+        StoredCookie.apply(stored.cookies, to: .shared)
+        return stored.snapshot
+    }
+
+    func currentBaseURL() -> String { baseURL.absoluteString }
 
     func nodes() async throws -> [ManagedNode] { try await call("/api/control/nodes") }
     func overview() async throws -> Overview { try await call("/api/v1/overview") }
     func networkPorts() async throws -> NetworkPorts { try await call("/api/v1/network-ports") }
     func sites() async throws -> [Site] { try await call("/api/v1/sites") }
     func dataServices() async throws -> DataServicesResponse { try await call("/api/v1/data-services") }
+    func dataTables(path: String) async throws -> DataTablesResponse {
+        try await call("/api/v1/data-tables?\(queryItems(["path": path]))")
+    }
+    func dataRows(path: String, table: String, limit: Int = 25, offset: Int = 0) async throws -> DataRowsResponse {
+        try await call("/api/v1/data-rows?\(queryItems(["path": path, "table": table, "limit": String(limit), "offset": String(offset)]))")
+    }
     func history(hours: Int) async throws -> [SystemPoint] { try await call("/api/v1/system-history?hours=\(hours)") }
     func traffic(site: String, hours: Int) async throws -> [TrafficPoint] { try await call("/api/v1/traffic?\(scope(site: site, hours: hours))") }
     func sources(site: String, hours: Int) async throws -> Sources { try await call("/api/v1/sources?\(scope(site: site, hours: hours))") }
@@ -183,12 +233,22 @@ actor APIClient {
     func updateHybridSettings(_ settings: HybridSettings) async throws -> HybridSettings { try await call("/api/v2/settings", method: "PUT", body: settings) }
     func hybridAdmission() async throws -> HybridAdmission { try await call("/api/v2/admission") }
     func fleetLinks() async throws -> [FleetLink] { try await call("/api/v2/links") }
+    func mcpSnapshot() async throws -> MCPSnapshot { try await call("/api/v1/mcp") }
+    func updateMCPGovernance(_ value: MCPGovernance) async throws -> MCPGovernance {
+        try await call("/api/v1/mcp/governance", method: "PUT", body: value)
+    }
 
     private func scope(site: String, hours: Int) -> String {
         var components = URLComponents()
         components.queryItems = [.init(name: "hours", value: String(hours))]
         if !site.isEmpty { components.queryItems?.append(.init(name: "site", value: site)) }
         return components.percentEncodedQuery ?? "hours=\(hours)"
+    }
+
+    private func queryItems(_ values: [String: String]) -> String {
+        var components = URLComponents()
+        components.queryItems = values.map { URLQueryItem(name: $0.key, value: $0.value) }
+        return components.percentEncodedQuery ?? ""
     }
 }
 

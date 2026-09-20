@@ -36,10 +36,10 @@ struct VulnerabilityDetail: View {
     let project: ProjectHealth; let vulnerability: Vulnerability
     var body: some View {
         List {
-            Section("Finding") { LabeledContent("Project", value: project.name); LabeledContent("Severity", value: vulnerability.severity.uppercased()); LabeledContent("Package", value: vulnerability.package); LabeledContent("Installed", value: vulnerability.installedVersion); LabeledContent("Fixed", value: vulnerability.fixedVersion) }
+            Section("Finding") { HWLabeled("Project", value: project.name); HWLabeled("Severity", value: vulnerability.severity.uppercased()); HWLabeled("Package", value: vulnerability.package); HWLabeled("Installed", value: vulnerability.installedVersion); HWLabeled("Fixed", value: vulnerability.fixedVersion) }
             Section("Description") { Text(vulnerability.summary) }
             if let url = URL(string: vulnerability.url), url.scheme == "https", url.host != "example.invalid" { Section { Link("Open advisory", destination: url) } }
-        }.scrollContentBackground(.hidden).background(HW.background).navigationTitle(vulnerability.id)
+        }.hwHiddenScrollBackground().background(HW.background).navigationTitle(vulnerability.id)
     }
 }
 
@@ -156,7 +156,7 @@ struct TopologyView: View {
                                                layer: picked.layer)
                     }
                 }
-                .onChange(of: model.selectedSite) { _, _ in
+                .onChange(of: model.selectedSite) { _ in
                     focusedSiteID = nil
                     focusedRoad = nil
                     send(.fit)
@@ -189,7 +189,7 @@ struct TopologyView: View {
     @ViewBuilder private var dossier: some View {
         if let focusedSiteID {
             VStack(alignment: .leading, spacing: 8) {
-                Text("TARGET LOCKED").font(.caption2.bold()).tracking(1.6).foregroundStyle(HW.teal)
+                Text("TARGET LOCKED").font(.caption2.bold()).kerning(1.6).foregroundStyle(HW.teal)
                 if let site = sites.first(where: { $0.id == focusedSiteID }) {
                     Text(site.name).font(.headline)
                     Text(projectScope
@@ -205,19 +205,12 @@ struct TopologyView: View {
                         Text(focusedRoad.replacingOccurrences(of: "road:", with: "").replacingOccurrences(of: ":", with: " → "))
                             .font(.caption2).foregroundStyle(HW.amber)
                     }
-                    ForEach(Array(TopologyLayer.hops(for: site, project: project(for: site), routes: model.sources.internalRoutes ?? []).prefix(3))) { hop in
-                        Text(hop.title)
-                            .font(.caption2)
-                            .foregroundStyle(hop.weavatrix ? Color(red: 0.71, green: 0.55, blue: 1) : HW.amber)
-                    }
                     HStack(spacing: 6) {
                         Button("Details") { selection = TopologySelection(siteID: site.id, layer: nil) }
-                        Button("Elevate") { send(.elevate) }
                         Button("Release") { send(.fit) }
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.mini)
-                    .fixedSize(horizontal: true, vertical: true)
                 } else if focusedSiteID == "host" {
                     Text(node.name).font(.headline)
                     Text("Public edge · feeder roads stay on the board").font(.caption2).foregroundStyle(HW.secondary)
@@ -229,8 +222,8 @@ struct TopologyView: View {
                     Button("Release") { send(.fit) }.buttonStyle(.bordered).controlSize(.small)
                 }
             }
-            .padding(10)
-            .frame(maxWidth: 236, alignment: .leading)
+            .padding(8)
+            .frame(maxWidth: 168, alignment: .leading)
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
         }
     }
@@ -238,7 +231,7 @@ struct TopologyView: View {
     private var legend: some View {
         VStack(alignment: .leading, spacing: 6) {
             Button { showLegend.toggle() } label: {
-                HStack { Text("LEGEND").font(.caption2.bold()).tracking(1.4); Spacer(); Text(showLegend ? "▾" : "▸") }
+                HStack { Text("LEGEND").font(.caption2.bold()).kerning(1.4); Spacer(); Text(showLegend ? "▾" : "▸") }
             }.buttonStyle(.plain)
             if showLegend {
                 if mode == .traffic {
@@ -309,33 +302,33 @@ struct TopologyTowerInspector: View {
     private var layers: [TopologyLayer] { TopologyLayer.layers(for: site, project: project) }
 
     var body: some View {
-        NavigationStack {
+        HWStackNavigation {
             List {
                 Section {
-                    LabeledContent("Project", value: site.name)
-                    LabeledContent("Domains", value: site.domains.joined(separator: ", "))
-                    LabeledContent("Requests", value: "\(site.requestsPerMinute.formatted())/min")
-                    LabeledContent("Errors", value: Format.percent(site.errorRate))
-                    LabeledContent("p95 latency", value: "\(site.p95Ms.formatted()) ms")
+                    HWLabeled("Project", value: site.name)
+                    HWLabeled("Domains", value: site.domains.joined(separator: ", "))
+                    HWLabeled("Requests", value: "\(site.requestsPerMinute.formatted())/min")
+                    HWLabeled("Errors", value: Format.percent(site.errorRate))
+                    HWLabeled("p95 latency", value: "\(site.p95Ms.formatted()) ms")
                 }
                 Section("Resources") {
-                    LabeledContent("CPU", value: Format.percent(site.cpuPercent))
-                    LabeledContent("Memory", value: "\(Format.bytes(site.memoryBytes)) of \(Format.bytes(site.memoryLimit))")
-                    LabeledContent("Traffic", value: "\(Format.bytes(site.bytesPerMinute))/min")
+                    HWLabeled("CPU", value: Format.percent(site.cpuPercent))
+                    HWLabeled("Memory", value: "\(Format.bytes(site.memoryBytes)) of \(Format.bytes(site.memoryLimit))")
+                    HWLabeled("Traffic", value: "\(Format.bytes(site.bytesPerMinute))/min")
                 }
                 if let layer, layers.indices.contains(layer) {
                     Section("Selected layer · \(layer + 1) of \(layers.count)") {
-                        LabeledContent("Name", value: layers[layer].title)
+                        HWLabeled("Name", value: layers[layer].title)
                         Text(layers[layer].detail).foregroundStyle(HW.secondary)
                     }
                 }
                 if let container = selectedContainer {
                     Section("Container details") {
-                        LabeledContent("State", value: container.state)
-                        LabeledContent("Image", value: container.image)
-                        LabeledContent("CPU", value: Format.percent(container.cpuPercent))
-                        LabeledContent("Memory", value: Format.bytes(container.memoryBytes))
-                        LabeledContent("Processes", value: container.pids.formatted())
+                        HWLabeled("State", value: container.state)
+                        HWLabeled("Image", value: container.image)
+                        HWLabeled("CPU", value: Format.percent(container.cpuPercent))
+                        HWLabeled("Memory", value: Format.bytes(container.memoryBytes))
+                        HWLabeled("Processes", value: container.pids.formatted())
                     }
                 }
                 Section("Services inside") {
@@ -378,22 +371,22 @@ struct TopologyTowerInspector: View {
                 }
                 if let project {
                     Section("Code evidence") {
-                        LabeledContent("Coverage", value: project.completeness)
-                        LabeledContent("Revision", value: project.revision)
-                        LabeledContent("Modules", value: (project.analysis?.modules?.count ?? 0).formatted())
-                        LabeledContent("Communities", value: (project.analysis?.communities?.count ?? 0).formatted())
+                        HWLabeled("Coverage", value: project.completeness)
+                        HWLabeled("Revision", value: project.revision)
+                        HWLabeled("Modules", value: (project.analysis?.modules?.count ?? 0).formatted())
+                        HWLabeled("Communities", value: (project.analysis?.communities?.count ?? 0).formatted())
                         NavigationLink("Inspect code health") { CodeProjectDetail(project: project) }
                     }
                 }
                 Section { NavigationLink("Open workload") { WorkloadDetailView(site: site) } }
             }
-            .scrollContentBackground(.hidden)
+            .hwHiddenScrollBackground()
             .background(HW.background)
             .navigationTitle(site.name)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } } }
         }
-        .presentationDetents([.medium, .large])
+        .hwSheetDetents()
     }
 }
 
@@ -401,7 +394,7 @@ struct TowerLayersView: View {
     @Environment(\.dismiss) private var dismiss
     let project: ProjectHealth
     var body: some View {
-        NavigationStack {
+        HWStackNavigation {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     Eyebrow(text: "Runtime tower layers"); Text(project.name).font(.largeTitle.bold())
@@ -411,7 +404,7 @@ struct TowerLayersView: View {
                     NavigationLink("Open complete code health evidence") { CodeProjectDetail(project: project) }.buttonStyle(.borderedProminent)
                 }.padding(20)
             }.background(HW.background).toolbar { Button("Done") { dismiss() } }
-        }.presentationDetents([.medium, .large])
+        }.hwSheetDetents()
     }
 }
 
@@ -423,7 +416,6 @@ struct WorkloadsView: View {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 280), spacing: 12)], spacing: 12) {
             ForEach(filtered) { site in NavigationLink { WorkloadDetailView(site: site) } label: { VStack(alignment: .leading, spacing: 13) { HStack { VStack(alignment: .leading) { Text(site.name).font(.title3.bold()); Text(site.domains.joined(separator: ", ")).font(.caption).foregroundStyle(HW.secondary) }; Spacer(); Text(site.errorRate > 2 ? "AT RISK" : "HEALTHY").font(.caption2.bold()).foregroundStyle(site.errorRate > 2 ? HW.red : HW.teal) }; HStack { mini("Requests", "\(site.requestsPerMinute.formatted())/min"); mini("CPU", Format.percent(site.cpuPercent)); mini("Memory", Format.bytes(site.memoryBytes)) }; ProgressView(value: site.memoryBytes, total: max(1, site.memoryLimit)).tint(site.memoryBytes / max(1, site.memoryLimit) > 0.85 ? HW.red : HW.teal); HStack { Text("Open requests, processes, storage & limits").font(.caption).foregroundStyle(HW.teal); Spacer(); Image(systemName: "chevron.right") } }.padding(16).panel() }.buttonStyle(.plain) }
         }
-        DataServicesView()
         }
     }
     private func mini(_ name: String, _ value: String) -> some View { VStack(alignment: .leading) { Text(name).font(.caption2).foregroundStyle(HW.secondary); Text(value).font(.caption.bold()) }.frame(maxWidth: .infinity, alignment: .leading) }
@@ -438,12 +430,12 @@ struct WorkloadDetailView: View {
         List {
             Section { LazyVGrid(columns: [GridItem(.adaptive(minimum: 145))], spacing: 10) { StatCard(title: "Requests", value: "\(site.requestsPerMinute.formatted())/min"); StatCard(title: "CPU", value: Format.percent(site.cpuPercent)); StatCard(title: "Memory", value: Format.bytes(site.memoryBytes), color: HW.amber); StatCard(title: "p95", value: "\(site.p95Ms.formatted()) ms") }.listRowInsets(EdgeInsets()) }
             Section { Picker("Detail", selection: $tab) { Text("Requests").tag("Requests"); Text("Processes").tag("Processes"); Text("Storage").tag("Storage"); Text("Limits").tag("Limits") }.pickerStyle(.segmented) }
-            if tab == "Requests" { Section { ForEach(model.requests.filter { $0.site == site.id }) { row in NavigationLink { RequestDetailView(request: row) } label: { RequestRow(request: row) } } } }
+            if tab == "Requests" { Section { PagedRows(items: model.requests.filter { $0.site == site.id }) { row in NavigationLink { RequestDetailView(request: row) } label: { RequestRow(request: row) } } } }
             else if tab == "Processes" { Section { if site.containers.isEmpty { Text("No container process snapshot is available yet.").foregroundStyle(HW.secondary) }; ForEach(site.containers) { item in VStack(alignment: .leading) { Text(item.name).font(.headline); Text("\(item.image) · \(Format.percent(item.cpuPercent)) CPU · \(Format.bytes(item.memoryBytes))").foregroundStyle(HW.secondary) } } } }
             else if tab == "Storage" { Section { NavigationLink("Inspect files, databases, images and container layers") { StorageInspectorView() } } }
-            else { Section { LabeledContent("Memory limit", value: Format.bytes(site.memoryLimit)); LabeledContent("Shared Nginx", value: site.sharedNginx ? "Yes" : "No"); Text("Limit editing is restricted to operators and owners.").font(.caption).foregroundStyle(HW.secondary) } }
+            else { Section { HWLabeled("Memory limit", value: Format.bytes(site.memoryLimit)); HWLabeled("Shared Nginx", value: site.sharedNginx ? "Yes" : "No"); Text("Limit editing is restricted to operators and owners.").font(.caption).foregroundStyle(HW.secondary) } }
             Section("Controls") { Button("Restart", systemImage: "arrow.clockwise") { pendingAction = "restart" }; Button("Stop", systemImage: "stop.fill", role: .destructive) { pendingAction = "stop" } }
-        }.scrollContentBackground(.hidden).background(HW.background).navigationTitle(site.name)
+        }.hwHiddenScrollBackground().background(HW.background).navigationTitle(site.name)
         .confirmationDialog("\((pendingAction ?? "Action").capitalized) \(site.name)?", isPresented: Binding(get: { pendingAction != nil }, set: { if !$0 { pendingAction = nil } })) { if let action = pendingAction { Button(action.capitalized, role: action == "stop" ? .destructive : nil) { Task { await model.runSiteAction(site, action: action) }; pendingAction = nil } } } message: { Text("This changes the running service on the selected node.") }
     }
 }
@@ -508,5 +500,5 @@ struct AddRuleView: View {
     @EnvironmentObject private var model: AppModel
     @Environment(\.dismiss) private var dismiss
     @State private var kind = "ip"; @State private var value = ""
-    var body: some View { NavigationStack { Form { Picker("Rule type", selection: $kind) { Text("IP address").tag("ip"); Text("Country code").tag("country") }; TextField(kind == "ip" ? "203.0.113.10" : "US", text: $value).textInputAutocapitalization(kind == "country" ? .characters : .never); Text("The rule applies to the selected project. Choose a site in the scope bar first.").font(.caption).foregroundStyle(HW.secondary) } .navigationTitle("New access rule").toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }; ToolbarItem(placement: .confirmationAction) { Button("Add") { Task { await model.block(site: model.selectedSite, kind: kind, value: value); dismiss() } }.disabled(value.isEmpty || model.selectedSite.isEmpty) } } } }
+    var body: some View { HWStackNavigation { Form { Picker("Rule type", selection: $kind) { Text("IP address").tag("ip"); Text("Country code").tag("country") }; TextField(kind == "ip" ? "203.0.113.10" : "US", text: $value).textInputAutocapitalization(kind == "country" ? .characters : .never); Text("The rule applies to the selected project. Choose a site in the scope bar first.").font(.caption).foregroundStyle(HW.secondary) } .navigationTitle("New access rule").toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }; ToolbarItem(placement: .confirmationAction) { Button("Add") { Task { await model.block(site: model.selectedSite, kind: kind, value: value); dismiss() } }.disabled(value.isEmpty || model.selectedSite.isEmpty) } } } }
 }

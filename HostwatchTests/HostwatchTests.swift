@@ -100,13 +100,15 @@ final class HostwatchTests: XCTestCase {
     func testTowerLockFramesFromTheRightLikeElectron() {
         let pose = TopologyCamera.lock(base: SCNVector3(2, 0, -1), height: 4)
         let eye = TopologyCamera.eye(of: pose)
-        XCTAssertLessThan(pose.target.x, 2)
+        XCTAssertEqual(pose.target.x, 2, accuracy: 0.15)
+        XCTAssertEqual(pose.target.z, -1, accuracy: 0.15)
         XCTAssertGreaterThan(eye.x, pose.target.x)
         XCTAssertGreaterThan(eye.y, pose.target.y)
         XCTAssertGreaterThan(eye.z, pose.target.z)
         XCTAssertGreaterThanOrEqual(pose.pitch, TopologyCamera.minPitch)
         XCTAssertLessThanOrEqual(pose.pitch, TopologyCamera.maxPitch)
-        XCTAssertGreaterThan(pose.distance, 13)
+        XCTAssertGreaterThan(pose.distance, 10)
+        XCTAssertLessThan(pose.distance, 22)
     }
 
     func testOrbitCameraStaysUprightAcrossFullYaw() {
@@ -158,6 +160,15 @@ final class HostwatchTests: XCTestCase {
         XCTAssertTrue(hops.contains { $0.weavatrix && $0.title.contains("Weavatrix") })
     }
 
+    func testTowerLabelsPackTightlyInsideTheTowerBand() {
+        let tops = TopologyLayout.packLabels(heights: [20, 20, 20], minY: 100, maxY: 200, gap: 2)
+        XCTAssertEqual(tops, [100, 122, 144])
+        XCTAssertLessThanOrEqual((tops.last ?? 0) + 20, 200)
+        let squeezed = TopologyLayout.packLabels(heights: Array(repeating: 20, count: 10), minY: 0, maxY: 100, gap: 2)
+        XCTAssertEqual(squeezed.first ?? -1, 0, accuracy: 0.5)
+        XCTAssertLessThanOrEqual((squeezed.last ?? 0) + 20, 100.5)
+    }
+
     func testManhattanRoadsStayOrthogonalOnTheCyberboard() {
         let a = TopologyPoint(x: -4.4, z: -1)
         let b = TopologyPoint(x: 4.4, z: 3.4)
@@ -184,5 +195,54 @@ final class HostwatchTests: XCTestCase {
         XCTAssertFalse(RequestEvidence.usableHost("localhost"))
         XCTAssertTrue(RequestEvidence.usableHost("api.kablay.us"))
         XCTAssertTrue(RequestEvidence.diagnosis(status: 400, host: "_", method: "UNKNOWN", path: "/", upstream: nil).contains("No application or destination page"))
+        XCTAssertEqual(RequestEvidence.destinationURL(for: Fixtures.requests.first { $0.method == "GET" }!)?.host, Fixtures.requests.first { $0.method == "GET" }?.host)
+        XCTAssertNil(RequestEvidence.destinationURL(for: Fixtures.requests.first { $0.method == "POST" }!))
+        XCTAssertGreaterThan(DestinationGroup.groups(from: Fixtures.requests).count, 24)
+        XCTAssertEqual(SidebarPage.data.title, "Database")
+    }
+
+    func testMCPSnapshotDecodesAgentJSON() throws {
+        let payload = Data("""
+        {"governance":{"enabled":true,"allowObserve":true,"allowMutate":false,"deniedTools":["deploy"],"maxMutationsPerHour":20,"staleAfterSeconds":900,"updatedAt":"2026-09-20T00:00:00Z"},"clients":[{"id":"studio","hostname":"studio.local","username":"sergii","app":"cursor","remoteIp":"203.0.113.44","firstSeen":"2026-09-20T00:00:00Z","lastSeen":"2026-09-20T00:00:00Z","lastTool":"overview","observeCalls":1,"mutateCalls":0,"stale":false}],"history":[],"knownTools":[{"name":"overview","kind":"observe","title":"Overview"}]}
+        """.utf8)
+        let snap = try JSONDecoder().decode(MCPSnapshot.self, from: payload)
+        XCTAssertEqual(snap.governance.deniedTools, ["deploy"])
+        XCTAssertFalse(snap.governance.allowMutate)
+        XCTAssertEqual(snap.clients[0].hostname, "studio.local")
+        XCTAssertEqual(snap.knownTools[0].name, "overview")
+        XCTAssertEqual(SidebarPage.mcp.title, "MCP")
+        XCTAssertEqual(SidebarPage.mcp.icon, "antenna.radiowaves.left.and.right")
+    }
+
+    func testSessionCookieSnapshotCanBeRestoredAfterAppDeath() throws {
+        let stored = StoredCookie(
+            name: "hostwatch",
+            value: "session-token",
+            domain: "gethostwatch.com",
+            path: "/",
+            expires: nil,
+            secure: true,
+            httpOnly: true,
+            sameSite: "lax"
+        )
+        let encoded = try JSONEncoder().encode(StoredSession(
+            baseURL: "https://gethostwatch.com",
+            csrf: "csrf-token",
+            cookies: [stored],
+            snapshot: SessionState(authenticated: true, csrf: "csrf-token", user: .init(id: "u", email: "a@b.c", name: "A", totpEnabled: true), organization: nil, role: "owner"),
+            savedAt: Date()
+        ))
+        let decoded = try JSONDecoder().decode(StoredSession.self, from: encoded)
+        XCTAssertEqual(decoded.csrf, "csrf-token")
+        XCTAssertTrue(decoded.snapshot.authenticated)
+        XCTAssertEqual(decoded.cookies.first?.value, "session-token")
+
+        let storage = HTTPCookieStorage.shared
+        let url = URL(string: "https://gethostwatch.com")!
+        for cookie in storage.cookies(for: url) ?? [] { storage.deleteCookie(cookie) }
+        StoredCookie.apply(decoded.cookies, to: storage)
+        let restored = storage.cookies(for: url)?.first { $0.name == "hostwatch" }
+        XCTAssertEqual(restored?.value, "session-token")
+        XCTAssertNotNil(restored?.expiresDate, "Session cookies must gain an expiry so iOS keeps them after the app is killed.")
     }
 }

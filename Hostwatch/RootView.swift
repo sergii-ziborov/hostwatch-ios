@@ -4,7 +4,6 @@ struct RootView: View {
     @EnvironmentObject private var model: AppModel
     @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var selection: SidebarPage?
-    @State private var columnVisibility: NavigationSplitViewVisibility = .automatic
     @State private var selectedTab: String
     @State private var morePage: SidebarPage?
 
@@ -24,32 +23,43 @@ struct RootView: View {
         }
     }
 
-    private static let primaryPages: [SidebarPage] = [.overview, .traffic, .topology, .workloads]
+    private static let primaryPages: [SidebarPage] = [.overview, .traffic, .data, .topology]
 
     private var compactNavigation: some View {
         TabView(selection: $selectedTab) {
             ForEach(Self.primaryPages) { page in
-                NavigationStack { PageContainer(page: page) }
-                    .tabItem { Label(page == .topology ? "Runtime" : page.title, systemImage: page.icon) }
-                    .tag(page.rawValue)
+                HWStackNavigation {
+                    if selectedTab == page.rawValue {
+                        PageContainer(page: page)
+                    } else {
+                        Color.clear
+                    }
+                }
+                .tabItem { Label(page == .topology ? "Runtime" : page.title, systemImage: page.icon) }
+                .tag(page.rawValue)
             }
-            NavigationStack {
+            HWStackNavigation {
                 List {
-                    Section("Observe") { mobileMenu(.incidents); mobileMenu(.fleet) }
-                    Section("Control") { mobileMenu(.policies); mobileMenu(.environment); mobileMenu(.cleanup); mobileMenu(.automations) }
+                    if let page = morePage {
+                        NavigationLink(destination: PageContainer(page: page), isActive: Binding(
+                            get: { morePage != nil },
+                            set: { if !$0 { morePage = nil } }
+                        )) { EmptyView() }
+                    }
+                    Section("Observe") { mobileMenu(.incidents); mobileMenu(.workloads); mobileMenu(.fleet) }
+                    Section("Control") { mobileMenu(.policies); mobileMenu(.environment); mobileMenu(.mcp); mobileMenu(.cleanup); mobileMenu(.automations) }
                     Section("Analyze") { mobileMenu(.codeHealth) }
                     Section("Company") { mobileMenu(.access); mobileMenu(.security); mobileMenu(.organization) }
                     Section { Button("Sign out", systemImage: "rectangle.portrait.and.arrow.right", role: .destructive) { Task { await model.signOut() } } }
                 }
-                .scrollContentBackground(.hidden)
+                .hwHiddenScrollBackground()
                 .background(HW.background)
                 .navigationTitle("More")
-                .navigationDestination(item: $morePage) { page in PageContainer(page: page) }
             }
             .tabItem { Label("More", systemImage: "ellipsis.circle") }
             .tag("more")
         }
-        .onChange(of: selectedTab) { _, value in
+        .onChange(of: selectedTab) { value in
             if let page = SidebarPage(rawValue: value) { model.setLive(model.live, page: page) }
         }
     }
@@ -59,41 +69,40 @@ struct RootView: View {
     }
 
     private var splitNavigation: some View {
-        NavigationSplitView(columnVisibility: $columnVisibility) {
-            List(selection: $selection) {
-                Section {
-                    brand
-                }
-                .listRowBackground(Color.clear)
-
+        NavigationView {
+            List {
+                Section { brand }
+                    .listRowBackground(Color.clear)
                 Section("Observe") {
-                    menu(.overview); menu(.traffic); menu(.incidents); menu(.topology); menu(.workloads); menu(.fleet)
+                    menu(.overview); menu(.traffic); menu(.data); menu(.incidents); menu(.topology); menu(.workloads); menu(.fleet)
                 }
                 Section("Control") {
-                    menu(.policies); menu(.environment); menu(.cleanup); menu(.automations)
+                    menu(.policies); menu(.environment); menu(.mcp); menu(.cleanup); menu(.automations)
                 }
                 Section("Analyze") { menu(.codeHealth) }
                 Section("Company") { menu(.access); menu(.security); menu(.organization) }
-
                 Section {
                     Button(role: .destructive) { Task { await model.signOut() } } label: { Label("Sign out", systemImage: "rectangle.portrait.and.arrow.right") }
                 }
             }
-            .scrollContentBackground(.hidden)
+            .hwHiddenScrollBackground()
             .background(HW.background)
-            .navigationSplitViewColumnWidth(min: 230, ideal: 270, max: 320)
-        } detail: {
-            NavigationStack {
-                PageContainer(page: selection ?? .overview)
-            }
-            .background(HW.background)
+            .navigationTitle("Hostwatch")
+
+            PageContainer(page: selection ?? .overview)
+                .background(HW.background)
         }
-        .navigationSplitViewStyle(.balanced)
+        .navigationViewStyle(DoubleColumnNavigationViewStyle())
     }
 
     private func menu(_ page: SidebarPage) -> some View {
-        NavigationLink(value: page) { Label(page.title, systemImage: page.icon) }
-            .tag(page)
+        Button {
+            selection = page
+            model.setLive(model.live, page: page)
+        } label: {
+            Label(page.title, systemImage: page.icon)
+                .foregroundStyle(selection == page ? HW.teal : .primary)
+        }
     }
 
     private var brand: some View {
@@ -103,7 +112,7 @@ struct RootView: View {
                 Text("H").font(.headline.bold()).foregroundStyle(HW.teal)
             }
             VStack(alignment: .leading, spacing: 2) {
-                Text("HOSTWATCH").font(.headline).tracking(1.5)
+                Text("HOSTWATCH").font(.headline).kerning(1.5)
                 Text(model.session.organization?.name ?? "Control plane").font(.caption).foregroundStyle(HW.secondary).lineLimit(1)
             }
         }
@@ -116,31 +125,34 @@ struct PageContainer: View {
     let page: SidebarPage
 
     var body: some View {
-        Group {
-            if page == .topology {
-                VStack(alignment: .leading, spacing: 12) {
-                    PageHeader(page: page)
-                    ScopeBar(page: page)
-                    sampleDataBanner
-                    errorBanner
-                    pageContent
-                        .opacity(model.loading ? 0.64 : 1)
-                }
-                .padding(20)
-                .frame(maxWidth: 1500, maxHeight: .infinity, alignment: .topLeading)
-            } else {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 18) {
+        ZStack(alignment: .topTrailing) {
+            Group {
+                if page == .topology {
+                    VStack(alignment: .leading, spacing: 12) {
                         PageHeader(page: page)
                         ScopeBar(page: page)
                         sampleDataBanner
                         errorBanner
                         pageContent
-                            .opacity(model.loading ? 0.64 : 1)
                     }
                     .padding(20)
-                    .frame(maxWidth: 1500, alignment: .leading)
+                    .frame(maxWidth: 1500, maxHeight: .infinity, alignment: .topLeading)
+                } else {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 18) {
+                            PageHeader(page: page)
+                            ScopeBar(page: page)
+                            sampleDataBanner
+                            errorBanner
+                            pageContent
+                        }
+                        .padding(20)
+                        .frame(maxWidth: 1500, alignment: .leading)
+                    }
                 }
+            }
+            if model.loading {
+                PageLoadingOverlay(hasContent: model.hasCachedContent(for: page))
             }
         }
         .background(HW.background)
@@ -179,6 +191,7 @@ struct PageContainer: View {
             switch page {
             case .overview: OverviewView()
             case .traffic: TrafficView()
+            case .data: DataView()
             case .incidents: IncidentsView()
             case .topology: TopologyView()
             case .workloads: WorkloadsView()
@@ -186,6 +199,7 @@ struct PageContainer: View {
             case .cleanup: CleanupView()
             case .policies: TrafficPoliciesView()
             case .environment: EnvironmentView()
+            case .mcp: MCPView()
             case .codeHealth: CodeHealthView()
             case .automations: AutomationsView()
             case .access: AccessView()
@@ -204,7 +218,7 @@ struct PageHeader: View {
         VStack(alignment: .leading, spacing: 7) {
             if sizeClass != .compact {
                 Eyebrow(text: "\(model.session.organization?.name ?? "Infrastructure") · \(model.nodes.first(where: { $0.id == model.selectedNode })?.name ?? "Primary node")")
-                Text(page.title).font(.system(.largeTitle, design: .rounded, weight: .bold))
+                Text(page.title).font(.hw(.largeTitle, design: .rounded, weight: .bold))
             }
             HStack(spacing: 7) {
                 Circle().fill(model.fixtures || !model.live ? HW.amber : HW.teal).frame(width: 8, height: 8)
@@ -304,7 +318,7 @@ struct ScopeBar: View {
     }
 
     private var showsSite: Bool {
-        [.traffic, .topology, .workloads, .policies, .environment].contains(page)
+        [.traffic, .data, .topology, .workloads, .policies, .environment].contains(page)
     }
 
     private var showsWindow: Bool { [.overview, .traffic].contains(page) }

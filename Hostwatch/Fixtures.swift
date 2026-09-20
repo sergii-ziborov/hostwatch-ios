@@ -76,9 +76,56 @@ enum Fixtures {
             .init(caller: "eppy-api", destinationHost: "eppy-postgres", targetService: "eppy-postgres", requests: 48, bytes: 96_000)
         ])
 
-    static let requests: [RequestSample] = (0..<42).map { index in
+    static let dataFiles: [DataFile] = [
+        .init(path: "/srv/apps/eppy/data/eppy.sqlite3", type: "SQLite database", siteId: "eppy", siteName: "Eppy", container: "eppy-api-1", sizeBytes: 2_097_152, modifiedAt: ISO8601DateFormatter().string(from: .now), backup: false),
+        .init(path: "/srv/apps/applydjinn/data/cache.sqlite", type: "Cache metadata (SQLite)", siteId: "applydjinn", siteName: "ApplyDjinn", container: "applydjinn-app-1", sizeBytes: 524_288, modifiedAt: ISO8601DateFormatter().string(from: .now), backup: false),
+        .init(path: "/var/backups/eppy.sqlite3", type: "SQLite database", siteId: "eppy", siteName: "Eppy", container: nil, sizeBytes: 1_048_576, modifiedAt: ISO8601DateFormatter().string(from: .now), backup: true)
+    ]
+
+    static func tables(for path: String) -> DataTablesResponse {
+        DataTablesResponse(path: path, tables: [
+            .init(name: "users", columns: ["id", "email", "created_at"], rowCount: 3),
+            .init(name: "sessions", columns: ["id", "user_id", "token"], rowCount: 12)
+        ], error: nil)
+    }
+
+    static func rows(path: String, table: String, limit: Int, offset: Int) -> DataRowsResponse {
+        let all: [[String]]
+        let columns: [String]
+        if table == "users" {
+            columns = ["id", "email", "created_at"]
+            all = [["1", "owner@eppy.local", "2026-01-01"], ["2", "ops@eppy.local", "2026-02-01"], ["3", "guest@eppy.local", "2026-03-01"]]
+        } else {
+            columns = ["id", "user_id", "token"]
+            all = (1...12).map { ["\($0)", "\(($0 % 3) + 1)", "sess-\($0)"] }
+        }
+        let slice = Array(all.dropFirst(offset).prefix(limit))
+        return DataRowsResponse(path: path, table: table, columns: columns, rows: slice, offset: offset, limit: limit, rowCount: all.count, truncated: offset + slice.count < all.count)
+    }
+
+    static let mcp = MCPSnapshot(
+        governance: .init(enabled: true, allowObserve: true, allowMutate: true, deniedTools: ["deploy"], maxMutationsPerHour: 20, staleAfterSeconds: 900, updatedAt: ISO8601DateFormatter().string(from: .now)),
+        clients: [
+            .init(id: "studio", hostname: "studio.local", username: "sergii", app: "cursor", remoteIp: "203.0.113.44", firstSeen: ISO8601DateFormatter().string(from: Date().addingTimeInterval(-3600)), lastSeen: ISO8601DateFormatter().string(from: .now), lastTool: "overview", observeCalls: 18, mutateCalls: 1, stale: false),
+            .init(id: "mac-mini", hostname: "mac-mini.local", username: "ops", app: "cursor", remoteIp: "198.51.100.20", firstSeen: ISO8601DateFormatter().string(from: Date().addingTimeInterval(-86400)), lastSeen: ISO8601DateFormatter().string(from: Date().addingTimeInterval(-7200)), lastTool: "list_sites", observeCalls: 4, mutateCalls: 0, stale: true)
+        ],
+        history: [
+            .init(id: "e1", time: ISO8601DateFormatter().string(from: .now), clientId: "studio", hostname: "studio.local", username: "sergii", app: "cursor", tool: "overview", kind: "observe", status: "allowed", summary: nil, error: nil, remoteIp: "203.0.113.44"),
+            .init(id: "e2", time: ISO8601DateFormatter().string(from: Date().addingTimeInterval(-90)), clientId: "studio", hostname: "studio.local", username: "sergii", app: "cursor", tool: "deploy", kind: "mutate", status: "denied", summary: "id,action", error: "tool deploy is blocked by governance", remoteIp: "203.0.113.44")
+        ],
+        knownTools: [
+            .init(name: "overview", kind: "observe", title: "Overview"),
+            .init(name: "publish", kind: "mutate", title: "Publish bindings"),
+            .init(name: "secret_put", kind: "mutate", title: "Put secret"),
+            .init(name: "site_action", kind: "mutate", title: "Site action"),
+            .init(name: "deploy", kind: "mutate", title: "Deploy"),
+            .init(name: "job_action", kind: "mutate", title: "Job action")
+        ]
+    )
+
+    static let requests: [RequestSample] = (0..<72).map { index in
         let site = sites[index % sites.count]
-        let paths = ["/", "/analytics/contact-settings", "/api/search", "/specialists", "/auth"]
+        let paths = ["/"] + (1...40).map { "/page/\($0)" }
         let statuses = [200, 200, 200, 404, 502, 200, 429]
         return .init(id: "req-\(index)", time: ISO8601DateFormatter().string(from: Date().addingTimeInterval(Double(-index * 28))), site: site.id, host: site.domains[0], method: index % 6 == 0 ? "POST" : "GET", path: paths[index % paths.count], status: statuses[index % statuses.count], bytes: Double(437 + index * 89), requestBytes: Double(212 + index), durationMs: Double(2 + (index * 73) % 1200), scheme: "https", protocolName: "HTTP/2.0", tlsProtocol: "TLSv1.3", tlsCipher: "TLS_AES_256_GCM_SHA384", upstreamAddr: "127.0.0.1:3000", upstreamStatus: String(statuses[index % statuses.count]), upstreamMs: Double(1 + index % 83), cacheStatus: index % 4 == 0 ? "HIT" : "MISS", clientIp: index % 3 == 0 ? "203.0.113.\(20 + index)" : "198.51.100.\(10 + index)", internalRequest: false, country: index % 3 == 0 ? "Israel" : "United States", countryCode: index % 3 == 0 ? "IL" : "US", region: index % 3 == 0 ? "Tel Aviv" : "Virginia", city: index % 3 == 0 ? "Tel Aviv" : "Ashburn", latitude: index % 3 == 0 ? 32.0853 : 39.0438, longitude: index % 3 == 0 ? 34.7818 : -77.4874, userAgent: index % 5 == 0 ? "Googlebot/2.1" : "Safari/605.1.15", source: index % 5 == 0 ? "Googlebot" : "Direct", referrerPath: index % 5 == 0 ? "/search" : nil, bot: index % 5 == 0 ? "Googlebot" : nil)
     }

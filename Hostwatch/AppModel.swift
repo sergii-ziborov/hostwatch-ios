@@ -11,6 +11,7 @@ final class AppModel: ObservableObject {
     @Published var live = true
     @Published var loading = false
     @Published var restoringSession = true
+    @Published var hasSavedSession = false
     @Published var errorMessage: String?
 
     @Published var overview: Overview?
@@ -46,6 +47,7 @@ final class AppModel: ObservableObject {
     @Published var hybridAdmission: HybridAdmission?
     @Published var fleetLinks: [FleetLink] = []
     @Published var hybridError: String?
+    @Published var mcpSnapshot: MCPSnapshot?
 
     @Published var baseURLText: String {
         didSet { UserDefaults.standard.set(baseURLText, forKey: "controlPlaneURL") }
@@ -82,14 +84,45 @@ final class AppModel: ObservableObject {
     deinit { liveTask?.cancel() }
 
     private func initialRestore() async {
-        await restoreSession()
-        try? await Task.sleep(for: .milliseconds(500))
+        hasSavedSession = await client.hasSavedSession()
+        if hasSavedSession, Self.prefersDeviceUnlock, !DeviceUnlock.isRunningTests {
+            restoringSession = false
+            return
+        }
+        if hasSavedSession { await unlockSavedSession() }
+        else { await restoreSession() }
         restoringSession = false
+    }
+
+    static var prefersDeviceUnlock: Bool {
+        guard DeviceUnlock.isAvailable() else { return false }
+        if UserDefaults.standard.object(forKey: "biometricUnlockEnabled") == nil { return true }
+        return UserDefaults.standard.bool(forKey: "biometricUnlockEnabled")
+    }
+
+    func unlockSavedSession() async {
+        if session.authenticated {
+            await persistSession()
+            return
+        }
+        if let snapshot = await client.applySavedSession() {
+            session = snapshot
+            let url = await client.currentBaseURL()
+            if url != baseURLText { baseURLText = url }
+            hasSavedSession = true
+        }
+        await restoreSession()
+    }
+
+    func persistSession() async {
+        guard session.authenticated, !fixtures else { return }
+        await client.persistAuthenticated(session)
+        hasSavedSession = true
     }
 
 #if DEBUG
     private func installFixtures() {
-        overview = Fixtures.overview; sites = Fixtures.sites; dataServices = Fixtures.dataServices; dataServicesError = nil
+        overview = Fixtures.overview; sites = Fixtures.sites; dataServices = Fixtures.dataServices; dataFiles = Fixtures.dataFiles; dataServicesError = nil; mcpSnapshot = Fixtures.mcp
         history = Fixtures.history; traffic = Fixtures.traffic; sources = Fixtures.sources
         requests = Fixtures.requests; errorEvidence = .init(windowHours: 24, site: nil, interval: nil, requests: Fixtures.requests.filter { $0.status >= 400 }, retainedErrors: Fixtures.requests.filter { $0.status >= 400 }.count, retainedFrom: Fixtures.requests.last?.time, capped: false)
         let grouped = Dictionary(grouping: Fixtures.requests, by: \RequestSample.path)
@@ -122,9 +155,33 @@ final class AppModel: ObservableObject {
     func restoreSession() async {
         do {
             try await configureClient()
-            session = try await client.sessionState()
-            if session.authenticated { try await loadNodes(); await reload(page: .overview) }
-        } catch { session = SessionState(); errorMessage = error.localizedDescription }
+            let value = try await client.sessionState()
+            if value.authenticated {
+                session = value
+                hasSavedSession = true
+                try await loadNodes()
+                await reload(page: .overview)
+                errorMessage = nil
+            } else {
+                await client.forgetSession()
+                session = SessionState()
+                hasSavedSession = false
+            }
+        } catch APIError.unauthorized {
+            await client.forgetSession()
+            session = SessionState()
+            hasSavedSession = false
+            errorMessage = APIError.unauthorized.errorDescription
+        } catch {
+            if let cached = await client.cachedSnapshot() {
+                session = cached
+                hasSavedSession = true
+                _ = await client.applySavedSession()
+            } else {
+                session = SessionState()
+                errorMessage = error.localizedDescription
+            }
+        }
     }
 
     func signIn(email: String, password: String) async {
@@ -133,7 +190,11 @@ final class AppModel: ObservableObject {
         do {
             try await configureClient()
             session = try await client.signIn(email: email, password: password)
-            if session.authenticated { try await loadNodes(); await reload(page: .overview) }
+            if session.authenticated {
+                hasSavedSession = true
+                try await loadNodes()
+                await reload(page: .overview)
+            }
         } catch { errorMessage = error.localizedDescription }
     }
 
@@ -141,7 +202,11 @@ final class AppModel: ObservableObject {
         loading = true; defer { loading = false }
         do {
             session = try await client.verify(otp: otp)
-            if session.authenticated { try await loadNodes(); await reload(page: .overview) }
+            if session.authenticated {
+                hasSavedSession = true
+                try await loadNodes()
+                await reload(page: .overview)
+            }
         } catch { errorMessage = error.localizedDescription }
     }
 
@@ -154,6 +219,7 @@ final class AppModel: ObservableObject {
         let result = try await client.redeemQR(ticket)
         guard result.authenticated else { return false }
         session = result
+        hasSavedSession = true
         try await loadNodes()
         await reload(page: .overview)
         return true
@@ -171,6 +237,7 @@ final class AppModel: ObservableObject {
         let result = try await client.redeemDeviceQR(ticket, proof: proof)
         guard result.authenticated else { return false }
         session = result
+        hasSavedSession = true
         try await loadNodes()
         await reload(page: .overview)
         return true
@@ -185,6 +252,7 @@ final class AppModel: ObservableObject {
         _ = try? await client.signOut()
         await client.forgetSession()
         session = SessionState()
+        hasSavedSession = false
         clearPrivateData()
     }
     func disableTOTP(currentPassword: String, otp: String) async throws {
@@ -192,6 +260,7 @@ final class AppModel: ObservableObject {
         _ = try? await client.signOut()
         await client.forgetSession()
         session = SessionState()
+        hasSavedSession = false
         clearPrivateData()
     }
 
@@ -201,6 +270,7 @@ final class AppModel: ObservableObject {
         catch { errorMessage = "The local session was removed, but server sign-out could not be confirmed: \(error.localizedDescription)" }
         await client.forgetSession()
         session = SessionState()
+        hasSavedSession = false
         clearPrivateData()
     }
 
@@ -212,6 +282,7 @@ final class AppModel: ObservableObject {
         projects = []; jobs = []; members = []; license = nil; environment = nil
         nodes = []; selectedNode = ""; selectedSite = ""
         hybridPeers = []; hybridSettings = nil; hybridAdmission = nil; fleetLinks = []; hybridError = nil
+        mcpSnapshot = nil
     }
 
     private func configureClient() async throws {
@@ -244,10 +315,10 @@ final class AppModel: ObservableObject {
         liveTask = Task { [weak self] in
             var ticks = 0
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(page == .topology ? 1 : 5))
+                await HWSleep.seconds(page == .topology ? 3 : 8)
                 guard let self, !Task.isCancelled else { return }
                 if page == .topology {
-                    await self.pulseTopology(full: ticks % 15 == 0)
+                    await self.pulseTopology(full: ticks % 10 == 0)
                     ticks += 1
                 } else {
                     await self.reload(page: page, quiet: true)
@@ -263,14 +334,19 @@ final class AppModel: ObservableObject {
         do {
             async let overviewCall = client.overview()
             async let sitesCall = client.sites()
-            async let sourcesCall = client.sources(site: "", hours: hours)
-            let loaded = try await (overviewCall, sitesCall, sourcesCall)
-            overview = loaded.0
-            sites = loaded.1
-            sources = loaded.2
             if full {
-                projects = try await client.projects()
+                async let sourcesCall = client.sources(site: "", hours: hours)
+                async let projectsCall = client.projects()
+                let loaded = try await (overviewCall, sitesCall, sourcesCall, projectsCall)
+                overview = loaded.0
+                sites = loaded.1
+                sources = loaded.2
+                projects = loaded.3
                 await loadDataServices()
+            } else {
+                let loaded = try await (overviewCall, sitesCall)
+                overview = loaded.0
+                sites = loaded.1
             }
         } catch {
             errorMessage = error.localizedDescription
@@ -279,25 +355,38 @@ final class AppModel: ObservableObject {
 
     func reload(page: SidebarPage, quiet: Bool = false) async {
 #if DEBUG
-        if fixtures { installFixtures(); return }
+        if fixtures {
+            if overview == nil { installFixtures() }
+            return
+        }
 #endif
         if !quiet { loading = true }; defer { if !quiet { loading = false } }
         do {
-            let commonOverview = try await client.overview()
-            let commonSites = try await client.sites()
-            overview = commonOverview; sites = commonSites
+            if !quiet || overview == nil || sites.isEmpty {
+                async let commonOverview = client.overview()
+                async let commonSites = client.sites()
+                let common = try await (commonOverview, commonSites)
+                overview = common.0
+                sites = common.1
+            }
             switch page {
             case .overview:
                 history = try await client.history(hours: hours)
+            case .data:
                 await loadDataServices()
             case .traffic:
                 async let trafficCall = client.traffic(site: selectedSite, hours: hours)
                 async let sourcesCall = client.sources(site: selectedSite, hours: hours)
-                async let requestsCall = client.requests(site: selectedSite)
-                async let errorsCall = client.errors(site: selectedSite, hours: hours)
-                async let pathsCall = client.paths(site: selectedSite, hours: hours)
-                let loaded = try await (trafficCall, sourcesCall, requestsCall, errorsCall, pathsCall)
-                traffic = loaded.0; sources = loaded.1; requests = loaded.2; errorEvidence = loaded.3; paths = loaded.4.paths
+                if quiet {
+                    let loaded = try await (trafficCall, sourcesCall)
+                    traffic = loaded.0; sources = loaded.1
+                } else {
+                    async let requestsCall = client.requests(site: selectedSite)
+                    async let errorsCall = client.errors(site: selectedSite, hours: hours)
+                    async let pathsCall = client.paths(site: selectedSite, hours: hours)
+                    let loaded = try await (trafficCall, sourcesCall, requestsCall, errorsCall, pathsCall)
+                    traffic = loaded.0; sources = loaded.1; requests = loaded.2; errorEvidence = loaded.3; paths = loaded.4.paths
+                }
             case .incidents, .topology, .codeHealth:
                 if page == .topology {
                     async let projectsCall = client.projects()
@@ -316,7 +405,6 @@ final class AppModel: ObservableObject {
                 await loadFleet()
             case .workloads:
                 requests = try await client.requests(site: selectedSite)
-                await loadDataServices()
             case .cleanup:
                 await refreshCleanup()
             case .policies:
@@ -325,6 +413,8 @@ final class AppModel: ObservableObject {
                 (guardState, accessRules) = try await (guardCall, rulesCall)
             case .environment:
                 if let site = sites.first(where: { $0.id == selectedSite }) ?? sites.first { environment = try await client.environment(site: site.id) }
+            case .mcp:
+                mcpSnapshot = try await client.mcpSnapshot()
             case .automations:
                 jobs = try await client.jobs()
             case .access, .organization:
@@ -336,6 +426,47 @@ final class AppModel: ObservableObject {
             }
             errorMessage = nil
         } catch { errorMessage = error.localizedDescription }
+    }
+
+    func hasCachedContent(for page: SidebarPage) -> Bool {
+        switch page {
+        case .overview: return overview != nil
+        case .traffic: return !traffic.isEmpty || !requests.isEmpty
+        case .data: return !dataServices.isEmpty || !dataFiles.isEmpty || dataServicesError != nil
+        case .workloads: return !sites.isEmpty
+        case .topology: return !sites.isEmpty || !projects.isEmpty
+        case .mcp: return mcpSnapshot != nil
+        default: return true
+        }
+    }
+
+    func saveMCPGovernance(_ value: MCPGovernance) async {
+#if DEBUG
+        if fixtures {
+            mcpSnapshot = MCPSnapshot(governance: value, clients: mcpSnapshot?.clients ?? Fixtures.mcp.clients, history: mcpSnapshot?.history ?? Fixtures.mcp.history, knownTools: mcpSnapshot?.knownTools ?? Fixtures.mcp.knownTools)
+            return
+        }
+#endif
+        do {
+            let updated = try await client.updateMCPGovernance(value)
+            if var snap = mcpSnapshot { snap = MCPSnapshot(governance: updated, clients: snap.clients, history: snap.history, knownTools: snap.knownTools); mcpSnapshot = snap }
+            else { mcpSnapshot = try await client.mcpSnapshot() }
+            errorMessage = nil
+        } catch { errorMessage = error.localizedDescription }
+    }
+
+    func dataTables(path: String) async throws -> DataTablesResponse {
+#if DEBUG
+        if fixtures { return Fixtures.tables(for: path) }
+#endif
+        return try await client.dataTables(path: path)
+    }
+
+    func dataRows(path: String, table: String, limit: Int = 25, offset: Int = 0) async throws -> DataRowsResponse {
+#if DEBUG
+        if fixtures { return Fixtures.rows(path: path, table: table, limit: limit, offset: offset) }
+#endif
+        return try await client.dataRows(path: path, table: table, limit: limit, offset: offset)
     }
 
     private func loadDataServices() async {

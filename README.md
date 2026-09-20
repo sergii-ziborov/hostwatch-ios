@@ -6,18 +6,19 @@ Native SwiftUI control-plane client for Hostwatch. The iPhone and iPad app is in
 
 ## Product structure
 
-- **Overview** — host resources and capacity with resource drilldowns.
-- **Data inventory** — running data-service containers and observed database/cache files are shown separately. File size is disk evidence; query rate and cache hit ratio require a dedicated exporter.
+- **Overview** — host resources and capacity with resource drilldowns. A loader stays on the page while that snapshot arrives instead of fading the whole interface.
+- **Database** — its own tab for running data-service containers and observed files. SQLite files can list tables and preview rows; PostgreSQL/Redis stay at container evidence. File size is disk evidence; query rate and cache hit ratio require a dedicated exporter.
 - **Cleanup** — preview and explicitly remove only old APT downloads, generated manual-page caches, and unused Docker build records. The disk inspector links to the same section. Actual filesystem space freed by Docker may be lower than its virtual cache size.
 - **Network** — the host Network card shows all interface ingress and egress and a live local/remote port socket snapshot. Port counts are not per-port byte totals.
 - **Two QR paths** — a signed-in app can approve a website sign-in under More → Account security → Approve a sign-in. To sign in to the app by QR, first sign in on the website with a password, then open Organization → Account security → Sign in on iPhone or iPad. The app's first sign-in defaults to email and password.
-- **Traffic** — requests, errors, destinations, sources, locations and retained evidence.
+- **Traffic** — requests, errors, destinations, sources, locations and retained evidence. Long destination and request lists autoload in pages, and an open control launches a GET destination in the system browser.
 - **Time and error evidence** — charts use local time on the horizontal axis. Unparsed Nginx requests with no usable Host are labeled as unmapped instead of inventing a website URL.
 - **Incidents & risks** — operational incidents, anomaly signals and vulnerabilities in separate tabs.
 - **Runtime topology** — a native SceneKit cyberboard aligned with the Electron RepoLens board. **Towers** shows stacked runtime + Weavatrix layers and structure roads. **Traffic** hides those layers and runs live packets on the same Manhattan roads. Selecting a project explodes it into frontend, backend and data towers. Drag orbits without flipping, two fingers pan, pinch zooms, tap frames a tower from the right.
 - **Fleet** — hybrid edge/home peers, public IP change history, heartbeat freshness, admission (slots, disk, stale), and home load-scaling settings.
 - **Workloads** — project traffic, processes, storage, limits and controls.
 - **Traffic policies** — bandwidth, anomaly and IP/country access rules.
+- **MCP** — under Control: turn MCP off, allow or deny reads and changes, block tools, cap hourly mutations, and see which computers are talking to this company through MCP plus a redacted tool history. Limits are enforced on the Hostwatch node; a local MCP process cannot lift them.
 - **Environment** — per-project environment variable management.
 - **Code health** — repository evidence, findings and vulnerabilities.
 - **Automations**, **Access**, **Organization** — scheduled services, users and license/deployment settings.
@@ -26,9 +27,9 @@ The app supports the hosted control plane and licensed enterprise installations.
 
 On iPhone or iPad, sign in by scanning the one-time QR shown in **Organization → Account security → Sign in on iPhone or iPad** on an already signed-in Hostwatch website. Compare the six-digit number on both screens and approve on the website. The QR expires after two minutes and can only sign in the device that claimed it. Password and authenticator-code sign-in remain available. **More → Account security** lets an account enroll, replace, or disable its authenticator and approve another device's website sign-in with the camera or a short manual pairing code. That approval asks for Face ID or the device passcode.
 
-The minimum deployment target is iOS 18. The four primary areas are native phone tabs; less frequent controls are under **More**. iPad keeps a sidebar. Links to a request destination or external advisory open in the system browser, outside the app.
+The minimum deployment target is iOS 15, so the same build runs on current iPhones and older iPads such as iPad mini 4 (15.8). The four primary areas are Overview, Traffic, Database and Runtime; only the selected tab stays mounted. Workloads and less frequent controls are under **More**. iPad keeps a sidebar. Links to a request destination or external advisory open in the system browser, outside the app. Live refresh loads only the visible page: topology pulses host/site snapshots every 3s and the heavier inventory every 30s; other pages refresh every 8s without re-downloading request/error buffers.
 
-On launch, a native Hostwatch splash stays visible while the saved server session is checked. From **More → Account security**, enable device unlock to require Face ID or the device passcode on subsequent launches and after sending the app to the background. This is an on-device screen lock for an existing server session, not a substitute for signing in to the control plane or its two-factor policy. Disk scans show progress and errors, and directory drilldown preserves the host summary while loading child entries.
+On launch, a native Hostwatch splash stays visible while the saved server session is checked. After the first successful sign-in the session cookies are stored in the device keychain so they survive app death; **Face ID / Touch ID / passcode** (on by default when the device can evaluate it) unlocks that session on the next launch and after the app goes to the background. Signing out removes the saved session. This is an on-device unlock for a stored control-plane session, not a substitute for account two-factor policy. Disk scans show progress and errors, and directory drilldown preserves the host summary while loading child entries.
 
 ## Build
 

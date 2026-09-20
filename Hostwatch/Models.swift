@@ -205,6 +205,83 @@ struct DataServicesResponse: Decodable {
     private enum CodingKeys: String, CodingKey { case services, files, dockerHealthy, scannedAt, scanError }
 }
 
+struct DataTableInfo: Decodable, Identifiable {
+    var id: String { name }
+    let name: String
+    let columns: [String]?
+    let rowCount: Int?
+}
+
+struct DataTablesResponse: Decodable {
+    let path: String
+    let tables: [DataTableInfo]
+    let error: String?
+}
+
+struct DataRowsResponse: Decodable {
+    let path: String
+    let table: String
+    let columns: [String]
+    let rows: [[String]]
+    let offset: Int
+    let limit: Int
+    let rowCount: Int?
+    let truncated: Bool
+}
+
+struct MCPGovernance: Codable {
+    var enabled: Bool
+    var allowObserve: Bool
+    var allowMutate: Bool
+    var deniedTools: [String]
+    var maxMutationsPerHour: Int
+    var staleAfterSeconds: Int
+    var updatedAt: String?
+}
+
+struct MCPToolInfo: Decodable, Identifiable {
+    var id: String { name }
+    let name: String
+    let kind: String
+    let title: String
+}
+
+struct MCPClientInfo: Decodable, Identifiable {
+    let id: String
+    let hostname: String
+    let username: String
+    let app: String
+    let remoteIp: String?
+    let firstSeen: String
+    let lastSeen: String
+    let lastTool: String?
+    let observeCalls: Int
+    let mutateCalls: Int
+    let stale: Bool
+}
+
+struct MCPHistoryEvent: Decodable, Identifiable {
+    let id: String
+    let time: String
+    let clientId: String
+    let hostname: String
+    let username: String
+    let app: String
+    let tool: String
+    let kind: String
+    let status: String
+    let summary: String?
+    let error: String?
+    let remoteIp: String?
+}
+
+struct MCPSnapshot: Decodable {
+    let governance: MCPGovernance
+    let clients: [MCPClientInfo]
+    let history: [MCPHistoryEvent]
+    let knownTools: [MCPToolInfo]
+}
+
 struct Site: Codable, Identifiable, Hashable {
     let id: String; let name: String; let domains: [String]; let sharedNginx: Bool; let containers: [ContainerInfo]
     let cpuPercent: Double; let memoryBytes: Double; let memoryLimit: Double; let requestsPerMinute: Double; let bytesPerMinute: Double; let errorRate: Double; let p95Ms: Double
@@ -348,20 +425,22 @@ struct FleetLink: Codable, Identifiable {
 }
 
 enum SidebarPage: String, CaseIterable, Identifiable {
-    case overview, traffic, incidents, topology, workloads, fleet, cleanup, policies, environment, codeHealth, automations, access, security, organization
+    case overview, traffic, data, incidents, topology, workloads, fleet, cleanup, policies, environment, mcp, codeHealth, automations, access, security, organization
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .overview: "Overview"; case .traffic: "Traffic"; case .incidents: "Incidents & risks"; case .topology: "Runtime topology"
-        case .workloads: "Workloads"; case .fleet: "Fleet"; case .cleanup: "Cleanup"; case .policies: "Traffic policies"; case .environment: "Environment"; case .codeHealth: "Code health"
+        case .overview: "Overview"; case .traffic: "Traffic"; case .data: "Database"; case .incidents: "Incidents & risks"; case .topology: "Runtime topology"
+        case .workloads: "Workloads"; case .fleet: "Fleet"; case .cleanup: "Cleanup"; case .policies: "Traffic policies"; case .environment: "Environment"; case .mcp: "MCP"
+        case .codeHealth: "Code health"
         case .automations: "Automations"; case .access: "Access"; case .security: "Account security"; case .organization: "Organization"
         }
     }
     var icon: String {
         switch self {
-        case .overview: "square.grid.2x2"; case .traffic: "chart.xyaxis.line"; case .incidents: "exclamationmark.shield"; case .topology: "point.3.connected.trianglepath.dotted"
-        case .workloads: "shippingbox"; case .fleet: "laptopcomputer.and.iphone"; case .cleanup: "sparkles.rectangle.stack"; case .policies: "shield.lefthalf.filled"; case .environment: "key.horizontal"; case .codeHealth: "waveform.path.ecg.rectangle"
-        case .automations: "clock.arrow.trianglehead.counterclockwise.rotate.90"; case .access: "person.2.badge.gearshape"; case .security: "lock.shield"; case .organization: "building.2"
+        case .overview: "square.grid.2x2"; case .traffic: "chart.xyaxis.line"; case .data: "cylinder.split.1x2"; case .incidents: "exclamationmark.shield"; case .topology: "point.3.connected.trianglepath.dotted"
+        case .workloads: "shippingbox"; case .fleet: "laptopcomputer.and.iphone"; case .cleanup: "sparkles.rectangle.stack"; case .policies: "shield.lefthalf.filled"; case .environment: "key.horizontal"; case .mcp: "antenna.radiowaves.left.and.right"
+        case .codeHealth: "waveform.path.ecg.rectangle"
+        case .automations: "clock.arrow.circlepath"; case .access: "person.2"; case .security: "lock.shield"; case .organization: "building.2"
         }
     }
 }

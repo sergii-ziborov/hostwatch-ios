@@ -2,7 +2,7 @@ name: Hostwatch
 options:
   bundleIdPrefix: com.hostwatch
   deploymentTarget:
-    iOS: "18.0"
+    iOS: "15.0"
 settings:
   base:
     SWIFT_VERSION: "5.0"

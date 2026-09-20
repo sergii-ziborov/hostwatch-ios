@@ -60,7 +60,11 @@ struct QRCodeImage: View {
                     .frame(width: size, height: size).padding(10).background(.white).clipShape(RoundedRectangle(cornerRadius: 12))
                     .accessibilityLabel("One-time QR code")
             } else {
-                ContentUnavailableView("QR unavailable", systemImage: "qrcode")
+                VStack(spacing: 8) {
+                    Image(systemName: "qrcode").font(.largeTitle)
+                    Text("QR unavailable")
+                }
+                .foregroundStyle(HW.secondary)
             }
         }
     }
@@ -99,7 +103,7 @@ struct DeviceQRSignInView: View {
             if let claim {
                 Text("Compare this number with the website, then approve on the website:")
                     .font(.footnote).foregroundStyle(HW.secondary).multilineTextAlignment(.center)
-                Text(claim.verificationCode).font(.largeTitle.monospacedDigit().bold()).tracking(4).foregroundStyle(HW.teal)
+                Text(claim.verificationCode).font(.largeTitle.monospacedDigit().bold()).kerning(4).foregroundStyle(HW.teal)
                 ProgressView("Waiting for website approval…").font(.footnote)
                 Button("Cancel") { self.claim = nil; self.ticket = nil; proof = "" }.buttonStyle(.bordered)
             }
@@ -107,7 +111,7 @@ struct DeviceQRSignInView: View {
         }
         .frame(maxWidth: .infinity)
         .sheet(isPresented: $scanning) {
-            NavigationStack {
+            HWStackNavigation {
                 CameraQRScanner { value in
                     scanning = false
                     claim = nil; proof = ""; error = ""
@@ -121,7 +125,7 @@ struct DeviceQRSignInView: View {
         .task(id: claim?.id) {
             guard let ticket, claim != nil, !proof.isEmpty else { return }
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(2))
+                await HWSleep.seconds(2)
                 guard !Task.isCancelled else { return }
                 do {
                     if try await model.redeemDeviceQR(ticket, proof: proof) { return }
@@ -151,7 +155,7 @@ struct DeviceQRSignInView: View {
 
 struct AccountSecurityView: View {
     @EnvironmentObject private var model: AppModel
-    @AppStorage("biometricUnlockEnabled") private var biometricUnlockEnabled = false
+    @AppStorage("biometricUnlockEnabled") private var biometricUnlockEnabled = true
     @State private var deviceUnlockAvailable = false
     @State private var showApproval = false
     @State private var pendingCount = 0
@@ -167,11 +171,11 @@ struct AccountSecurityView: View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 10) {
                 Text("App unlock").font(.title3.bold())
-                Toggle("Use Face ID or device passcode", isOn: $biometricUnlockEnabled)
+                Toggle("Keep session with \(DeviceUnlock.methodName)", isOn: $biometricUnlockEnabled)
                     .disabled(!deviceUnlockAvailable)
                 Text(deviceUnlockAvailable
-                     ? "Lock Hostwatch when it goes to the background and confirm again on return. This protects the app on this device; it does not replace website sign-in or account two-factor authentication."
-                     : "Set up Face ID and a device passcode in Settings to enable app unlock.")
+                     ? "After you sign in once, Hostwatch stores the session in the device keychain. \(DeviceUnlock.methodName) unlocks it on launch and after the app leaves the screen. Signing out removes the saved session."
+                     : "Set up Face ID, Touch ID or a device passcode in Settings so Hostwatch can keep your session on this device.")
                     .font(.footnote).foregroundStyle(HW.secondary)
             }.padding(18).frame(maxWidth: .infinity, alignment: .leading).panel()
             VStack(alignment: .leading, spacing: 10) {
@@ -217,7 +221,7 @@ struct AccountSecurityView: View {
             guard !model.fixtures else { return }
             while !Task.isCancelled {
                 pendingCount = (try? await model.pendingQRApprovals().count) ?? 0
-                try? await Task.sleep(for: .seconds(5))
+                await HWSleep.seconds(5)
             }
         }
     }
@@ -251,7 +255,7 @@ struct QRApprovalView: View {
     @State private var error = ""
 
     var body: some View {
-        NavigationStack {
+        HWStackNavigation {
             Form {
                 Section {
                     Button("Scan QR code", systemImage: "qrcode.viewfinder") { scanning = true }
@@ -272,10 +276,10 @@ struct QRApprovalView: View {
                 }
                 if let ticket {
                     Section("Verify before approving") {
-                        LabeledContent("Type", value: ticket.kind == "second-factor" ? "After password" : "New device sign-in")
-                        LabeledContent("Device", value: ticket.device)
-                        LabeledContent("Network address", value: ticket.clientIP)
-                        LabeledContent("Pairing code", value: ticket.entryCode)
+                        HWLabeled("Type", value: ticket.kind == "second-factor" ? "After password" : "New device sign-in")
+                        HWLabeled("Device", value: ticket.device)
+                        HWLabeled("Network address", value: ticket.clientIP)
+                        HWLabeled("Pairing code", value: ticket.entryCode)
                         Text(ticket.verificationCode).font(.largeTitle.monospacedDigit().bold()).foregroundStyle(HW.teal)
                         Toggle("This number matches the other device", isOn: $confirmed)
                         Button("Approve sign-in") { Task { await handle(approve: true) } }
@@ -289,7 +293,7 @@ struct QRApprovalView: View {
             .navigationTitle("Approve sign-in")
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } } }
             .sheet(isPresented: $scanning) {
-                NavigationStack {
+                HWStackNavigation {
                     CameraQRScanner { value in
                         scanning = false
                         if let id = QRPayload.id(from: value, server: model.baseURLText) { Task { await inspect(id) } }
@@ -302,7 +306,7 @@ struct QRApprovalView: View {
             .task {
                 while !Task.isCancelled {
                     if let approvals = try? await model.pendingQRApprovals() { pending = approvals }
-                    try? await Task.sleep(for: .seconds(5))
+                    await HWSleep.seconds(5)
                 }
             }
         }

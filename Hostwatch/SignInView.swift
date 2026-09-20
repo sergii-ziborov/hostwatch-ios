@@ -62,7 +62,7 @@ struct SignInView: View {
                 RoundedRectangle(cornerRadius: 20).stroke(HW.teal, lineWidth: 2).frame(width: 72, height: 72)
                 Text("H").font(.system(size: 34, weight: .black, design: .rounded)).foregroundStyle(HW.teal)
             }
-            Text("HOSTWATCH").font(.system(.title, design: .rounded, weight: .bold)).tracking(3)
+            Text("HOSTWATCH").font(.hw(.title, design: .rounded, weight: .bold)).kerning(3)
             Text("Infrastructure control plane").foregroundStyle(HW.secondary)
         }
     }

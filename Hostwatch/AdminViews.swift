@@ -28,10 +28,10 @@ struct AddEnvironmentVariableView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""; @State private var value = ""; @State private var reveal = false
     var body: some View {
-        NavigationStack {
+        HWStackNavigation {
             Form {
-                TextField("NAME", text: $name).textInputAutocapitalization(.characters).autocorrectionDisabled().fontDesign(.monospaced)
-                if reveal { TextField("Value", text: $value).fontDesign(.monospaced) } else { SecureField("Value", text: $value).fontDesign(.monospaced) }
+                TextField("NAME", text: $name).textInputAutocapitalization(.characters).autocorrectionDisabled().font(.hw(.body, design: .monospaced))
+                if reveal { TextField("Value", text: $value).font(.hw(.body, design: .monospaced)) } else { SecureField("Value", text: $value).font(.hw(.body, design: .monospaced)) }
                 Toggle("Show while editing", isOn: $reveal)
                 Section { Text("Saving replaces an existing variable with the same name. The control plane returns only its name and secret classification afterward.").font(.caption).foregroundStyle(HW.secondary) }
             }.navigationTitle("Environment variable").toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }; ToolbarItem(placement: .confirmationAction) { Button("Save") { Task { await model.setEnvironment(name: name, value: value); dismiss() } }.disabled(name.isEmpty || value.isEmpty) } }
@@ -71,19 +71,19 @@ struct CodeProjectDetail: View {
         List {
             Section { Picker("Evidence", selection: $tab) { Text("Overview").tag("Overview"); Text("Graph").tag("Graph"); Text("Git").tag("Git"); Text("Risks").tag("Risks") }.pickerStyle(.segmented) }
             if tab == "Overview" {
-                Section("Evidence quality") { LabeledContent("Status", value: project.status); LabeledContent("Completeness", value: project.completeness); LabeledContent("Scanner", value: project.scanner); LabeledContent("Scanned", value: project.scannedAt) }
+                Section("Evidence quality") { HWLabeled("Status", value: project.status); HWLabeled("Completeness", value: project.completeness); HWLabeled("Scanner", value: project.scanner); HWLabeled("Scanned", value: project.scannedAt) }
                 Section("Modules") { ForEach(project.analysis?.modules ?? []) { module in VStack(alignment: .leading) { Text(module.path).font(.headline); Text("\(module.files) files · \(module.symbols) symbols").foregroundStyle(HW.secondary) } } }
             } else if tab == "Graph" {
-                Section("Code graph") { LabeledContent("Status", value: project.graph?.status ?? "Unavailable"); LabeledContent("Nodes", value: (project.graph?.nodes ?? 0).formatted()); LabeledContent("Edges", value: (project.graph?.edges ?? 0).formatted()); LabeledContent("Build", value: "\((project.graph?.buildMs ?? 0).formatted()) ms") }
+                Section("Code graph") { HWLabeled("Status", value: project.graph?.status ?? "Unavailable"); HWLabeled("Nodes", value: (project.graph?.nodes ?? 0).formatted()); HWLabeled("Edges", value: (project.graph?.edges ?? 0).formatted()); HWLabeled("Build", value: "\((project.graph?.buildMs ?? 0).formatted()) ms") }
                 Section("Hot paths") { ForEach(project.analysis?.hotPaths ?? []) { path in VStack(alignment: .leading) { Text(path.label).font(.headline); Text("\(path.file):\(path.line) · score \(path.score.formatted())").foregroundStyle(HW.secondary) } } }
             } else if tab == "Git" {
-                Section("Repository") { LabeledContent("Branch", value: project.git?.branch ?? "Unknown"); LabeledContent("Revision", value: project.git?.head ?? project.revision); LabeledContent("Working tree", value: project.git?.dirty == true ? "Dirty" : "Clean"); LabeledContent("Changed files", value: (project.git?.dirtyFiles ?? 0).formatted()); LabeledContent("Last message", value: project.git?.lastMessage ?? "Unavailable") }
+                Section("Repository") { HWLabeled("Branch", value: project.git?.branch ?? "Unknown"); HWLabeled("Revision", value: project.git?.head ?? project.revision); HWLabeled("Working tree", value: project.git?.dirty == true ? "Dirty" : "Clean"); HWLabeled("Changed files", value: (project.git?.dirtyFiles ?? 0).formatted()); HWLabeled("Last message", value: project.git?.lastMessage ?? "Unavailable") }
             } else {
-                Section("Vulnerabilities") { ForEach(project.vulnerabilities ?? []) { vulnerability in NavigationLink { VulnerabilityDetail(project: project, vulnerability: vulnerability) } label: { VStack(alignment: .leading) { Text(vulnerability.id).foregroundStyle(vulnerability.severity.lowercased() == "critical" ? HW.red : HW.amber).bold(); Text("\(vulnerability.package) · \(vulnerability.summary)").font(.caption).foregroundStyle(HW.secondary) } } } }
+                Section("Vulnerabilities") { ForEach(project.vulnerabilities ?? []) { vulnerability in NavigationLink { VulnerabilityDetail(project: project, vulnerability: vulnerability) } label: { VStack(alignment: .leading) { Text(vulnerability.id).font(.body.weight(.bold)).foregroundStyle(vulnerability.severity.lowercased() == "critical" ? HW.red : HW.amber); Text("\(vulnerability.package) · \(vulnerability.summary)").font(.caption).foregroundStyle(HW.secondary) } } } }
                 Section("Findings") { ForEach(project.findings ?? []) { finding in VStack(alignment: .leading) { Text(finding.message).font(.headline); Text("\(finding.severity.uppercased()) · \(finding.file):\(finding.line)").font(.caption).foregroundStyle(HW.secondary) } } }
                 Section("Dead-code candidates") { ForEach(project.analysis?.deadCode ?? []) { item in VStack(alignment: .leading) { Text(item.label).font(.headline); Text("\(item.confidence) confidence · \(item.file):\(item.line) · \(item.reason)").font(.caption).foregroundStyle(HW.secondary) } } }
             }
-        }.scrollContentBackground(.hidden).background(HW.background).navigationTitle(project.name)
+        }.hwHiddenScrollBackground().background(HW.background).navigationTitle(project.name)
     }
 }
 
@@ -105,7 +105,7 @@ struct AccessView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack { VStack(alignment: .leading) { Eyebrow(text: "Company access"); Text("Users and roles").font(.title2.bold()) }; Spacer(); Button("Add user", systemImage: "person.badge.plus") { showAdd = true }.buttonStyle(.borderedProminent) }
-            ForEach(model.members) { member in HStack { Circle().fill(HW.panelRaised).frame(width: 44, height: 44).overlay(Text(String(member.user.name.prefix(1))).bold().foregroundStyle(HW.teal)); VStack(alignment: .leading) { Text(member.user.name).font(.headline); Text(member.user.email).font(.caption).foregroundStyle(HW.secondary) }; Spacer(); Text(member.role.replacingOccurrences(of: "_", with: " ").uppercased()).font(.caption2.bold()).foregroundStyle(HW.amber).padding(.horizontal, 9).padding(.vertical, 5).background(HW.amber.opacity(0.14)).clipShape(Capsule()) }.padding(15).panel() }
+            ForEach(model.members) { member in HStack { Circle().fill(HW.panelRaised).frame(width: 44, height: 44).overlay(Text(String(member.user.name.prefix(1))).font(.body.weight(.bold)).foregroundStyle(HW.teal)); VStack(alignment: .leading) { Text(member.user.name).font(.headline); Text(member.user.email).font(.caption).foregroundStyle(HW.secondary) }; Spacer(); Text(member.role.replacingOccurrences(of: "_", with: " ").uppercased()).font(.caption2.bold()).foregroundStyle(HW.amber).padding(.horizontal, 9).padding(.vertical, 5).background(HW.amber.opacity(0.14)).clipShape(Capsule()) }.padding(15).panel() }
             Text("Role changes and removals are audited by the control plane.").font(.footnote).foregroundStyle(HW.secondary)
         }.sheet(isPresented: $showAdd) { AddUserView() }
     }
@@ -115,7 +115,7 @@ struct AddUserView: View {
     @EnvironmentObject private var model: AppModel
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""; @State private var email = ""; @State private var password = ""; @State private var role = "viewer"
-    var body: some View { NavigationStack { Form { TextField("Name", text: $name); TextField("Email", text: $email).keyboardType(.emailAddress).textInputAutocapitalization(.never); SecureField("Temporary password · 14+ characters", text: $password); Picker("Role", selection: $role) { Text("Viewer").tag("viewer"); Text("Operator").tag("operator"); Text("Company admin").tag("company_admin") }; Section { Text("The user signs in with this temporary password. Account creation is available only to authorized company owners and is recorded in the audit log.").font(.caption).foregroundStyle(HW.secondary) } }.navigationTitle("Add company user").toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }; ToolbarItem(placement: .confirmationAction) { Button("Add") { Task { await model.createUser(name: name, email: email, password: password, role: role); dismiss() } }.disabled(name.isEmpty || !email.contains("@") || password.count < 14) } } } }
+    var body: some View { HWStackNavigation { Form { TextField("Name", text: $name); TextField("Email", text: $email).keyboardType(.emailAddress).textInputAutocapitalization(.never); SecureField("Temporary password · 14+ characters", text: $password); Picker("Role", selection: $role) { Text("Viewer").tag("viewer"); Text("Operator").tag("operator"); Text("Company admin").tag("company_admin") }; Section { Text("The user signs in with this temporary password. Account creation is available only to authorized company owners and is recorded in the audit log.").font(.caption).foregroundStyle(HW.secondary) } }.navigationTitle("Add company user").toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }; ToolbarItem(placement: .confirmationAction) { Button("Add") { Task { await model.createUser(name: name, email: email, password: password, role: role); dismiss() } }.disabled(name.isEmpty || !email.contains("@") || password.count < 14) } } } }
 }
 
 struct OrganizationView: View {
@@ -128,8 +128,8 @@ struct OrganizationView: View {
             if let license = model.license {
                 VStack(alignment: .leading, spacing: 14) {
                     HStack { Text("License & deployment").font(.title3.bold()); Spacer(); Text(license.state.uppercased()).font(.caption2.bold()).foregroundStyle(license.state == "active" ? HW.teal : HW.amber).padding(.horizontal, 9).padding(.vertical, 5).background((license.state == "active" ? HW.teal : HW.amber).opacity(0.14)).clipShape(Capsule()) }
-                    LabeledContent("Mode", value: deploymentTitle(license.deploymentMode)); LabeledContent("Installation", value: license.installationId); LabeledContent("Enforced", value: license.enforced ? "Yes" : "No")
-                    if let claims = license.claims { LabeledContent("Customer", value: claims.customer); LabeledContent("Expires", value: claims.expiresAt); LabeledContent("Limits", value: "\(claims.limits.nodes) nodes · \(claims.limits.users) users"); Text(claims.features.joined(separator: " · ")).font(.caption).foregroundStyle(HW.secondary) }
+                    HWLabeled("Mode", value: deploymentTitle(license.deploymentMode)); HWLabeled("Installation", value: license.installationId); HWLabeled("Enforced", value: license.enforced ? "Yes" : "No")
+                    if let claims = license.claims { HWLabeled("Customer", value: claims.customer); HWLabeled("Expires", value: claims.expiresAt); HWLabeled("Limits", value: "\(claims.limits.nodes) nodes · \(claims.limits.users) users"); Text(claims.features.joined(separator: " · ")).font(.caption).foregroundStyle(HW.secondary) }
                     Text(license.message).font(.footnote).foregroundStyle(HW.secondary)
                     if model.session.role == "platform_owner" || model.session.role == "company_admin" { Button("Install signed enterprise license") { showLicense = true }.buttonStyle(.bordered) }
                 }.padding(18).panel()
@@ -147,5 +147,5 @@ struct InstallLicenseView: View {
     @EnvironmentObject private var model: AppModel
     @Environment(\.dismiss) private var dismiss
     @State private var value = ""
-    var body: some View { NavigationStack { Form { TextEditor(text: $value).font(.system(.caption, design: .monospaced)).frame(minHeight: 240); Section { Text("Paste the signed license generated by the controller REST licensing workflow. The app does not generate or alter license claims.").font(.caption).foregroundStyle(HW.secondary) } }.navigationTitle("Enterprise license").toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }; ToolbarItem(placement: .confirmationAction) { Button("Install") { Task { await model.installLicense(value); dismiss() } }.disabled(value.isEmpty) } } } }
+    var body: some View { HWStackNavigation { Form { TextEditor(text: $value).font(.system(.caption, design: .monospaced)).frame(minHeight: 240); Section { Text("Paste the signed license generated by the controller REST licensing workflow. The app does not generate or alter license claims.").font(.caption).foregroundStyle(HW.secondary) } }.navigationTitle("Enterprise license").toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }; ToolbarItem(placement: .confirmationAction) { Button("Install") { Task { await model.installLicense(value); dismiss() } }.disabled(value.isEmpty) } } } }
 }

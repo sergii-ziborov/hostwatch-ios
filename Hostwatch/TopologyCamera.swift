@@ -4,7 +4,7 @@ import simd
 enum TopologyCamera {
     static let minPitch: Float = 0.22
     static let maxPitch: Float = 1.12
-    static let minDistance: Float = 6.2
+    static let minDistance: Float = 5.2
     static let maxDistance: Float = 42
 
     struct Pose {
@@ -72,10 +72,11 @@ enum TopologyCamera {
         ))
     }
 
-    /// Electron lock: look at the tower center from the right-front-up quarter.
+    /// Electron lock: look at the tower body from the right-front-up quarter.
+    /// Labels live in screen space to the right, so the look point stays on the tower.
     static func lock(base: SCNVector3, height: Float) -> Pose {
-        let reach = max(14, height * 1.8 + 9)
-        let look = SCNVector3(base.x - 0.2, min(2.4, max(0.85, height * 0.4)), base.z)
+        let reach = max(12, height * 1.55 + 7)
+        let look = SCNVector3(base.x, min(2.6, max(0.7, height * 0.4)), base.z)
         let placed = SCNVector3(look.x + reach * 0.42, look.y + reach * 0.72, look.z + reach * 0.56)
         return capture(eye: placed, target: look)
     }
