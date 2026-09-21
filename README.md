@@ -2,7 +2,7 @@
 
 Native SwiftUI control-plane client for Hostwatch. The iPhone and iPad app is intended for **public App Store distribution**, while access to a control plane is provisioned by an organization. It uses the same signed-in session and REST API as the web application. There is no public demo or registration flow.
 
-**Release status:** the App Store Connect record and public privacy declaration exist. Xcode Cloud builds the current branch, and Release builds for iPhone and iPad. A Debug device build for the paired iPhone 13 mini (`iPhone s`) succeeds; the phone went offline before `devicectl` could install (CoreDevice 4016). Unlock the phone and install the signed `iphoneos` build from Xcode to replace the earlier on-device copy. Physical-device sign-in and Face ID have not yet been verified. An App Store distribution archive, TestFlight upload, authenticated screenshots and public release are still pending.
+**Release status:** the App Store Connect record and public privacy declaration exist. Xcode Cloud builds the current branch, and Release builds for iPhone and iPad. The current Debug build was installed on the paired iPhone 13 mini (`iPhone s`) on 2026-09-21. Launch from the Mac was denied because the phone was locked; open the installed app after unlocking it. Physical-device sign-in and Face ID have not yet been verified. An App Store distribution archive, TestFlight upload, authenticated screenshots and public release are still pending.
 
 ## Product structure
 
@@ -20,6 +20,7 @@ Native SwiftUI control-plane client for Hostwatch. The iPhone and iPad app is in
 - **Fleet** — hybrid edge/home peers, public IP change history, heartbeat freshness, admission (slots, disk, stale), and home load-scaling settings.
 - **Workloads** — project traffic, processes, storage, limits and controls.
 - **Traffic policies** — bandwidth, anomaly and IP/country access rules.
+- **Managed secrets** — the Environment page keeps client-encrypted `.env` links separate from node-stored vault secrets. Owners can create and rotate values, set expiry, issue scoped application tokens with IP and read limits, review access, and revoke grants. MCP insertion is independently disabled by default in the MCP governance screen.
 - **MCP** — under Control: turn MCP off, allow or deny reads and changes, block tools, cap hourly mutations, and see which computers are talking to this company through MCP plus a redacted tool history. Limits are enforced on the Hostwatch node; a local MCP process cannot lift them.
 - **Environment** — per-project environment variable management.
 - **Code health** — repository evidence, findings and vulnerabilities.
