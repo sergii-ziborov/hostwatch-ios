@@ -81,8 +81,7 @@ struct NativeTopologyScene: UIViewRepresentable {
         context.coordinator.selection = $selection
         context.coordinator.focusedSiteID = $focusedSiteID
         context.coordinator.focusedRoad = $focusedRoad
-        view.rendersContinuously = mode.showsPackets
-        view.isPlaying = mode.showsPackets
+        context.coordinator.updatePlayback(mode: mode)
         context.coordinator.render(snapshot: snapshot, mode: mode)
         context.coordinator.applyHighlight()
         if context.coordinator.lastCommand != command.number {
@@ -114,6 +113,7 @@ struct NativeTopologyScene: UIViewRepresentable {
         private var mode: TopologyMode = .traffic
         private var labelsPending = false
         private var labelTrackingGeneration = 0
+        private var trackingLabels = false
 
         init(selection: Binding<TopologySelection?>, focusedSiteID: Binding<String?>, focusedRoad: Binding<String?>) {
             self.selection = selection
@@ -130,6 +130,12 @@ struct NativeTopologyScene: UIViewRepresentable {
             view.addSubview(labels)
             orbit.require(toFail: labels.scrollGesture)
             tap.require(toFail: labels.tapGesture)
+        }
+
+        func updatePlayback(mode: TopologyMode) {
+            let active = mode.showsPackets || trackingLabels
+            view?.rendersContinuously = active
+            view?.isPlaying = active
         }
 
         func renderer(_ renderer: SCNSceneRenderer, updateAtTime time: TimeInterval) {
@@ -684,12 +690,12 @@ struct NativeTopologyScene: UIViewRepresentable {
             guard let view else { return }
             labelTrackingGeneration += 1
             let generation = labelTrackingGeneration
-            view.isPlaying = true
-            view.rendersContinuously = true
+            trackingLabels = true
+            updatePlayback(mode: mode)
             DispatchQueue.main.asyncAfter(deadline: .now() + duration) { [weak self, weak view] in
                 guard let self, let view, generation == self.labelTrackingGeneration else { return }
-                view.rendersContinuously = self.mode.showsPackets
-                view.isPlaying = self.mode.showsPackets
+                self.trackingLabels = false
+                self.updatePlayback(mode: self.mode)
                 view.setNeedsDisplay()
                 self.syncLabels()
             }
