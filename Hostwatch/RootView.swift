@@ -9,11 +9,16 @@ struct RootView: View {
 
     init() {
         let requested = ProcessInfo.processInfo.environment["HOSTWATCH_PAGE"]
-        let page = requested.flatMap(SidebarPage.init(rawValue:)) ?? .overview
+        let saved = UserDefaults.standard.string(forKey: "hostwatch.selectedPage")
+        let page = requested.flatMap(SidebarPage.init(rawValue:))
+            ?? saved.flatMap(SidebarPage.init(rawValue:)) ?? .overview
         _selection = State(initialValue: page)
         let isPrimary = Self.primaryPages.contains(page)
-        _selectedTab = State(initialValue: isPrimary ? page.rawValue : "more")
-        _morePage = State(initialValue: isPrimary ? nil : page)
+        let savedTab = UserDefaults.standard.string(forKey: "hostwatch.selectedTab")
+        let tab = requested == nil && (savedTab == "more" || Self.primaryPages.contains(where: { $0.rawValue == savedTab }))
+            ? savedTab! : (isPrimary ? page.rawValue : "more")
+        _selectedTab = State(initialValue: tab)
+        _morePage = State(initialValue: tab == "more" && !isPrimary ? page : nil)
     }
 
     var body: some View {
@@ -60,7 +65,11 @@ struct RootView: View {
             .tag("more")
         }
         .onChange(of: selectedTab) { value in
-            if let page = SidebarPage(rawValue: value) { model.setLive(model.live, page: page) }
+            UserDefaults.standard.set(value, forKey: "hostwatch.selectedTab")
+            if let page = SidebarPage(rawValue: value) {
+                UserDefaults.standard.set(page.rawValue, forKey: "hostwatch.selectedPage")
+                model.setLive(model.live, page: page)
+            }
         }
     }
 
@@ -98,6 +107,7 @@ struct RootView: View {
     private func menu(_ page: SidebarPage) -> some View {
         Button {
             selection = page
+            UserDefaults.standard.set(page.rawValue, forKey: "hostwatch.selectedPage")
             model.setLive(model.live, page: page)
         } label: {
             Label(page.title, systemImage: page.icon)

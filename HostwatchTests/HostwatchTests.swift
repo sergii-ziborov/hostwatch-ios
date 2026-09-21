@@ -154,19 +154,22 @@ final class HostwatchTests: XCTestCase {
     func testTowerLockFramesFromTheRightLikeElectron() {
         let pose = TopologyCamera.lock(base: SCNVector3(2, 0, -1), height: 4)
         let eye = TopologyCamera.eye(of: pose)
-        XCTAssertEqual(pose.target.x, 2, accuracy: 0.15)
-        XCTAssertEqual(pose.target.z, -1, accuracy: 0.15)
+        XCTAssertGreaterThan(pose.target.x, 2)
+        XCTAssertLessThan(pose.target.z, -1)
         XCTAssertGreaterThan(eye.x, pose.target.x)
         XCTAssertGreaterThan(eye.y, pose.target.y)
         XCTAssertGreaterThan(eye.z, pose.target.z)
         XCTAssertGreaterThanOrEqual(pose.pitch, TopologyCamera.minPitch)
         XCTAssertLessThanOrEqual(pose.pitch, TopologyCamera.maxPitch)
-        XCTAssertGreaterThan(pose.distance, 10)
-        XCTAssertLessThan(pose.distance, 22)
+        XCTAssertGreaterThan(pose.distance, 7)
+        XCTAssertLessThan(pose.distance, 10)
         XCTAssertEqual(pose.target.y, 2.08, accuracy: 0.01)
         let tall = TopologyCamera.lock(base: SCNVector3(2, 0, -1), height: 7)
         XCTAssertEqual(tall.target.y, 3.64, accuracy: 0.01)
         XCTAssertGreaterThan(tall.distance, pose.distance)
+        let wide = TopologyCamera.lock(base: SCNVector3(2, 0, -1), height: 4, aspect: 1.4)
+        XCTAssertGreaterThan(wide.target.x, pose.target.x)
+        XCTAssertLessThan(wide.target.z, pose.target.z)
     }
 
     func testOrbitCameraStaysUprightAcrossFullYaw() {

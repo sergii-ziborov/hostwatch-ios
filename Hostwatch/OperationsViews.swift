@@ -47,9 +47,10 @@ struct VulnerabilityDetail: View {
 struct TopologyView: View {
     @EnvironmentObject private var model: AppModel
     @Environment(\.verticalSizeClass) private var verticalSizeClass
-    @State private var mode: TopologyMode = .towers
+    @State private var mode = TopologyMode(rawValue: UserDefaults.standard.string(forKey: "hostwatch.topologyMode") ?? "") ?? .towers
     @State private var command = TopologyCommand(number: 0, action: .fit)
     @State private var selection: TopologySelection?
+    @State private var labelInfo: TopologyLabelInfo?
     @State private var focusedSiteID: String?
     @State private var focusedRoad: String?
     @State private var showLegend = false
@@ -108,6 +109,7 @@ struct TopologyView: View {
                                                             services: projectScope ? [] : model.dataServices,
                                                             links: componentLinks, projectScope: projectScope),
                                             mode: mode, command: command, selection: $selection,
+                                            labelInfo: $labelInfo,
                                             focusedSiteID: $focusedSiteID, focusedRoad: $focusedRoad)
                         HStack(alignment: .bottom) {
                             Button { showLegend = true } label: {
@@ -156,10 +158,26 @@ struct TopologyView: View {
                     }
                 }
                 .sheet(isPresented: $showLegend) { legend }
+                .sheet(item: $labelInfo) { info in
+                    HWStackNavigation {
+                        List {
+                            Section("Label") { Text(info.title).font(.headline) }
+                            Section("Observed detail") { Text(info.detail) }
+                            Section("What it means") { Text(info.explanation) }
+                        }
+                        .hwHiddenScrollBackground()
+                        .background(HW.background)
+                        .navigationTitle("Topology detail")
+                        .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { labelInfo = nil } } }
+                    }
+                }
                 .onChange(of: model.selectedSite) { _ in
                     focusedSiteID = nil
                     focusedRoad = nil
                     send(.fit)
+                }
+                .onChange(of: mode) { value in
+                    UserDefaults.standard.set(value.rawValue, forKey: "hostwatch.topologyMode")
                 }
             } else {
                 EmptyState(

@@ -110,10 +110,6 @@ struct AppUnlockView: View {
 
     private var unlockControls: some View {
         VStack(spacing: verticalSizeClass == .compact ? 10 : 20) {
-            Image(systemName: DeviceUnlock.symbolName)
-                .font(.system(size: verticalSizeClass == .compact ? 34 : 52))
-                .foregroundStyle(HW.teal)
-                .padding(verticalSizeClass == .compact ? 10 : 20).panel()
             Text("Unlock Hostwatch").font(.title2.bold())
             Text("Your control-plane session stays on this device. Confirm with \(DeviceUnlock.methodName) to open it. Sign out only if you want this device forgotten.")
                 .font(.footnote).foregroundStyle(HW.secondary).multilineTextAlignment(.center)
