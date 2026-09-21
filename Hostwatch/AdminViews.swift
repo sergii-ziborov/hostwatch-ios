@@ -8,7 +8,19 @@ struct EnvironmentView: View {
     private var site: Site? { model.sites.first(where: { $0.id == model.selectedSite }) ?? model.sites.first }
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack { VStack(alignment: .leading) { Eyebrow(text: "Project configuration"); Text(site.map { "\($0.name) environment" } ?? "Environment").font(.title2.bold()); Text("Values stay hidden during normal viewing. Owners can share an encrypted link.").font(.caption).foregroundStyle(HW.secondary) }; Spacer(); if ["owner", "platform_owner"].contains(model.session.role ?? "") { Button("Share .env", systemImage: "link") { showShare = true }.buttonStyle(.bordered).disabled(site == nil) }; Button("Add variable", systemImage: "plus") { showAdd = true }.buttonStyle(.borderedProminent).disabled(site == nil) }
+            VStack(alignment: .leading, spacing: 12) {
+                Eyebrow(text: "Project configuration")
+                Text(site.map { "\($0.name) environment" } ?? "Environment").font(.title2.bold())
+                Text("Values stay hidden during normal viewing. Owners can share an encrypted link.").font(.caption).foregroundStyle(HW.secondary)
+                HStack(spacing: 8) {
+                    if ["owner", "platform_owner"].contains(model.session.role ?? "") {
+                        Button("Share .env", systemImage: "link") { showShare = true }
+                            .buttonStyle(.bordered).disabled(site == nil)
+                    }
+                    Button("Add", systemImage: "plus") { showAdd = true }
+                        .buttonStyle(.borderedProminent).disabled(site == nil)
+                }
+            }
             if model.environment?.managed == false { Label(model.environment?.error ?? "Environment management is unavailable for this project.", systemImage: "exclamationmark.triangle").foregroundStyle(HW.amber).padding(14).panel() }
             ForEach(model.environment?.variables ?? []) { variable in
                 HStack(spacing: 14) {
