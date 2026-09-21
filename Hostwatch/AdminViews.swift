@@ -3,11 +3,12 @@ import SwiftUI
 struct EnvironmentView: View {
     @EnvironmentObject private var model: AppModel
     @State private var showAdd = false
+    @State private var showShare = false
     @State private var deleteVariable: EnvironmentVariable?
     private var site: Site? { model.sites.first(where: { $0.id == model.selectedSite }) ?? model.sites.first }
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack { VStack(alignment: .leading) { Eyebrow(text: "Project configuration"); Text(site.map { "\($0.name) environment" } ?? "Environment").font(.title2.bold()); Text("Secret values are never returned after they are saved.").font(.caption).foregroundStyle(HW.secondary) }; Spacer(); Button("Add variable", systemImage: "plus") { showAdd = true }.buttonStyle(.borderedProminent).disabled(site == nil) }
+            HStack { VStack(alignment: .leading) { Eyebrow(text: "Project configuration"); Text(site.map { "\($0.name) environment" } ?? "Environment").font(.title2.bold()); Text("Values stay hidden during normal viewing. Owners can share an encrypted link.").font(.caption).foregroundStyle(HW.secondary) }; Spacer(); if ["owner", "platform_owner"].contains(model.session.role ?? "") { Button("Share .env", systemImage: "link") { showShare = true }.buttonStyle(.bordered).disabled(site == nil) }; Button("Add variable", systemImage: "plus") { showAdd = true }.buttonStyle(.borderedProminent).disabled(site == nil) }
             if model.environment?.managed == false { Label(model.environment?.error ?? "Environment management is unavailable for this project.", systemImage: "exclamationmark.triangle").foregroundStyle(HW.amber).padding(14).panel() }
             ForEach(model.environment?.variables ?? []) { variable in
                 HStack(spacing: 14) {
@@ -19,7 +20,118 @@ struct EnvironmentView: View {
             if model.environment?.variables.isEmpty != false { EmptyState(icon: "key.horizontal", title: "No variables", detail: "Add the first variable for this project.") }
         }
         .sheet(isPresented: $showAdd) { AddEnvironmentVariableView() }
+        .sheet(isPresented: $showShare) { if let site { EnvironmentShareComposer(site: site, variables: model.environment?.variables ?? []).environmentObject(model) } }
         .confirmationDialog("Delete \(deleteVariable?.name ?? "variable")?", isPresented: Binding(get: { deleteVariable != nil }, set: { if !$0 { deleteVariable = nil } })) { if let variable = deleteVariable { Button("Delete", role: .destructive) { Task { await model.deleteEnvironment(name: variable.name) }; deleteVariable = nil } } } message: { Text("The project may fail to start if it requires this value.") }
+    }
+}
+
+struct EnvironmentShareComposer: View {
+    @EnvironmentObject private var model: AppModel
+    @Environment(\.dismiss) private var dismiss
+    let site: Site
+    let variables: [EnvironmentVariable]
+    @State private var selected: Set<String> = []
+    @State private var completeFile = false
+    @State private var minutes = 60
+    @State private var link: URL?
+    @State private var showSystemShare = false
+    @State private var shares: [EnvironmentShareRecord] = []
+    @State private var busy = false
+    @State private var error: String?
+
+    var body: some View {
+        HWStackNavigation {
+            Form {
+                Section {
+                    Text("Choose values for \(site.name). Anyone with the complete link can decrypt them until the link expires or is revoked.")
+                        .font(.caption).foregroundStyle(HW.secondary)
+                    Toggle("Complete original .env file", isOn: $completeFile)
+                }
+                if !completeFile {
+                    Section("Variables") {
+                        ForEach(variables) { variable in
+                            Toggle(variable.name, isOn: Binding(get: { selected.contains(variable.name) }, set: { enabled in
+                                if enabled { selected.insert(variable.name) } else { selected.remove(variable.name) }
+                            }))
+                        }
+                    }
+                }
+                Section("Link lifetime") {
+                    Picker("Expires after", selection: $minutes) {
+                        Text("10 minutes").tag(10)
+                        Text("1 hour").tag(60)
+                        Text("24 hours").tag(1440)
+                    }
+                    Button(busy ? "Creating…" : "Create encrypted link") { Task { await create() } }
+                        .disabled(busy || (!completeFile && selected.isEmpty))
+                }
+                if let link {
+                    Section("New link") {
+                        Text("Save or send the complete link now. Its key cannot be recovered from Hostwatch later.").font(.caption).foregroundStyle(HW.secondary)
+                        Text(link.absoluteString).font(.system(.caption2, design: .monospaced)).textSelection(.enabled)
+                        Button("Share link", systemImage: "square.and.arrow.up") { showSystemShare = true }
+                        Button("Copy link") { UIPasteboard.general.string = link.absoluteString }
+                    }
+                }
+                if !shares.isEmpty {
+                    Section("Active links") {
+                        ForEach(shares.filter { $0.siteId == site.id }) { share in
+                            EnvironmentShareRow(share: share, busy: busy) { Task { await revoke(share.id) } }
+                        }
+                    }
+                }
+                if let error { Section { Text(error).foregroundStyle(HW.red) } }
+            }
+            .navigationTitle("Encrypted .env link")
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } } }
+            .task { await load() }
+            .sheet(isPresented: $showSystemShare) { if let link { EnvironmentActivitySheet(items: [link]) } }
+        }
+    }
+
+    private func load() async {
+        do { shares = try await model.environmentShares(); error = nil }
+        catch { self.error = error.localizedDescription }
+    }
+
+    private func create() async {
+        busy = true; error = nil
+        do {
+            link = try await model.createEnvironmentShare(names: completeFile ? ["*"] : selected.sorted(), minutes: minutes)
+            shares = try await model.environmentShares()
+        } catch { self.error = error.localizedDescription }
+        busy = false
+    }
+
+    private func revoke(_ id: String) async {
+        busy = true; error = nil
+        do { try await model.revokeEnvironmentShare(id); shares.removeAll { $0.id == id }; if link?.absoluteString.contains(id) == true { link = nil } }
+        catch { self.error = error.localizedDescription }
+        busy = false
+    }
+}
+
+private struct EnvironmentActivitySheet: UIViewControllerRepresentable {
+    let items: [Any]
+    func makeUIViewController(context: Context) -> UIActivityViewController { UIActivityViewController(activityItems: items, applicationActivities: nil) }
+    func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
+}
+
+private struct EnvironmentShareRow: View {
+    let share: EnvironmentShareRecord
+    let busy: Bool
+    let onRevoke: () -> Void
+    private var title: String { share.names == ["*"] ? "Complete .env" : "\(share.names.count) variables" }
+
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading) {
+                Text(title)
+                Text("Expires \(share.expiresAt)").font(.caption2).foregroundStyle(HW.secondary)
+            }
+            Spacer()
+            Button("Revoke", role: .destructive, action: onRevoke).disabled(busy)
+        }
     }
 }
 

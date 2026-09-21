@@ -66,6 +66,7 @@ struct Member: Codable, Identifiable {
 }
 struct EnvironmentVariable: Codable, Identifiable { var id: String { name }; let name: String; let secret: Bool }
 struct EnvironmentState: Codable { let siteId: String; let variables: [EnvironmentVariable]; let managed: Bool; let updatedAt: String?; let error: String? }
+struct EnvironmentShareRecord: Codable, Identifiable { let id: String; let siteId: String; let names: [String]; let createdAt: String; let expiresAt: String }
 struct AccessRule: Codable, Identifiable { let id: String; let site: String; let kind: String; let value: String; let label: String?; let createdAt: String }
 struct AccessRuleState: Codable { let rules: [AccessRule]; let managed: Bool; let updatedAt: String?; let error: String? }
 struct TrafficGuardPolicy: Codable {

@@ -585,6 +585,15 @@ final class AppModel: ObservableObject {
         do { environment = try await client.deleteEnvironment(site: site.id, name: name) } catch { errorMessage = error.localizedDescription }
     }
 
+    func createEnvironmentShare(names: [String], minutes: Int) async throws -> URL {
+        guard let site = sites.first(where: { $0.id == selectedSite }) ?? sites.first else { throw APIError.invalidResponse }
+        guard ["owner", "platform_owner"].contains(session.role ?? "") else { throw APIError.server("Owner access is required.") }
+        return try await client.createEnvironmentShare(site: site.id, names: names, minutes: minutes)
+    }
+
+    func environmentShares() async throws -> [EnvironmentShareRecord] { try await client.environmentShares() }
+    func revokeEnvironmentShare(_ id: String) async throws { try await client.revokeEnvironmentShare(id) }
+
     func removeRule(_ rule: AccessRule) async {
         if fixtures { accessRules = .init(rules: accessRules.rules.filter { $0.id != rule.id }, managed: true, updatedAt: accessRules.updatedAt, error: nil); return }
         do { accessRules = try await client.removeAccessRule(id: rule.id) } catch { errorMessage = error.localizedDescription }
