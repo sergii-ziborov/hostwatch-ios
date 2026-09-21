@@ -46,7 +46,7 @@ struct VulnerabilityDetail: View {
 
 struct TopologyView: View {
     @EnvironmentObject private var model: AppModel
-    @State private var mode: TopologyMode = .traffic
+    @State private var mode: TopologyMode = .towers
     @State private var command = TopologyCommand(number: 0, action: .fit)
     @State private var selection: TopologySelection?
     @State private var focusedSiteID: String?

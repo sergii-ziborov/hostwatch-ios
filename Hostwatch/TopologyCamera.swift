@@ -75,9 +75,9 @@ enum TopologyCamera {
     /// Electron lock: look at the tower body from the right-front-up quarter.
     /// Labels live in screen space to the right, so the look point stays on the tower.
     static func lock(base: SCNVector3, height: Float) -> Pose {
-        let reach = max(12, height * 1.55 + 7)
-        let look = SCNVector3(base.x, min(2.6, max(0.7, height * 0.4)), base.z)
-        let placed = SCNVector3(look.x + reach * 0.42, look.y + reach * 0.72, look.z + reach * 0.56)
+        let reach = max(12, height * 1.3 + 7)
+        let look = SCNVector3(base.x, max(0.7, height * 0.52), base.z)
+        let placed = SCNVector3(look.x + reach * 0.42, look.y + reach * 0.54, look.z + reach * 0.72)
         return capture(eye: placed, target: look)
     }
 

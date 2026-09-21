@@ -163,6 +163,10 @@ final class HostwatchTests: XCTestCase {
         XCTAssertLessThanOrEqual(pose.pitch, TopologyCamera.maxPitch)
         XCTAssertGreaterThan(pose.distance, 10)
         XCTAssertLessThan(pose.distance, 22)
+        XCTAssertEqual(pose.target.y, 2.08, accuracy: 0.01)
+        let tall = TopologyCamera.lock(base: SCNVector3(2, 0, -1), height: 7)
+        XCTAssertEqual(tall.target.y, 3.64, accuracy: 0.01)
+        XCTAssertGreaterThan(tall.distance, pose.distance)
     }
 
     func testOrbitCameraStaysUprightAcrossFullYaw() {
@@ -234,6 +238,14 @@ final class HostwatchTests: XCTestCase {
         XCTAssertGreaterThan(overflow.moreBelow, 0)
         XCTAssertLessThan(overflow.count, 14)
         XCTAssertEqual(overflow.tops.count, overflow.count)
+        let end = TopologyLayout.arrangeLabels(
+            preferredTops: (0..<14).map { CGFloat($0) * 12 },
+            heights: Array(repeating: 20, count: 14),
+            minY: 0, maxY: 100, gap: 3, start: 13
+        )
+        XCTAssertGreaterThan(end.moreAbove, 0)
+        XCTAssertEqual(end.moreBelow, 0)
+        XCTAssertEqual(end.start + end.count, 14)
         for index in 1..<overflow.tops.count {
             XCTAssertGreaterThanOrEqual(overflow.tops[index], overflow.tops[index - 1] + 18)
         }

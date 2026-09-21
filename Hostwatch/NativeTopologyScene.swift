@@ -54,6 +54,7 @@ struct NativeTopologyScene: UIViewRepresentable {
         let constrained = ProcessInfo.processInfo.physicalMemory < 3_000_000_000
         view.antialiasingMode = constrained ? .none : .multisampling2X
         view.rendersContinuously = mode.showsPackets
+        view.isPlaying = mode.showsPackets
         view.preferredFramesPerSecond = constrained ? 20 : 30
         view.autoenablesDefaultLighting = false
         view.scene = SCNScene()
@@ -71,7 +72,7 @@ struct NativeTopologyScene: UIViewRepresentable {
         doubleTap.numberOfTapsRequired = 2
         tap.require(toFail: doubleTap)
         [orbit, slide, pinch, tap, doubleTap].forEach(view.addGestureRecognizer)
-        context.coordinator.attach(view)
+        context.coordinator.attach(view, orbit: orbit, tap: tap)
         context.coordinator.render(snapshot: snapshot, mode: mode)
         return view
     }
@@ -81,6 +82,7 @@ struct NativeTopologyScene: UIViewRepresentable {
         context.coordinator.focusedSiteID = $focusedSiteID
         context.coordinator.focusedRoad = $focusedRoad
         view.rendersContinuously = mode.showsPackets
+        view.isPlaying = mode.showsPackets
         context.coordinator.render(snapshot: snapshot, mode: mode)
         context.coordinator.applyHighlight()
         if context.coordinator.lastCommand != command.number {
@@ -96,6 +98,7 @@ struct NativeTopologyScene: UIViewRepresentable {
         var focusedRoad: Binding<String?>
         var lastCommand = 0
         private var structureKey = ""
+        private var previousSiteIDs: [String] = []
         private var pose = TopologyCamera.Pose(target: SCNVector3(0, 1.2, 0), yaw: 0.55, pitch: 0.62, distance: 18)
         private var fitDistance: Float = 18
         private let camera = SCNNode()
@@ -110,6 +113,7 @@ struct NativeTopologyScene: UIViewRepresentable {
         private var layerMids: [String: [Float]] = [:]
         private var mode: TopologyMode = .traffic
         private var labelsPending = false
+        private var labelTrackingGeneration = 0
 
         init(selection: Binding<TopologySelection?>, focusedSiteID: Binding<String?>, focusedRoad: Binding<String?>) {
             self.selection = selection
@@ -117,12 +121,15 @@ struct NativeTopologyScene: UIViewRepresentable {
             self.focusedRoad = focusedRoad
         }
 
-        func attach(_ view: SCNView) {
+        func attach(_ view: SCNView, orbit: UIPanGestureRecognizer, tap: UITapGestureRecognizer) {
             self.view = view
             labels.frame = view.bounds
             labels.autoresizingMask = [.flexibleWidth, .flexibleHeight]
             labels.isUserInteractionEnabled = true
+            labels.onTapItem = { [weak self] id in self?.selectLabel(id) }
             view.addSubview(labels)
+            orbit.require(toFail: labels.scrollGesture)
+            tap.require(toFail: labels.tapGesture)
         }
 
         func renderer(_ renderer: SCNSceneRenderer, updateAtTime time: TimeInterval) {
@@ -140,12 +147,20 @@ struct NativeTopologyScene: UIViewRepresentable {
         func render(snapshot: TopologySnapshot, mode: TopologyMode) {
             guard let view, let scene = view.scene else { return }
             self.mode = mode
-            let next = snapshot.sites.map(\.id).joined() + "|" + snapshot.services.map(\.id).joined()
+            let siteStructure = snapshot.sites.map { site -> String in
+                let project = snapshot.projects.first { site.id == $0.id || site.id.hasPrefix($0.id + "/") }
+                let layers = TopologyLayer.layers(for: site, project: project)
+                    .map { "\($0.kind.rawValue):\($0.title)" }.joined(separator: ",")
+                return "\(site.id)[\(layers)]"
+            }.joined(separator: ";")
+            let next = siteStructure + "|" + snapshot.services.map(\.id).joined()
                 + "|" + snapshot.routes.map { "\($0.caller)-\($0.targetService ?? $0.destinationHost)" }.joined()
                 + "|" + snapshot.projects.map { "\($0.id):\($0.analysis?.modules?.count ?? 0):\($0.analysis?.communities?.count ?? 0)" }.joined()
                 + "|\(snapshot.projectScope)|\(snapshot.links.map { "\($0.from)-\($0.to)" }.joined())"
             if structureKey != next {
-                let scopeChanged = structureKey.split(separator: "|").first != next.split(separator: "|").first
+                let siteIDs = snapshot.sites.map(\.id)
+                let scopeChanged = previousSiteIDs != siteIDs
+                previousSiteIDs = siteIDs
                 structureKey = next
                 rebuild(snapshot: snapshot, mode: mode, in: scene)
                 if scopeChanged {
@@ -223,17 +238,30 @@ struct NativeTopologyScene: UIViewRepresentable {
 
         private func pulse(snapshot: TopologySnapshot, mode: TopologyMode) {
             let maxEgress = max(1, snapshot.sites.map(\.bytesPerMinute).max() ?? 1)
+            var resized = false
+            SCNTransaction.begin()
+            SCNTransaction.animationDuration = 0.24
             for site in snapshot.sites {
                 let height = TopologyLayer.towerHeight(bytes: site.bytesPerMinute, maxBytes: maxEgress)
                 towerHeights[site.id] = height
+                let project = snapshot.projects.first { site.id == $0.id || site.id.hasPrefix($0.id + "/") }
+                for (index, layer) in TopologyLayer.layers(for: site, project: project).enumerated() {
+                    guard let anchorIndex = anchors.firstIndex(where: { $0.id == "site:\(site.id):\(index)" }) else { continue }
+                    anchors[anchorIndex].detail = layer.kind == .runtime ? layer.detail : String(layer.detail.prefix(42))
+                }
                 if let group = towerGroups[site.id], let base = towerBaseHeights[site.id], base > 0.15 {
-                    group.scale.y = height / base
+                    let nextScale = height / base
+                    resized = resized || abs(group.scale.y - nextScale) > 0.002
+                    group.scale.y = nextScale
                 }
             }
+            SCNTransaction.commit()
             for packet in packets {
                 let volume = snapshot.sites.first { $0.id == packet.to || $0.id == packet.from }?.requestsPerMinute ?? packet.volume
                 packet.retune(volume: max(10, volume))
             }
+            if resized { trackLabels(for: 0.34) }
+            view?.setNeedsDisplay()
         }
 
         private func addPlate(at position: TopologyPoint, to scene: SCNScene) {
@@ -315,21 +343,14 @@ struct NativeTopologyScene: UIViewRepresentable {
                 slab.position = SCNVector3(0, midY, 0)
                 slab.name = "site:\(site.id):\(index):\(layer.kind.rawValue)"
                 group.addChildNode(slab)
-                let rank: LabelAnchor.Rank
-                switch layer.kind {
-                case .runtime: rank = .runtime
-                case .module, .community, .hotspot: rank = .analysis
-                default: rank = .name
-                }
-                if rank != .name {
-                    anchors.append(.init(id: "site:\(site.id):\(index)", siteID: site.id,
-                                         world: SCNVector3(position.x, midY, position.z),
-                                         localY: midY, usesTower: true,
-                                         text: layer.title, detail: layer.kind == .runtime ? layer.detail : String(layer.detail.prefix(42)),
-                                         color: layer.color, rank: rank))
-                }
+                let rank: LabelAnchor.Rank = layer.kind == .runtime ? .runtime : .analysis
+                anchors.append(.init(id: "site:\(site.id):\(index)", siteID: site.id,
+                                     world: SCNVector3(position.x, midY, position.z),
+                                     localY: midY, usesTower: true,
+                                     text: layer.title, detail: layer.kind == .runtime ? layer.detail : String(layer.detail.prefix(42)),
+                                     color: layer.color, rank: rank))
                 mids.append(midY)
-                cursor += slabHeight + 0.08
+                cursor += slabHeight + (index < layers.count - 1 ? 0.08 : 0)
             }
             let hit = SCNNode(geometry: SCNCylinder(radius: 0.95, height: CGFloat(max(1.1, cursor))))
             hit.geometry?.firstMaterial = {
@@ -343,9 +364,11 @@ struct NativeTopologyScene: UIViewRepresentable {
             hit.name = "hit:\(site.id)"
             group.addChildNode(hit)
             group.position = SCNVector3(position.x, 0, position.z)
+            let baseHeight = max(0.16, cursor)
+            group.scale.y = height / baseHeight
             scene.rootNode.addChildNode(group)
             towerGroups[site.id] = group
-            towerBaseHeights[site.id] = max(height, cursor)
+            towerBaseHeights[site.id] = baseHeight
             layerMids[site.id] = mids
             addRing(at: SCNVector3(position.x, 0.04, position.z), radius: 0.86, color: layers.first?.color ?? .cyan, to: scene)
             anchors.append(.init(id: "name:\(site.id)", siteID: site.id,
@@ -553,7 +576,7 @@ struct NativeTopologyScene: UIViewRepresentable {
 
         private func resolvedWorld(_ anchor: LabelAnchor) -> SCNVector3 {
             guard anchor.usesTower, let group = towerGroups[anchor.siteID] else { return anchor.world }
-            return group.convertPosition(SCNVector3(0, anchor.localY, 0), to: nil)
+            return group.presentation.convertPosition(SCNVector3(0, anchor.localY, 0), to: nil)
         }
 
         private func syncLabels() {
@@ -575,7 +598,8 @@ struct NativeTopologyScene: UIViewRepresentable {
                 case .runtime, .analysis:
                     visible = mode.showsArchitecture && focus == anchor.siteID
                 }
-                guard onScreen, visible else { return nil }
+                let focusedLayer = (anchor.rank == .runtime || anchor.rank == .analysis) && focus == anchor.siteID
+                guard projected.z >= 0, visible, onScreen || focusedLayer else { return nil }
                 let titled = titledAnchor(anchor)
                 return .init(id: anchor.id, text: titled.text, detail: titled.detail,
                              point: calloutOrigin(for: world), color: titled.color, rank: anchor.rank)
@@ -588,8 +612,8 @@ struct NativeTopologyScene: UIViewRepresentable {
                 let topWorld: SCNVector3
                 let bottomWorld: SCNVector3
                 if let group = towerGroups[focus] {
-                    topWorld = group.convertPosition(SCNVector3(0, topLocal, 0), to: nil)
-                    bottomWorld = group.convertPosition(SCNVector3(0, 0.12, 0), to: nil)
+                    topWorld = group.presentation.convertPosition(SCNVector3(0, topLocal, 0), to: nil)
+                    bottomWorld = group.presentation.convertPosition(SCNVector3(0, 0.12, 0), to: nil)
                 } else if let base = towerBases[focus] {
                     topWorld = SCNVector3(base.x, topLocal, base.z)
                     bottomWorld = SCNVector3(base.x, 0.12, base.z)
@@ -599,8 +623,8 @@ struct NativeTopologyScene: UIViewRepresentable {
                 }
                 let top = calloutOrigin(for: topWorld).y
                 let bottom = calloutOrigin(for: bottomWorld).y
-                let lo = min(top, bottom)
-                let hi = max(top, bottom)
+                let lo = max(10, min(top, bottom))
+                let hi = min(labels.bounds.maxY - 10, max(top, bottom))
                 if hi - lo > 12 { band = lo...hi }
             }
             labels.render(names: names, layers: layers, band: band, focusID: focus)
@@ -651,7 +675,24 @@ struct NativeTopologyScene: UIViewRepresentable {
             if animated { SCNTransaction.begin(); SCNTransaction.animationDuration = 0.45 }
             TopologyCamera.apply(camera, pose: pose)
             if animated { SCNTransaction.commit() }
+            if animated { trackLabels(for: 0.55) }
+            view?.setNeedsDisplay()
             syncLabels()
+        }
+
+        private func trackLabels(for duration: TimeInterval) {
+            guard let view else { return }
+            labelTrackingGeneration += 1
+            let generation = labelTrackingGeneration
+            view.isPlaying = true
+            view.rendersContinuously = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + duration) { [weak self, weak view] in
+                guard let self, let view, generation == self.labelTrackingGeneration else { return }
+                view.rendersContinuously = self.mode.showsPackets
+                view.isPlaying = self.mode.showsPackets
+                view.setNeedsDisplay()
+                self.syncLabels()
+            }
         }
 
         func apply(_ action: TopologyCameraAction) {
@@ -733,6 +774,27 @@ struct NativeTopologyScene: UIViewRepresentable {
             }
         }
 
+        private func selectLabel(_ id: String) {
+            if id.hasPrefix("name:") {
+                lock(String(id.dropFirst("name:".count)), elevate: false)
+            } else if id.hasPrefix("site:") {
+                let components = id.split(separator: ":", maxSplits: 2)
+                guard components.count == 3, let layer = Int(components[2]) else { return }
+                let siteID = String(components[1])
+                lock(siteID, elevate: false)
+                selection.wrappedValue = TopologySelection(siteID: siteID, layer: layer)
+            } else if id.hasPrefix("flow:") {
+                let roadName = "road:" + id.dropFirst("flow:".count)
+                guard let flow = TopologyFlow.parse(roadName: roadName) else { return }
+                focusedRoad.wrappedValue = roadName
+                focusedSiteID.wrappedValue = flow.from
+                applyHighlight()
+                syncLabels()
+            } else if id == "host" || id.hasPrefix("ext:") {
+                lock(id, elevate: false)
+            }
+        }
+
         @objc func doubleTap(_ gesture: UITapGestureRecognizer) {
             guard let name = pickName(in: gesture) else {
                 apply(.fit)
@@ -785,7 +847,7 @@ private struct LabelAnchor {
     let localY: Float
     let usesTower: Bool
     let text: String
-    let detail: String
+    var detail: String
     let color: UIColor
     let rank: Rank
 }
@@ -880,6 +942,10 @@ private final class TopologyLabelCanvas: UIView {
     private var lastLayers: [Item] = []
     private var lastBand: ClosedRange<CGFloat>?
     private var lastVisible = 4
+    private var scrollRemainder: CGFloat = 0
+    var onTapItem: ((String) -> Void)?
+    let scrollGesture = UIPanGestureRecognizer()
+    let tapGesture = UITapGestureRecognizer()
     private let moreAbove = UIButton(type: .system)
     private let moreBelow = UIButton(type: .system)
 
@@ -893,13 +959,20 @@ private final class TopologyLabelCanvas: UIView {
         moreBelow.addTarget(self, action: #selector(pageDown), for: .touchUpInside)
         addSubview(moreAbove)
         addSubview(moreBelow)
+        scrollGesture.addTarget(self, action: #selector(scrollLayers(_:)))
+        scrollGesture.maximumNumberOfTouches = 1
+        scrollGesture.cancelsTouchesInView = false
+        addGestureRecognizer(scrollGesture)
+        tapGesture.addTarget(self, action: #selector(tapLabel(_:)))
+        addGestureRecognizer(tapGesture)
     }
 
     required init?(coder: NSCoder) { nil }
 
     override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
         let hit = super.hitTest(point, with: event)
-        return hit === self ? nil : hit
+        if hit !== self { return hit }
+        return labelScrollFrame.contains(point) || item(at: point) != nil ? self : nil
     }
 
     override func draw(_ rect: CGRect) {
@@ -971,6 +1044,59 @@ private final class TopologyLabelCanvas: UIView {
     @objc private func pageDown() {
         windowStart += pageSize
         render(names: lastNames, layers: lastLayers, band: lastBand, focusID: lastFocus)
+    }
+
+    @objc private func scrollLayers(_ gesture: UIPanGestureRecognizer) {
+        switch gesture.state {
+        case .began:
+            scrollRemainder = 0
+        case .changed:
+            scrollRemainder += gesture.translation(in: self).y
+            gesture.setTranslation(.zero, in: self)
+            let row: CGFloat = 24
+            while abs(scrollRemainder) >= row {
+                let delta = scrollRemainder < 0 ? 1 : -1
+                scrollRemainder += scrollRemainder < 0 ? row : -row
+                scrollWindow(by: delta)
+            }
+        case .ended, .cancelled:
+            if abs(scrollRemainder) > 10 { scrollWindow(by: scrollRemainder < 0 ? 1 : -1) }
+            scrollRemainder = 0
+        default:
+            break
+        }
+    }
+
+    @objc private func tapLabel(_ gesture: UITapGestureRecognizer) {
+        guard gesture.state == .ended, let id = item(at: gesture.location(in: self)) else { return }
+        onTapItem?(id)
+    }
+
+    private func item(at point: CGPoint) -> String? {
+        for entry in lastLayers + lastNames {
+            if let chip = chips[entry.id], !chip.isHidden, chip.frame.contains(point) { return entry.id }
+        }
+        return nil
+    }
+
+    private func scrollWindow(by delta: Int) {
+        let maxStart = max(0, lastLayers.count - max(1, lastVisible))
+        let next = min(maxStart, max(0, windowStart + delta))
+        guard next != windowStart else { return }
+        windowStart = next
+        render(names: lastNames, layers: lastLayers, band: lastBand, focusID: lastFocus)
+    }
+
+    private var labelScrollFrame: CGRect {
+        guard let band = lastBand else { return .null }
+        let visibleFrames = lastLayers.compactMap { item -> CGRect? in
+            guard let chip = chips[item.id], !chip.isHidden else { return nil }
+            return chip.frame
+        }
+        guard var frame = visibleFrames.first else { return .null }
+        for next in visibleFrames.dropFirst() { frame = frame.union(next) }
+        return CGRect(x: frame.minX - 24, y: band.lowerBound,
+                      width: frame.width + 48, height: band.upperBound - band.lowerBound).intersection(bounds)
     }
 
     private var pageSize: Int { max(1, lastVisible - 2) }
