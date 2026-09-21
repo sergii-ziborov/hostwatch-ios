@@ -122,20 +122,22 @@ struct RootView: View {
 
 struct PageContainer: View {
     @EnvironmentObject private var model: AppModel
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     let page: SidebarPage
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
             Group {
                 if page == .topology {
-                    VStack(alignment: .leading, spacing: 12) {
-                        PageHeader(page: page)
+                    VStack(alignment: .leading, spacing: verticalSizeClass == .compact ? 8 : 12) {
+                        if verticalSizeClass != .compact { PageHeader(page: page) }
                         ScopeBar(page: page)
                         sampleDataBanner
                         errorBanner
                         pageContent
                     }
-                    .padding(20)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, verticalSizeClass == .compact ? 8 : 20)
                     .frame(maxWidth: 1500, maxHeight: .infinity, alignment: .topLeading)
                 } else {
                     ScrollView {
@@ -235,6 +237,7 @@ struct PageHeader: View {
 struct ScopeBar: View {
     @EnvironmentObject private var model: AppModel
     @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     let page: SidebarPage
 
     var body: some View {
@@ -247,16 +250,28 @@ struct ScopeBar: View {
     }
 
     private var compactControls: some View {
-        VStack(spacing: 8) {
-            HStack(spacing: 6) {
-                nodeMenu.frame(maxWidth: .infinity)
-                if showsSite { siteMenu.frame(maxWidth: .infinity) }
-                if showsWindow { windowMenu.frame(maxWidth: .infinity) }
-            }
-            HStack {
-                liveButton
-                Spacer()
-                refreshButton
+        Group {
+            if verticalSizeClass == .compact && page == .topology {
+                HStack(spacing: 6) {
+                    liveButton
+                    nodeMenu.frame(maxWidth: .infinity)
+                    if showsSite { siteMenu.frame(maxWidth: .infinity) }
+                    if showsWindow { windowMenu.frame(maxWidth: .infinity) }
+                    refreshButton
+                }
+            } else {
+                VStack(spacing: 8) {
+                    HStack(spacing: 6) {
+                        nodeMenu.frame(maxWidth: .infinity)
+                        if showsSite { siteMenu.frame(maxWidth: .infinity) }
+                        if showsWindow { windowMenu.frame(maxWidth: .infinity) }
+                    }
+                    HStack {
+                        liveButton
+                        Spacer()
+                        refreshButton
+                    }
+                }
             }
         }
         .buttonStyle(.bordered)

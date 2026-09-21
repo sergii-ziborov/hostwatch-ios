@@ -76,6 +76,7 @@ struct AppSplashView: View {
 }
 
 struct AppUnlockView: View {
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     let busy: Bool
     let error: String?
     let unlock: () -> Void
@@ -84,21 +85,45 @@ struct AppUnlockView: View {
     var body: some View {
         ZStack {
             HW.background.ignoresSafeArea()
-            VStack(spacing: 25) {
-                LaunchBrand()
-                Image(systemName: DeviceUnlock.symbolName).font(.system(size: 52)).foregroundStyle(HW.teal)
-                    .padding(20).panel()
-                Text("Unlock Hostwatch").font(.title2.bold())
-                Text("Your control-plane session stays on this device. Confirm with \(DeviceUnlock.methodName) to open it. Sign out only if you want this device forgotten.")
-                    .font(.footnote).foregroundStyle(HW.secondary).multilineTextAlignment(.center)
-                    .frame(maxWidth: 340)
-                if let error { Text(error).font(.footnote).foregroundStyle(HW.red).multilineTextAlignment(.center) }
-                Button { unlock() } label: {
-                    if busy { ProgressView().frame(maxWidth: .infinity) }
-                    else { Label("Unlock with \(DeviceUnlock.methodName)", systemImage: DeviceUnlock.symbolName).frame(maxWidth: .infinity) }
-                }.buttonStyle(.borderedProminent).controlSize(.large).disabled(busy).frame(maxWidth: 320)
-                Button("Sign out", action: signOut).font(.footnote).disabled(busy)
-            }.padding(24)
+            GeometryReader { geometry in
+                ScrollView {
+                    Group {
+                        if geometry.size.width >= 700 && geometry.size.width > geometry.size.height {
+                            HStack(spacing: 24) {
+                                LaunchBrand().frame(maxWidth: .infinity)
+                                unlockControls.frame(maxWidth: 360)
+                            }
+                        } else {
+                            VStack(spacing: 25) {
+                                LaunchBrand()
+                                unlockControls
+                            }
+                        }
+                    }
+                    .frame(maxWidth: 800)
+                    .padding(20)
+                    .frame(maxWidth: .infinity, minHeight: geometry.size.height)
+                }
+            }
+        }
+    }
+
+    private var unlockControls: some View {
+        VStack(spacing: verticalSizeClass == .compact ? 10 : 20) {
+            Image(systemName: DeviceUnlock.symbolName)
+                .font(.system(size: verticalSizeClass == .compact ? 34 : 52))
+                .foregroundStyle(HW.teal)
+                .padding(verticalSizeClass == .compact ? 10 : 20).panel()
+            Text("Unlock Hostwatch").font(.title2.bold())
+            Text("Your control-plane session stays on this device. Confirm with \(DeviceUnlock.methodName) to open it. Sign out only if you want this device forgotten.")
+                .font(.footnote).foregroundStyle(HW.secondary).multilineTextAlignment(.center)
+                .frame(maxWidth: 340)
+            if let error { Text(error).font(.footnote).foregroundStyle(HW.red).multilineTextAlignment(.center) }
+            Button { unlock() } label: {
+                if busy { ProgressView().frame(maxWidth: .infinity) }
+                else { Label("Unlock with \(DeviceUnlock.methodName)", systemImage: DeviceUnlock.symbolName).frame(maxWidth: .infinity) }
+            }.buttonStyle(.borderedProminent).controlSize(.large).disabled(busy).frame(maxWidth: 320)
+            Button("Sign out", action: signOut).font(.footnote).disabled(busy)
         }
     }
 }

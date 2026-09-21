@@ -46,12 +46,13 @@ struct VulnerabilityDetail: View {
 
 struct TopologyView: View {
     @EnvironmentObject private var model: AppModel
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     @State private var mode: TopologyMode = .towers
     @State private var command = TopologyCommand(number: 0, action: .fit)
     @State private var selection: TopologySelection?
     @State private var focusedSiteID: String?
     @State private var focusedRoad: String?
-    @State private var showLegend = true
+    @State private var showLegend = false
 
     private var parentSites: [Site] {
         model.selectedSite.isEmpty ? model.sites : model.sites.filter { $0.id == model.selectedSite }
@@ -100,35 +101,33 @@ struct TopologyView: View {
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
-                    ZStack(alignment: .topLeading) {
+                    targetStatusBar
+                    ZStack(alignment: .bottomLeading) {
                         NativeTopologyScene(snapshot: .init(node: node, overview: overview, sites: sites, projects: projects,
                                                             routes: model.sources.internalRoutes ?? [],
                                                             services: projectScope ? [] : model.dataServices,
                                                             links: componentLinks, projectScope: projectScope),
                                             mode: mode, command: command, selection: $selection,
                                             focusedSiteID: $focusedSiteID, focusedRoad: $focusedRoad)
-                        HStack(alignment: .top, spacing: 8) {
-                            dossier
-                            Spacer(minLength: 0)
-                        }
-                        .padding(10)
-                        VStack {
-                            Spacer()
-                            HStack(alignment: .bottom) {
-                                legend
-                                Spacer()
-                                VStack(spacing: 8) {
-                                    Button { send(.zoomIn) } label: { Image(systemName: "plus.magnifyingglass") }
-                                        .accessibilityLabel("Zoom in")
-                                    Button { send(.zoomOut) } label: { Image(systemName: "minus.magnifyingglass") }
-                                        .accessibilityLabel("Zoom out")
-                                }
-                                .buttonStyle(.bordered)
+                        HStack(alignment: .bottom) {
+                            Button { showLegend = true } label: {
+                                Label("Legend", systemImage: "info.circle")
                             }
-                            .padding(10)
+                            Spacer()
+                            VStack(spacing: 8) {
+                                Button { send(.zoomIn) } label: { Image(systemName: "plus.magnifyingglass") }
+                                    .accessibilityLabel("Zoom in")
+                                Button { send(.zoomOut) } label: { Image(systemName: "minus.magnifyingglass") }
+                                    .accessibilityLabel("Zoom out")
+                            }
                         }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        .padding(8)
                     }
-                    .frame(minHeight: 440)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .frame(minHeight: verticalSizeClass == .compact ? 150 : 280)
+                    .layoutPriority(1)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
@@ -156,6 +155,7 @@ struct TopologyView: View {
                                                layer: picked.layer)
                     }
                 }
+                .sheet(isPresented: $showLegend) { legend }
                 .onChange(of: model.selectedSite) { _ in
                     focusedSiteID = nil
                     focusedRoad = nil
@@ -186,55 +186,62 @@ struct TopologyView: View {
         #endif
     }
 
-    @ViewBuilder private var dossier: some View {
+    @ViewBuilder private var targetStatusBar: some View {
         if let focusedSiteID {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("TARGET LOCKED").font(.caption2.bold()).kerning(1.6).foregroundStyle(HW.teal)
-                if let flow = focusedRoad.flatMap({ TopologyFlow.parse(roadName: $0) }) {
-                    originPip(flow.origin)
-                    Text("\(boardTitle(flow.from)) → \(boardTitle(flow.to))")
-                        .font(.caption.bold())
-                    Text(flowCaption(flow))
-                        .font(.caption2).foregroundStyle(HW.secondary)
+            HStack(spacing: 8) {
+                Circle().fill(targetOriginColor).frame(width: 7, height: 7)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("TARGET LOCKED · \(targetTitle)")
+                        .font(.caption.bold()).lineLimit(1)
+                    if verticalSizeClass != .compact {
+                        Text(targetSummary).font(.caption2).foregroundStyle(HW.secondary).lineLimit(1)
+                    }
                 }
+                Spacer(minLength: 0)
                 if let site = sites.first(where: { $0.id == focusedSiteID }) {
-                    if focusedRoad == nil {
-                        originPip(.ourService)
-                        Text(site.name).font(.headline)
-                    }
-                    Text(projectScope
-                         ? "\(parentSites.first?.name ?? site.name) · \(TopologyServiceRole.of(siteID: site.id)?.title ?? "service")"
-                         : site.domains.joined(separator: " · "))
-                        .font(.caption2).foregroundStyle(HW.secondary)
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 70), spacing: 6)], alignment: .leading, spacing: 6) {
-                        pip("REQ/MIN", Int(site.requestsPerMinute).formatted())
-                        pip("ERRORS", Format.percent(site.errorRate))
-                        pip("LAYERS", "\(TopologyLayer.layers(for: site, project: project(for: site)).count)")
-                    }
-                    HStack(spacing: 6) {
-                        Button("Details") { selection = TopologySelection(siteID: site.id, layer: nil) }
-                        Button("Release") { send(.fit) }
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.mini)
-                } else if focusedSiteID == "host" {
-                    if focusedRoad == nil { originPip(.external) }
-                    Text(focusedRoad == nil ? "Public clients" : node.name).font(.headline)
-                    Text("External traffic enters here. Teal roads are public clients, not our services.")
-                        .font(.caption2).foregroundStyle(HW.secondary)
-                    Button("Release") { send(.fit) }.buttonStyle(.bordered).controlSize(.small)
-                } else if focusedSiteID.hasPrefix("ext:"), let service = model.dataServices.first(where: { "ext:\($0.id)" == focusedSiteID }) {
-                    if focusedRoad == nil { originPip(.ourData) }
-                    Text(service.type).font(.headline)
-                    Text("Our data · \(service.role) · \(service.siteName ?? "host")").font(.caption2).foregroundStyle(HW.secondary)
-                    pip("STATE", service.container.state)
-                    Button("Release") { send(.fit) }.buttonStyle(.bordered).controlSize(.small)
+                    Button("Details") { selection = TopologySelection(siteID: site.id, layer: nil) }
                 }
+                Button { send(.fit) } label: { Image(systemName: "xmark.circle.fill") }
+                    .accessibilityLabel("Release target")
             }
-            .padding(8)
-            .frame(maxWidth: 176, alignment: .leading)
+            .buttonStyle(.bordered)
+            .controlSize(.mini)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
         }
+    }
+
+    private var targetTitle: String {
+        if let flow = focusedRoad.flatMap({ TopologyFlow.parse(roadName: $0) }) {
+            return "\(boardTitle(flow.from)) → \(boardTitle(flow.to))"
+        }
+        return focusedSiteID.map(boardTitle) ?? ""
+    }
+
+    private var targetSummary: String {
+        if let flow = focusedRoad.flatMap({ TopologyFlow.parse(roadName: $0) }) { return flowCaption(flow) }
+        guard let focusedSiteID else { return "" }
+        if let site = sites.first(where: { $0.id == focusedSiteID }) {
+            return "\(Int(site.requestsPerMinute))/min · \(Format.percent(site.errorRate)) errors · \(TopologyLayer.layers(for: site, project: project(for: site)).count) layers"
+        }
+        if let service = model.dataServices.first(where: { "ext:\($0.id)" == focusedSiteID }) {
+            return "Our data · \(service.role) · \(service.container.state)"
+        }
+        return "External traffic enters here"
+    }
+
+    private var targetOriginColor: Color {
+        if let flow = focusedRoad.flatMap({ TopologyFlow.parse(roadName: $0) }) {
+            switch flow.origin {
+            case .external: return HW.teal
+            case .ourService: return HW.amber
+            case .ourData: return Color(red: 0.35, green: 0.82, blue: 0.62)
+            }
+        }
+        return focusedSiteID == "host" ? HW.teal : focusedSiteID?.hasPrefix("ext:") == true
+            ? Color(red: 0.35, green: 0.82, blue: 0.62) : HW.amber
     }
 
     private func boardTitle(_ id: String) -> String {
@@ -253,48 +260,34 @@ struct TopologyView: View {
         }
     }
 
-    private func originPip(_ origin: TopologyOrigin) -> some View {
-        Text(origin.title.uppercased())
-            .font(.caption2.bold())
-            .kerning(0.8)
-            .foregroundStyle(origin == .external ? HW.teal : origin == .ourData ? Color(red: 0.35, green: 0.82, blue: 0.62) : HW.amber)
-    }
-
     private var legend: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Button { showLegend.toggle() } label: {
-                HStack { Text("LEGEND").font(.caption2.bold()).kerning(1.4); Spacer(); Text(showLegend ? "▾" : "▸") }
-            }.buttonStyle(.plain)
-            if showLegend {
-                if mode == .traffic {
-                    legendRow(HW.teal, TopologyOrigin.external.legend)
-                    legendRow(HW.amber, TopologyOrigin.ourService.legend)
-                    legendRow(Color(red: 0.35, green: 0.82, blue: 0.62), TopologyOrigin.ourData.legend)
-                    Text("Teal starts at PUBLIC. Amber is our services. Green is our data. Packets keep the color of their source.")
-                        .font(.caption2).foregroundStyle(HW.secondary)
-                } else {
-                    legendRow(HW.teal, "RUNTIME · CONTAINERS")
-                    legendRow(Color(red: 0.71, green: 0.55, blue: 1), "WEAVATRIX · MODULES")
-                    legendRow(HW.amber, "STRUCTURE · ROADS ONLY")
-                    Text(projectScope
-                         ? "Towers show frontend, backend and data as separate pillars. Packets stay off."
-                         : "Towers show stacked services and Weavatrix. Roads are structure, not live flow.")
-                        .font(.caption2).foregroundStyle(HW.secondary)
-                }
-                Text("DRAG orbit · TWO FINGERS pan · PINCH zoom · TAP a tower")
+            HStack {
+                Text("LEGEND").font(.caption2.bold()).kerning(1.4)
+                Spacer()
+                Button("Done") { showLegend = false }
+            }
+            if mode == .traffic {
+                legendRow(HW.teal, TopologyOrigin.external.legend)
+                legendRow(HW.amber, TopologyOrigin.ourService.legend)
+                legendRow(Color(red: 0.35, green: 0.82, blue: 0.62), TopologyOrigin.ourData.legend)
+                Text("Teal starts at PUBLIC. Amber is our services. Green is our data. Packets keep the color of their source.")
+                    .font(.caption2).foregroundStyle(HW.secondary)
+            } else {
+                legendRow(HW.teal, "RUNTIME · CONTAINERS")
+                legendRow(Color(red: 0.71, green: 0.55, blue: 1), "WEAVATRIX · MODULES")
+                legendRow(HW.amber, "STRUCTURE · ROADS ONLY")
+                Text(projectScope
+                     ? "Towers show frontend, backend and data as separate pillars. Packets stay off."
+                     : "Towers show stacked services and Weavatrix. Roads are structure, not live flow.")
                     .font(.caption2).foregroundStyle(HW.secondary)
             }
+            Text("DRAG orbit · TWO FINGERS pan · PINCH zoom · TAP a tower")
+                .font(.caption2).foregroundStyle(HW.secondary)
         }
-        .padding(10)
-        .frame(maxWidth: 220, alignment: .leading)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
-    }
-
-    private func pip(_ title: String, _ value: String) -> some View {
-        VStack(alignment: .leading, spacing: 1) {
-            Text(title).font(.caption2).foregroundStyle(HW.secondary)
-            Text(value).font(.caption.bold())
-        }
+        .padding(20)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(HW.background)
     }
 
     private func legendRow(_ color: Color, _ text: String) -> some View {
