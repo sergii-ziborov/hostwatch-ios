@@ -19,11 +19,15 @@ struct MCPView: View {
         VStack(alignment: .leading, spacing: 12) {
             Eyebrow(text: "Company node")
             Text("What the AI may do").font(.title3.bold())
-            Text("These limits are enforced on the Hostwatch node. A local MCP process cannot lift them.")
+            Text("The node enforces these limits for Hostwatch MCP calls. Protect the agent administrator token: its holder can call the API directly.")
                 .font(.caption).foregroundStyle(HW.secondary)
             Toggle("Allow MCP on this node", isOn: bind(\.enabled, snap.governance))
             Toggle("Allow reads", isOn: bind(\.allowObserve, snap.governance)).disabled(!snap.governance.enabled)
             Toggle("Allow changes", isOn: bind(\.allowMutate, snap.governance)).disabled(!snap.governance.enabled)
+            Toggle("Allow secret insertion through MCP", isOn: bind(\.allowSecretInsertion, snap.governance))
+                .disabled(!snap.governance.enabled || !snap.governance.allowMutate)
+            Text("Off by default. Applies to local secret binding, publish and vault insertion. Hostwatch checks this on the node for every MCP call.")
+                .font(.caption).foregroundStyle(HW.secondary)
             HStack {
                 Text("Changes per hour").foregroundStyle(HW.secondary)
                 Spacer()

@@ -4,6 +4,7 @@ struct EnvironmentView: View {
     @EnvironmentObject private var model: AppModel
     @State private var showAdd = false
     @State private var showShare = false
+    @State private var showVault = false
     @State private var deleteVariable: EnvironmentVariable?
     private var site: Site? { model.sites.first(where: { $0.id == model.selectedSite }) ?? model.sites.first }
     var body: some View {
@@ -15,6 +16,8 @@ struct EnvironmentView: View {
                 HStack(spacing: 8) {
                     if ["owner", "platform_owner"].contains(model.session.role ?? "") {
                         Button("Share .env", systemImage: "link") { showShare = true }
+                            .buttonStyle(.bordered).disabled(site == nil)
+                        Button("Vault", systemImage: "lock.shield") { showVault = true }
                             .buttonStyle(.bordered).disabled(site == nil)
                     }
                     Button("Add", systemImage: "plus") { showAdd = true }
@@ -33,6 +36,7 @@ struct EnvironmentView: View {
         }
         .sheet(isPresented: $showAdd) { AddEnvironmentVariableView() }
         .sheet(isPresented: $showShare) { if let site { EnvironmentShareComposer(site: site, variables: model.environment?.variables ?? []).environmentObject(model) } }
+        .sheet(isPresented: $showVault) { if let site { VaultView(site: site).environmentObject(model) } }
         .confirmationDialog("Delete \(deleteVariable?.name ?? "variable")?", isPresented: Binding(get: { deleteVariable != nil }, set: { if !$0 { deleteVariable = nil } })) { if let variable = deleteVariable { Button("Delete", role: .destructive) { Task { await model.deleteEnvironment(name: variable.name) }; deleteVariable = nil } } } message: { Text("The project may fail to start if it requires this value.") }
     }
 }
@@ -45,6 +49,7 @@ struct EnvironmentShareComposer: View {
     @State private var selected: Set<String> = []
     @State private var completeFile = false
     @State private var minutes = 60
+    @State private var allowedIPs = ""
     @State private var link: URL?
     @State private var showSystemShare = false
     @State private var shares: [EnvironmentShareRecord] = []
@@ -74,6 +79,8 @@ struct EnvironmentShareComposer: View {
                         Text("1 hour").tag(60)
                         Text("24 hours").tag(1440)
                     }
+                    TextField("Allowed IPs/CIDRs (optional)", text: $allowedIPs)
+                        .textInputAutocapitalization(.never).autocorrectionDisabled()
                     Button(busy ? "Creating…" : "Create encrypted link") { Task { await create() } }
                         .disabled(busy || (!completeFile && selected.isEmpty))
                 }
@@ -109,7 +116,7 @@ struct EnvironmentShareComposer: View {
     private func create() async {
         busy = true; error = nil
         do {
-            link = try await model.createEnvironmentShare(names: completeFile ? ["*"] : selected.sorted(), minutes: minutes)
+            link = try await model.createEnvironmentShare(names: completeFile ? ["*"] : selected.sorted(), minutes: minutes, allowedCIDRs: allowedIPs.split(whereSeparator: { $0 == "," || $0.isWhitespace }).map(String.init))
             shares = try await model.environmentShares()
         } catch { self.error = error.localizedDescription }
         busy = false
@@ -140,6 +147,7 @@ private struct EnvironmentShareRow: View {
             VStack(alignment: .leading) {
                 Text(title)
                 Text("Expires \(share.expiresAt)").font(.caption2).foregroundStyle(HW.secondary)
+                if let cidrs = share.allowedCidrs, !cidrs.isEmpty { Text(cidrs.joined(separator: ", ")).font(.caption2).foregroundStyle(HW.secondary) }
             }
             Spacer()
             Button("Revoke", role: .destructive, action: onRevoke).disabled(busy)

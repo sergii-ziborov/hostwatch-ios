@@ -17,6 +17,7 @@
 		2D3749D562C2A34E6D9BD700 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76D7F5CC61DBDB2ABD270F11 /* AppModel.swift */; };
 		31E364EE31EB63BED483BBC6 /* MarkdownNotes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8730F512DE914609A39FE766 /* MarkdownNotes.swift */; };
 		3CBB7D0228F9F24E30D90436 /* ReclaimAdviceList.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A81A85715F0FC5BE6B2CD5D /* ReclaimAdviceList.swift */; };
+		4DE044BF3C7677A6EC605C02 /* VaultView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3975823A9BDAD4C763B10B2 /* VaultView.swift */; };
 		4EA8DD88F0712FE0CEAD618C /* NativeTopologyScene.swift in Sources */ = {isa = PBXBuildFile; fileRef = 453A7A03CCB0E61006B35768 /* NativeTopologyScene.swift */; };
 		4F83AB309A514BBABBB5C77C /* ErrorViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CECD0202623ADF793C7D3E2 /* ErrorViews.swift */; };
 		549D6E78E5E2DCF33EA8467B /* Fixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18CD1780E2379A0DF2B888DE /* Fixtures.swift */; };
@@ -77,6 +78,7 @@
 		AB8618F607DEE2D2E1E2849A /* OverviewTrafficViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverviewTrafficViews.swift; sourceTree = "<group>"; };
 		B81C8E5DDA41AFCD8723E518 /* AdminViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminViews.swift; sourceTree = "<group>"; };
 		C25C3FE01E0B2D3B00975C39 /* GeoLocation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeoLocation.swift; sourceTree = "<group>"; };
+		C3975823A9BDAD4C763B10B2 /* VaultView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultView.swift; sourceTree = "<group>"; };
 		D70AB601C45C76CEF7A402A2 /* SessionVault.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionVault.swift; sourceTree = "<group>"; };
 		D8DE859739CA33276FF42DAE /* TopologyCamera.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TopologyCamera.swift; sourceTree = "<group>"; };
 		E16B1858ED7B656C6848240B /* ReclaimPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReclaimPolicy.swift; sourceTree = "<group>"; };
@@ -137,6 +139,7 @@
 				D8DE859739CA33276FF42DAE /* TopologyCamera.swift */,
 				AB39624746B6B3C851E807D8 /* TopologyLayers.swift */,
 				0268161CF78A514986F3C0B2 /* TopologyLayout.swift */,
+				C3975823A9BDAD4C763B10B2 /* VaultView.swift */,
 			);
 			path = Hostwatch;
 			sourceTree = "<group>";
@@ -267,6 +270,7 @@
 				0A2B3941E22A5C716D2FD6BD /* TopologyCamera.swift in Sources */,
 				E98DDBBCE0FB0A9382DDF1C5 /* TopologyLayers.swift in Sources */,
 				FF2C5B265B29A1AD59463BA9 /* TopologyLayout.swift in Sources */,
+				4DE044BF3C7677A6EC605C02 /* VaultView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

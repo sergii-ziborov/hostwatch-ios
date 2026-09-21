@@ -66,7 +66,11 @@ struct Member: Codable, Identifiable {
 }
 struct EnvironmentVariable: Codable, Identifiable { var id: String { name }; let name: String; let secret: Bool }
 struct EnvironmentState: Codable { let siteId: String; let variables: [EnvironmentVariable]; let managed: Bool; let updatedAt: String?; let error: String? }
-struct EnvironmentShareRecord: Codable, Identifiable { let id: String; let siteId: String; let names: [String]; let createdAt: String; let expiresAt: String }
+struct EnvironmentShareRecord: Codable, Identifiable { let id: String; let siteId: String; let names: [String]; let allowedCidrs: [String]?; let createdAt: String; let expiresAt: String }
+struct VaultSecret: Decodable, Identifiable { let id: String; let site: String; let name: String; let description: String; let version: Int; let createdAt: String; let updatedAt: String; let expiresAt: String? }
+struct VaultGrant: Decodable, Identifiable { let id: String; let site: String; let label: String; let names: [String]; let allowedCidrs: [String]; let maxReads: Int; let reads: Int; let createdAt: String; let expiresAt: String; let revokedAt: String? }
+struct VaultGrantCreated: Decodable { let grant: VaultGrant; let token: String }
+struct VaultEvent: Decodable { let time: String; let action: String; let site: String; let name: String?; let grantId: String?; let clientIp: String?; let allowed: Bool }
 struct AccessRule: Codable, Identifiable { let id: String; let site: String; let kind: String; let value: String; let label: String?; let createdAt: String }
 struct AccessRuleState: Codable { let rules: [AccessRule]; let managed: Bool; let updatedAt: String?; let error: String? }
 struct TrafficGuardPolicy: Codable {
@@ -234,10 +238,30 @@ struct MCPGovernance: Codable {
     var enabled: Bool
     var allowObserve: Bool
     var allowMutate: Bool
+    var allowSecretInsertion: Bool
     var deniedTools: [String]
     var maxMutationsPerHour: Int
     var staleAfterSeconds: Int
     var updatedAt: String?
+
+    init(enabled: Bool, allowObserve: Bool, allowMutate: Bool, deniedTools: [String], maxMutationsPerHour: Int, staleAfterSeconds: Int, updatedAt: String?, allowSecretInsertion: Bool = false) {
+        self.enabled = enabled; self.allowObserve = allowObserve; self.allowMutate = allowMutate
+        self.deniedTools = deniedTools; self.maxMutationsPerHour = maxMutationsPerHour
+        self.staleAfterSeconds = staleAfterSeconds; self.updatedAt = updatedAt
+        self.allowSecretInsertion = allowSecretInsertion
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        enabled = try values.decode(Bool.self, forKey: .enabled)
+        allowObserve = try values.decode(Bool.self, forKey: .allowObserve)
+        allowMutate = try values.decode(Bool.self, forKey: .allowMutate)
+        allowSecretInsertion = try values.decodeIfPresent(Bool.self, forKey: .allowSecretInsertion) ?? false
+        deniedTools = try values.decode([String].self, forKey: .deniedTools)
+        maxMutationsPerHour = try values.decode(Int.self, forKey: .maxMutationsPerHour)
+        staleAfterSeconds = try values.decode(Int.self, forKey: .staleAfterSeconds)
+        updatedAt = try values.decodeIfPresent(String.self, forKey: .updatedAt)
+    }
 }
 
 struct MCPToolInfo: Decodable, Identifiable {

@@ -225,13 +225,13 @@ actor APIClient {
     }
     func installLicense(_ value: String) async throws -> LicenseStatus { try await call("/api/control/license", method: "PUT", body: LicenseValue(license: value)) }
     func environment(site: String) async throws -> EnvironmentState { try await call("/api/v1/sites/\(site)/environment") }
-    func createEnvironmentShare(site: String, names: [String], minutes: Int) async throws -> URL {
+    func createEnvironmentShare(site: String, names: [String], minutes: Int, allowedCIDRs: [String]) async throws -> URL {
         let exported: EnvironmentExport = try await call("/api/v1/sites/\(site)/environment/export", method: "POST", body: EnvironmentExportScope(names: names))
         let key = SymmetricKey(size: .bits256)
         let nonce = AES.GCM.Nonce()
         let sealed = try AES.GCM.seal(Data(exported.dotenv.utf8), using: key, nonce: nonce)
         let keyBytes = key.withUnsafeBytes { Data($0) }
-        let payload = EnvironmentSharePayload(siteId: site, names: names, iv: Data(nonce).base64URL, ciphertext: (sealed.ciphertext + sealed.tag).base64URL, minutes: minutes)
+        let payload = EnvironmentSharePayload(siteId: site, names: names, iv: Data(nonce).base64URL, ciphertext: (sealed.ciphertext + sealed.tag).base64URL, minutes: minutes, allowedCidrs: allowedCIDRs)
         let created: CreatedEnvironmentShare = try await call("/api/control/environment-shares", method: "POST", body: payload)
         guard let link = URL(string: "/share/env/\(created.id)#k=\(keyBytes.base64URL)", relativeTo: baseURL)?.absoluteURL else { throw APIError.invalidURL }
         return link
@@ -240,6 +240,18 @@ actor APIClient {
     func revokeEnvironmentShare(_ id: String) async throws { try await empty("/api/control/environment-shares/\(id)", method: "DELETE") }
     func setEnvironment(site: String, name: String, value: String) async throws -> EnvironmentState { try await call("/api/v1/sites/\(site)/environment/\(name.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? name)", method: "PUT", body: EnvironmentValue(value: value)) }
     func deleteEnvironment(site: String, name: String) async throws -> EnvironmentState { try await call("/api/v1/sites/\(site)/environment/\(name.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? name)", method: "DELETE") }
+    func vaultSecrets(site: String) async throws -> [VaultSecret] { try await call("/api/v1/vault/secrets?site=\(site)") }
+    func vaultGrants(site: String) async throws -> [VaultGrant] { try await call("/api/v1/vault/grants?site=\(site)") }
+    func vaultEvents(site: String) async throws -> [VaultEvent] { try await call("/api/v1/vault/events?site=\(site)") }
+    func putVaultSecret(site: String, name: String, value: String, description: String, expiresAt: String) async throws -> VaultSecret {
+        try await call("/api/v1/vault/secrets/\(site)/\(name)", method: "PUT", body: VaultSecretPayload(value: value, description: description, expiresAt: expiresAt))
+    }
+    func deleteVaultSecret(site: String, name: String) async throws { try await empty("/api/v1/vault/secrets/\(site)/\(name)", method: "DELETE") }
+    func applyVaultSecret(site: String, name: String) async throws -> EnvironmentState { try await call("/api/v1/vault/secrets/\(site)/\(name)/apply", method: "POST") }
+    func createVaultGrant(site: String, label: String, names: [String], minutes: Int, allowedCidrs: [String], maxReads: Int) async throws -> VaultGrantCreated {
+        try await call("/api/v1/vault/grants", method: "POST", body: VaultGrantPayload(site: site, label: label, names: names, minutes: minutes, allowedCidrs: allowedCidrs, maxReads: maxReads))
+    }
+    func revokeVaultGrant(_ id: String) async throws { try await empty("/api/v1/vault/grants/\(id)", method: "DELETE") }
     func accessRules(site: String) async throws -> AccessRuleState {
         let value = site.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? site
         return try await call("/api/v1/access-rules?site=\(value)")
@@ -290,9 +302,11 @@ private struct CurrentPassword: Encodable { let currentPassword: String }
 private struct DisableTOTP: Encodable { let currentPassword: String; let otp: String }
 private struct Rule: Encodable { let site: String; let kind: String; let value: String; let label: String }
 private struct EnvironmentValue: Encodable { let value: String }
+private struct VaultSecretPayload: Encodable { let value: String; let description: String; let expiresAt: String }
+private struct VaultGrantPayload: Encodable { let site: String; let label: String; let names: [String]; let minutes: Int; let allowedCidrs: [String]; let maxReads: Int }
 private struct EnvironmentExportScope: Encodable { let names: [String] }
 private struct EnvironmentExport: Decodable { let dotenv: String }
-private struct EnvironmentSharePayload: Encodable { let siteId: String; let names: [String]; let iv: String; let ciphertext: String; let minutes: Int }
+private struct EnvironmentSharePayload: Encodable { let siteId: String; let names: [String]; let iv: String; let ciphertext: String; let minutes: Int; let allowedCidrs: [String] }
 private struct CreatedEnvironmentShare: Decodable { let id: String }
 private struct NewUser: Encodable { let name: String; let email: String; let password: String; let role: String }
 private struct LicenseValue: Encodable { let license: String }
