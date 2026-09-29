@@ -26,8 +26,9 @@ final class HostwatchTests: XCTestCase {
     func testPairingQRIsBoundToTheConfiguredController() {
         let id = "ABCDEFGHIJKLMNOPQRSTUVWX"
         let value = QRPayload.url(server: "https://control.example.com", id: id)?.absoluteString
-        XCTAssertEqual(value, "https://control.example.com/#approve=\(id)")
+        XCTAssertEqual(value, "https://control.example.com/app/approve/\(id)")
         XCTAssertEqual(QRPayload.id(from: value ?? "", server: "https://control.example.com"), id)
+        XCTAssertEqual(QRPayload.id(from: "hostwatch://control.example.com/app/approve/\(id)", server: "https://control.example.com"), id)
         XCTAssertNil(QRPayload.id(from: value ?? "", server: "https://different.example.com"))
         XCTAssertNil(QRPayload.id(from: "https://control.example.com/#approve=bad", server: "https://control.example.com"))
     }
@@ -36,6 +37,10 @@ final class HostwatchTests: XCTestCase {
         let id = "ABCDEFGHIJKLMNOPQRSTUVWX"
         let secret = String(repeating: "a", count: 43)
         let value = "https://gethostwatch.com/#device-login=\(id).\(secret)"
+        let universal = "https://gethostwatch.com/app/device-login/\(id)#secret=\(secret)"
+        XCTAssertEqual(QRPayload.deviceTicket(from: universal)?.id, id)
+        XCTAssertEqual(QRPayload.deviceTicket(from: universal.replacingOccurrences(of: "https://", with: "hostwatch://"))?.id, id)
+        XCTAssertEqual(QRPayload.deviceTicket(from: universal)?.secret, secret)
         let ticket = QRPayload.deviceTicket(from: value)
         XCTAssertEqual(ticket?.server, "https://gethostwatch.com/")
         XCTAssertEqual(ticket?.id, id)

@@ -5,32 +5,45 @@ import Security
 import SwiftUI
 
 enum QRPayload {
+    static func canonical(_ value: String) -> String {
+        guard var url = URLComponents(string: value), url.scheme == "hostwatch" else { return value }
+        url.scheme = "https"
+        return url.url?.absoluteString ?? value
+    }
+
     static func url(server: String, id: String) -> URL? {
         guard let base = URL(string: server), var parts = URLComponents(url: base, resolvingAgainstBaseURL: false),
               ["https", "http"].contains(parts.scheme?.lowercased() ?? "") else { return nil }
-        parts.path = "/"
+        parts.path = "/app/approve/\(id)"
         parts.query = nil
-        parts.fragment = "approve=\(id)"
+        parts.fragment = nil
         return parts.url
     }
 
     static func id(from value: String, server: String) -> String? {
-        guard let target = URL(string: value), let base = URL(string: server),
+        guard let target = URL(string: canonical(value)), let base = URL(string: server),
               target.scheme?.lowercased() == base.scheme?.lowercased(),
               target.host?.lowercased() == base.host?.lowercased(),
-              target.port == base.port,
-              let fragment = target.fragment, fragment.hasPrefix("approve=") else { return nil }
-        let id = String(fragment.dropFirst("approve=".count))
+              target.port == base.port else { return nil }
+        let id: String
+        if target.path.hasPrefix("/app/approve/") { id = String(target.path.dropFirst("/app/approve/".count)) }
+        else if let fragment = target.fragment, fragment.hasPrefix("approve=") { id = String(fragment.dropFirst("approve=".count)) }
+        else { return nil }
         let allowed = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_")
         return id.count == 24 && id.unicodeScalars.allSatisfy(allowed.contains) ? id : nil
     }
 
     static func deviceTicket(from value: String) -> DeviceQRTicket? {
-        guard let parts = URLComponents(string: value), let scheme = parts.scheme?.lowercased(),
+        guard let parts = URLComponents(string: canonical(value)), let scheme = parts.scheme?.lowercased(),
               let host = parts.host, !host.isEmpty, parts.user == nil, parts.password == nil,
               scheme == "https" || (scheme == "http" && ["localhost", "127.0.0.1"].contains(host.lowercased())),
-              let fragment = parts.fragment, fragment.hasPrefix("device-login=") else { return nil }
-        let pair = String(fragment.dropFirst("device-login=".count)).split(separator: ".", omittingEmptySubsequences: false)
+              let fragment = parts.fragment else { return nil }
+        let payload: String
+        if parts.path.hasPrefix("/app/device-login/"), fragment.hasPrefix("secret=") {
+            payload = String(parts.path.dropFirst("/app/device-login/".count)) + "." + String(fragment.dropFirst("secret=".count))
+        } else if fragment.hasPrefix("device-login=") { payload = String(fragment.dropFirst("device-login=".count)) }
+        else { return nil }
+        let pair = payload.split(separator: ".", omittingEmptySubsequences: false)
         guard pair.count == 2 else { return nil }
         let id = String(pair[0]), secret = String(pair[1])
         let allowed = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_")
@@ -80,6 +93,7 @@ struct QRCodeImage: View {
 }
 
 struct DeviceQRSignInView: View {
+    var initialURL: URL? = nil
     @EnvironmentObject private var model: AppModel
     @State private var scanning = false
     @State private var ticket: DeviceQRTicket?
@@ -110,6 +124,8 @@ struct DeviceQRSignInView: View {
             if !error.isEmpty { Label(error, systemImage: "exclamationmark.triangle").font(.footnote).foregroundStyle(HW.red) }
         }
         .frame(maxWidth: .infinity)
+        .onAppear { if let initialURL { ticket = QRPayload.deviceTicket(from: initialURL.absoluteString) } }
+        .onChange(of: initialURL) { url in if let url { ticket = QRPayload.deviceTicket(from: url.absoluteString) } }
         .sheet(isPresented: $scanning) {
             HWStackNavigation {
                 CameraQRScanner { value in
@@ -170,6 +186,7 @@ struct AccountSecurityView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 10) {
+                HStack { Link("Terms", destination: URL(string: "https://gethostwatch.com/terms")!); Link("Privacy", destination: URL(string: "https://gethostwatch.com/privacy")!); Link("Support", destination: URL(string: "https://gethostwatch.com/support")!) }.font(.footnote)
                 Text("App unlock").font(.title3.bold())
                 Toggle("Keep session with \(DeviceUnlock.methodName)", isOn: $biometricUnlockEnabled)
                     .disabled(!deviceUnlockAvailable)
@@ -244,6 +261,7 @@ struct AccountSecurityView: View {
 }
 
 struct QRApprovalView: View {
+    var initialID: String? = nil
     @EnvironmentObject private var model: AppModel
     @Environment(\.dismiss) private var dismiss
     @State private var manualCode = ""
@@ -304,6 +322,7 @@ struct QRApprovalView: View {
                 }
             }
             .task {
+                if let initialID { await inspect(initialID) }
                 while !Task.isCancelled {
                     if let approvals = try? await model.pendingQRApprovals() { pending = approvals }
                     await HWSleep.seconds(5)

@@ -1,9 +1,7 @@
-# Hostwatch for iPhone and iPad — support
+# Hostwatch Support
 
-Hostwatch is available to organizations with a provisioned control plane. To obtain an account, contact your organization's administrator. There is no public sign-up or demo account.
+For sign-in, server access, account removal, operational errors or licensing contact serhii.ziborov@gmail.com or your organization administrator. Include the app version, control-plane address and the time of the issue. Never include passwords, API keys or unredacted secrets in a public issue.
 
-For app or account help, write to [serhii.ziborov@gmail.com](mailto:serhii.ziborov@gmail.com) with your organization, iOS version, app version, the control-plane hostname and a description of the problem. Do not send passwords, authenticator secrets, session cookies or raw private request logs.
+Website sign-in: choose “Use signed-in iPhone”, scan with Hostwatch or the iOS Camera, compare the number and approve in the app. First app sign-in: use email/password, or scan a device sign-in QR from an already authenticated website session. Face ID unlocks saved credentials; an administrator’s password reset or revoked account still requires sign-in.
 
-If sign-in fails, confirm the control-plane address in the sign-in screen and its availability in a browser. For QR sign-in, both devices must connect to the same control plane; the code expires after two minutes, and a signed-in device must approve the matching confirmation number. If the service returns an HTTP error, your administrator should also check the controller and node health.
-
-For privacy questions and data requests, see [PRIVACY.md](PRIVACY.md). For licensing and source permissions, see [LICENSE](LICENSE).
+Account access is provisioned by your organization. Request account/data deletion from its administrator or the support address above. Public technical issues: https://github.com/sergii-ziborov/hostwatch/issues.

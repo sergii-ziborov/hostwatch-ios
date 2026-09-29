@@ -4,6 +4,7 @@ import SwiftUI
 @MainActor
 final class AppModel: ObservableObject {
     @Published var session = SessionState()
+    @Published var deviceSignInURL: URL?
     @Published var nodes: [ManagedNode] = []
     @Published var selectedNode = ""
     @Published var selectedSite = ""
@@ -569,6 +570,10 @@ final class AppModel: ObservableObject {
         } catch { errorMessage = error.localizedDescription }
     }
 
+    func sharedVariables(nodeID: String) async throws -> [SharedVariable] { try await client.sharedVariables(nodeID: nodeID) }
+    func saveSharedVariable(id: String?, change: SharedVariableChange) async throws -> SharedVariableResult { try await client.saveSharedVariable(id: id, change: change) }
+    func syncSharedVariable(_ id: String) async throws -> SharedVariableResult { try await client.syncSharedVariable(id) }
+    func deleteSharedVariable(_ id: String) async throws { try await client.deleteSharedVariable(id) }
     func setEnvironment(name: String, value: String) async {
         guard let site = sites.first(where: { $0.id == selectedSite }) ?? sites.first else { return }
         if fixtures {
@@ -683,11 +688,11 @@ final class AppModel: ObservableObject {
         } catch { errorMessage = error.localizedDescription }
     }
 
-    func exportMarkdown(kind: String) async -> String? {
+    func exportMarkdown(kind: String, site: String? = nil) async -> String? {
 #if DEBUG
         if fixtures { return MarkdownNotes.export(kind: kind, projects: projects, groups: groupedErrors()) }
 #endif
-        do { return try await client.exportMarkdown(kind: kind, site: selectedSite).markdown }
+        do { return try await client.exportMarkdown(kind: kind, site: site ?? selectedSite, hours: hours).markdown }
         catch { errorMessage = error.localizedDescription; return nil }
     }
 

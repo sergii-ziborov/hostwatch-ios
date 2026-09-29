@@ -25,7 +25,7 @@ struct SignInView: View {
                                 Text("Password").tag(false)
                                 Text("Scan website QR").tag(true)
                             }.pickerStyle(.segmented)
-                            if useQR { DeviceQRSignInView() }
+                            if useQR { DeviceQRSignInView(initialURL: model.deviceSignInURL) }
                             else { credentialsForm }
                         }
                         DisclosureGroup("Control-plane address", isExpanded: $showServer) {
@@ -45,8 +45,9 @@ struct SignInView: View {
                     Text("Hosted control plane or licensed enterprise installation. Access is provisioned by your organization.")
                         .font(.footnote).foregroundStyle(HW.secondary).multilineTextAlignment(.center).frame(maxWidth: 420)
                     HStack(spacing: 16) {
-                        Link("Support", destination: URL(string: "https://github.com/sergii-ziborov/hostwatch-ios/blob/codex/initial-product/SUPPORT.md")!)
-                        Link("Privacy policy", destination: URL(string: "https://github.com/sergii-ziborov/hostwatch-ios/blob/codex/initial-product/PRIVACY.md")!)
+                        Link("Support", destination: URL(string: "https://gethostwatch.com/support")!)
+                        Link("Terms", destination: URL(string: "https://gethostwatch.com/terms")!)
+                        Link("Privacy policy", destination: URL(string: "https://gethostwatch.com/privacy")!)
                     }
                     .font(.footnote.weight(.semibold))
                     Spacer(minLength: 40)
@@ -54,6 +55,8 @@ struct SignInView: View {
                 .padding(.horizontal, 20)
             }
         }
+        .onAppear { if model.deviceSignInURL != nil { useQR = true } }
+        .onChange(of: model.deviceSignInURL) { url in if url != nil { useQR = true } }
     }
 
     private var brand: some View {

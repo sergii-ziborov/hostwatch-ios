@@ -6,8 +6,8 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    CURRENT_PROJECT_VERSION: 6
-    MARKETING_VERSION: 1.0.3
+    CURRENT_PROJECT_VERSION: 7
+    MARKETING_VERSION: 1.0.4
 targets:
   Hostwatch:
     type: application
@@ -25,9 +25,18 @@ targets:
         TARGETED_DEVICE_FAMILY: "1,2"
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: XMS5ZC28UJ
+    entitlements:
+      path: Hostwatch/Hostwatch.entitlements
+      properties:
+        com.apple.developer.associated-domains:
+          - applinks:gethostwatch.com
     info:
       path: Hostwatch/Info.plist
       properties:
+        CFBundleURLTypes:
+          - CFBundleURLName: com.hostwatch.controlplane
+            CFBundleURLSchemes:
+              - hostwatch
         CFBundleDisplayName: Hostwatch
         CFBundleShortVersionString: "$(MARKETING_VERSION)"
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"

@@ -24,6 +24,7 @@ actor APIClient {
     private var selectedNode = ""
     private let session: URLSession
     private let decoder = JSONDecoder()
+    private var renewal: Task<SessionState, Error>?
 
     init(baseURL: URL) {
         self.baseURL = baseURL
@@ -38,7 +39,7 @@ actor APIClient {
     func configure(baseURL: URL) { self.baseURL = baseURL }
     func select(node: String) { selectedNode = node }
 
-    private func call<T: Decodable>(_ path: String, method: String = "GET", body: Encodable? = nil) async throws -> T {
+    private func call<T: Decodable>(_ path: String, method: String = "GET", body: Encodable? = nil, retry: Bool = true) async throws -> T {
         guard let url = URL(string: path, relativeTo: baseURL)?.absoluteURL else { throw APIError.invalidURL }
         var request = URLRequest(url: url)
         request.httpMethod = method
@@ -48,6 +49,7 @@ actor APIClient {
             (path == "/api/session" && method == "GET" ? 12 : 25)
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("Hostwatch iOS/1.0", forHTTPHeaderField: "User-Agent")
+        request.setValue("ios", forHTTPHeaderField: "X-Hostwatch-Client")
         if (path.hasPrefix("/api/v1/") || path.hasPrefix("/api/v2/")), !selectedNode.isEmpty { request.setValue(selectedNode, forHTTPHeaderField: "X-Hostwatch-Node") }
         if !csrf.isEmpty, !["GET", "HEAD"].contains(method) { request.setValue(csrf, forHTTPHeaderField: "X-Hostwatch-CSRF") }
         if let body {
@@ -57,7 +59,13 @@ actor APIClient {
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
         guard (200..<300).contains(http.statusCode) else {
-            if http.statusCode == 401 || http.statusCode == 403 { throw APIError.unauthorized }
+            if http.statusCode == 401 {
+                if retry && !path.hasPrefix("/api/session") {
+                    _ = try await renewSession()
+                    return try await call(path, method: method, body: body, retry: false)
+                }
+                throw APIError.unauthorized
+            }
             let server = try? decoder.decode(ServerError.self, from: data)
             throw APIError.server(server?.error ?? "Request failed (HTTP \(http.statusCode)).")
         }
@@ -68,8 +76,22 @@ actor APIClient {
         let _: EmptyResponse = try await call(path, method: method, body: body)
     }
 
+    private func renewSession() async throws -> SessionState {
+        if let renewal { return try await renewal.value }
+        let task = Task<SessionState, Error> {
+            let value: SessionState = try await self.call("/api/session/refresh", method: "POST", retry: false)
+            guard value.authenticated else { throw APIError.unauthorized }
+            self.persistAuthenticated(value)
+            return value
+        }
+        renewal = task
+        defer { renewal = nil }
+        return try await task.value
+    }
+
     func sessionState() async throws -> SessionState {
         let value: SessionState = try await call("/api/session")
+        if !value.authenticated && hasSavedSession() { return try await renewSession() }
         csrf = value.csrf ?? ""
         if value.authenticated { persistAuthenticated(value) }
         return value
@@ -200,8 +222,8 @@ actor APIClient {
     func importMarkdown(kind: String, site: String, markdown: String) async throws -> ImportResult {
         try await call("/api/v1/imports", method: "POST", body: MarkdownImport(kind: kind, site: site, markdown: markdown))
     }
-    func exportMarkdown(kind: String, site: String) async throws -> MarkdownExport {
-        try await call("/api/v1/export.md?\(queryItems(["kind": kind, "site": site]))")
+    func exportMarkdown(kind: String, site: String, hours: Int = 24) async throws -> MarkdownExport {
+        try await call("/api/v1/export.md?\(queryItems(["kind": kind, "site": site, "hours": String(hours)]))")
     }
     func paths(site: String, hours: Int) async throws -> RequestPaths { try await call("/api/v1/paths?\(scope(site: site, hours: hours))") }
     func storage(path: String? = nil, refresh: Bool = false) async throws -> StorageResponse {
@@ -224,6 +246,10 @@ actor APIClient {
         try await empty("/api/control/users", method: "POST", body: NewUser(name: name, email: email, password: password, role: role))
     }
     func installLicense(_ value: String) async throws -> LicenseStatus { try await call("/api/control/license", method: "PUT", body: LicenseValue(license: value)) }
+    func sharedVariables(nodeID: String) async throws -> [SharedVariable] { try await call("/api/control/shared-variables?\(queryItems(["nodeId": nodeID]))") }
+    func saveSharedVariable(id: String?, change: SharedVariableChange) async throws -> SharedVariableResult { try await call("/api/control/shared-variables" + (id.map { "/\($0)" } ?? ""), method: id == nil ? "POST" : "PATCH", body: change) }
+    func syncSharedVariable(_ id: String) async throws -> SharedVariableResult { try await call("/api/control/shared-variables/\(id)/sync", method: "POST") }
+    func deleteSharedVariable(_ id: String) async throws { try await empty("/api/control/shared-variables/\(id)", method: "DELETE") }
     func environment(site: String) async throws -> EnvironmentState { try await call("/api/v1/sites/\(site)/environment") }
     func createEnvironmentShare(site: String, names: [String], minutes: Int, allowedCIDRs: [String]) async throws -> URL {
         let exported: EnvironmentExport = try await call("/api/v1/sites/\(site)/environment/export", method: "POST", body: EnvironmentExportScope(names: names))

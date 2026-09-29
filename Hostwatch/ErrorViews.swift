@@ -20,11 +20,12 @@ struct ErrorsView: View {
                     NavigationLink { ErrorExplorerView() } label: { Text("Status and path aggregates").font(.caption).foregroundStyle(HW.teal) }
                 }
                 Spacer()
+                MarkdownExportButton()
                 Menu("Import / export") {
                     Button("Import error Markdown") { importKind = "error"; importProject = model.selectedSite; importing = true }
                     Button("Import vulnerability Markdown") { importKind = "vulnerability"; importProject = model.selectedSite; importing = true }
-                    Button("Copy error Markdown") { Task { if let value = await model.exportMarkdown(kind: "error") { exportText = value } } }
-                    Button("Copy vulnerability Markdown") { Task { if let value = await model.exportMarkdown(kind: "vulnerability") { exportText = value } } }
+                    Button("Copy error Markdown") { Task { if let value = await model.exportMarkdown(kind: "error") { exportText = value; UIPasteboard.general.string = value } } }
+                    Button("Copy vulnerability Markdown") { Task { if let value = await model.exportMarkdown(kind: "vulnerability") { exportText = value; UIPasteboard.general.string = value } } }
                 }.buttonStyle(.bordered)
             }
             if let notice = model.importNotice {
@@ -128,6 +129,7 @@ struct ErrorProjectDetail: View {
         .hwHiddenScrollBackground()
         .background(HW.background)
         .navigationTitle(group.projectName)
+        .toolbar { MarkdownExportButton(site: group.projectId) }
     }
 }
 

@@ -8,6 +8,7 @@ struct HostwatchApp: App {
     @State private var unlocked = false
     @State private var unlocking = false
     @State private var unlockError: String?
+    @State private var approvalID: String?
 
     init() {
         HWAppearance.apply()
@@ -28,6 +29,13 @@ struct HostwatchApp: App {
                 } else {
                     SignInView().environmentObject(model)
                 }
+            }
+            .onOpenURL { handleLink($0) }
+            .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
+                if let url = activity.webpageURL { handleLink(url) }
+            }
+            .sheet(isPresented: Binding(get: { approvalID != nil && model.session.authenticated && unlocked }, set: { if !$0 { approvalID = nil } })) {
+                QRApprovalView(initialID: approvalID).environmentObject(model)
             }
             .preferredColorScheme(.dark)
             .tint(HW.teal)
@@ -60,6 +68,16 @@ struct HostwatchApp: App {
                 if !enabled { unlocked = true }
                 else if keepsSession { unlocked = false; Task { await unlockIfNeeded() } }
             }
+        }
+    }
+
+    private func handleLink(_ incoming: URL) {
+        let url = URL(string: QRPayload.canonical(incoming.absoluteString)) ?? incoming
+        if let id = QRPayload.id(from: url.absoluteString, server: model.baseURLText) {
+            approvalID = id
+            if !model.session.authenticated { model.errorMessage = "Sign in to Hostwatch first, then approve the website request." }
+        } else if QRPayload.deviceTicket(from: url.absoluteString) != nil, !model.session.authenticated {
+            model.deviceSignInURL = url
         }
     }
 

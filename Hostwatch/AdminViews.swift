@@ -3,6 +3,7 @@ import SwiftUI
 struct EnvironmentView: View {
     @EnvironmentObject private var model: AppModel
     @State private var showAdd = false
+    @State private var editingVariable: EnvironmentVariable?
     @State private var showShare = false
     @State private var showVault = false
     @State private var deleteVariable: EnvironmentVariable?
@@ -29,12 +30,12 @@ struct EnvironmentView: View {
                 HStack(spacing: 14) {
                     Image(systemName: variable.secret ? "lock.fill" : "textformat").foregroundStyle(variable.secret ? HW.amber : HW.teal)
                     VStack(alignment: .leading) { Text(variable.name).font(.system(.headline, design: .monospaced)); Text(variable.secret ? "Secret · value hidden" : "Configuration value").font(.caption).foregroundStyle(HW.secondary) }
-                    Spacer(); Button("Replace") { showAdd = true }.buttonStyle(.bordered); Button(role: .destructive) { deleteVariable = variable } label: { Image(systemName: "trash") }
+                    Spacer(); Button("Replace") { editingVariable = variable; showAdd = true }.buttonStyle(.bordered); Button(role: .destructive) { deleteVariable = variable } label: { Image(systemName: "trash") }
                 }.padding(15).panel()
             }
             if model.environment?.variables.isEmpty != false { EmptyState(icon: "key.horizontal", title: "No variables", detail: "Add the first variable for this project.") }
         }
-        .sheet(isPresented: $showAdd) { AddEnvironmentVariableView() }
+        .sheet(isPresented: $showAdd, onDismiss: { editingVariable = nil }) { AddEnvironmentVariableView(initialName: editingVariable?.name ?? "", initialSecret: editingVariable?.secret ?? true) }
         .sheet(isPresented: $showShare) { if let site { EnvironmentShareComposer(site: site, variables: model.environment?.variables ?? []).environmentObject(model) } }
         .sheet(isPresented: $showVault) { if let site { VaultView(site: site).environmentObject(model) } }
         .confirmationDialog("Delete \(deleteVariable?.name ?? "variable")?", isPresented: Binding(get: { deleteVariable != nil }, set: { if !$0 { deleteVariable = nil } })) { if let variable = deleteVariable { Button("Delete", role: .destructive) { Task { await model.deleteEnvironment(name: variable.name) }; deleteVariable = nil } } } message: { Text("The project may fail to start if it requires this value.") }
@@ -104,7 +105,7 @@ struct EnvironmentShareComposer: View {
             .navigationTitle("Encrypted .env link")
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } } }
             .task { await load() }
-            .sheet(isPresented: $showSystemShare) { if let link { EnvironmentActivitySheet(items: [link]) } }
+            .sheet(isPresented: $showSystemShare) { if let link { HWActivitySheet(items: [link]) } }
         }
     }
 
@@ -130,7 +131,7 @@ struct EnvironmentShareComposer: View {
     }
 }
 
-private struct EnvironmentActivitySheet: UIViewControllerRepresentable {
+struct HWActivitySheet: UIViewControllerRepresentable {
     let items: [Any]
     func makeUIViewController(context: Context) -> UIActivityViewController { UIActivityViewController(activityItems: items, applicationActivities: nil) }
     func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
@@ -158,15 +159,44 @@ private struct EnvironmentShareRow: View {
 struct AddEnvironmentVariableView: View {
     @EnvironmentObject private var model: AppModel
     @Environment(\.dismiss) private var dismiss
-    @State private var name = ""; @State private var value = ""; @State private var reveal = false
+    var initialName = ""
+    var initialSecret = true
+    @State private var name = ""
+    @State private var value = ""
+    @State private var reveal = false
+    @State private var secret = true
+    @State private var busy = false
+    @State private var error = ""
+    private var owner: Bool { ["owner", "platform_owner"].contains(model.session.role ?? "") }
     var body: some View {
         HWStackNavigation {
             Form {
                 TextField("NAME", text: $name).textInputAutocapitalization(.characters).autocorrectionDisabled().font(.hw(.body, design: .monospaced))
+                Toggle("Secret (encrypted vault + environment)", isOn: $secret).disabled(!owner)
                 if reveal { TextField("Value", text: $value).font(.hw(.body, design: .monospaced)) } else { SecureField("Value", text: $value).font(.hw(.body, design: .monospaced)) }
                 Toggle("Show while editing", isOn: $reveal)
-                Section { Text("Saving replaces an existing variable with the same name. The control plane returns only its name and secret classification afterward.").font(.caption).foregroundStyle(HW.secondary) }
-            }.navigationTitle("Environment variable").toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }; ToolbarItem(placement: .confirmationAction) { Button("Save") { Task { await model.setEnvironment(name: name, value: value); dismiss() } }.disabled(name.isEmpty || value.isEmpty) } }
+                Section { Text("Saving replaces this variable and recreates the project's services. Secret classification is preserved even for names such as VERIFY_SID.").font(.caption) }
+                if !error.isEmpty { Text(error).foregroundStyle(HW.red) }
+            }.navigationTitle("Environment variable")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() }.disabled(busy) }
+                ToolbarItem(placement: .confirmationAction) { Button(busy ? "Saving…" : "Save") { Task { await save() } }.disabled(busy || name.isEmpty || value.isEmpty || (secret && !owner)) }
+            }
+        }.onAppear { name = initialName; secret = initialName.isEmpty ? owner : initialSecret }
+        .interactiveDismissDisabled(busy)
+    }
+    private func save() async {
+        busy = true; defer { busy = false }
+        if secret {
+            guard let site = model.sites.first(where: { $0.id == model.selectedSite }) ?? model.sites.first else { return }
+            do {
+                _ = try await model.putVaultSecret(site: site.id, name: name, value: value, description: "Managed from iOS", expiresAt: "")
+                try await model.applyVaultSecret(site: site.id, name: name)
+                value = ""; dismiss()
+            } catch { self.error = error.localizedDescription }
+        } else {
+            model.errorMessage = nil; await model.setEnvironment(name: name, value: value)
+            if let error = model.errorMessage { self.error = error } else { value = ""; dismiss() }
         }
     }
 }
@@ -182,9 +212,10 @@ struct CodeHealthView: View {
             HStack {
                 VStack(alignment: .leading) { Eyebrow(text: "Repository evidence"); Text("Code intelligence, Git & vulnerabilities").font(.title2.bold()) }
                 Spacer()
+                MarkdownExportButton(kind: "vulnerability")
                 Menu("Markdown") {
                     Button("Import advisories") { importProject = model.selectedSite; importing = true }
-                    Button("Copy vulnerability Markdown") { Task { if let value = await model.exportMarkdown(kind: "vulnerability") { exportText = value } } }
+                    Button("Copy vulnerability Markdown") { Task { if let value = await model.exportMarkdown(kind: "vulnerability") { exportText = value; UIPasteboard.general.string = value } } }
                 }.buttonStyle(.bordered)
             }
             if !exportText.isEmpty {

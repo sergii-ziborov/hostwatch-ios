@@ -2,7 +2,7 @@
 
 Native SwiftUI control-plane client for Hostwatch. The iPhone and iPad app is intended for **public App Store distribution**, while access to a control plane is provisioned by an organization. It uses the same signed-in session and REST API as the web application. There is no public demo or registration flow.
 
-**Release status:** the App Store Connect record and public privacy declaration exist. Xcode Cloud builds the current branch, and Release builds for iPhone and iPad. The current Debug build was installed on the paired iPhone 13 mini (`iPhone s`) on 2026-09-21. Launch from the Mac was denied because the phone was locked; open the installed app after unlocking it. Physical-device sign-in and Face ID have not yet been verified. An App Store distribution archive, TestFlight upload, authenticated screenshots and public release are still pending.
+**Version 1.0.4 (7):** includes QR deep links, renewable device sessions, Errors Markdown export, explicit Secret creation and multi-project shared variables. A signed Debug build was installed on the paired iPhone 13 mini on 2026-09-29. The simulator suite passed 28 tests. Physical-camera/Face ID testing and a validated App Store distribution archive remain required; installation is not an App Store release. See [submission materials and release checklist](docs/APP_STORE.md).
 
 ## Product structure
 
@@ -22,17 +22,17 @@ Native SwiftUI control-plane client for Hostwatch. The iPhone and iPad app is in
 - **Traffic policies** — bandwidth, anomaly and IP/country access rules.
 - **Managed secrets** — the Environment page keeps client-encrypted `.env` links separate from node-stored vault secrets. Owners can create and rotate values, set expiry, issue scoped application tokens with IP and read limits, review access, and revoke grants. MCP insertion is independently disabled by default in the MCP governance screen.
 - **MCP** — under Control: turn MCP off, allow or deny reads and changes, block tools, cap hourly mutations, and see which computers are talking to this company through MCP plus a redacted tool history. Limits are enforced on the Hostwatch node; a local MCP process cannot lift them.
-- **Environment** — per-project environment variable management.
+- **Environment** — per-project variables with explicit Text/Secret choice, encrypted vault application and shared values assigned to multiple projects. Owners can rotate a shared value and retry projects whose sync failed.
 - **Code health** — repository evidence, findings and vulnerabilities.
 - **Automations**, **Access**, **Organization** — scheduled services, users and license/deployment settings.
 
 The app supports the hosted control plane and licensed enterprise installations. The control-plane URL can be changed on the sign-in screen. Enterprise licenses remain created and verified by the controller REST API; the mobile app only displays and installs a signed license for an authorized owner.
 
-On iPhone or iPad, sign in by scanning the one-time QR shown in **Organization → Account security → Sign in on iPhone or iPad** on an already signed-in Hostwatch website. Compare the six-digit number on both screens and approve on the website. The QR expires after two minutes and can only sign in the device that claimed it. Password and authenticator-code sign-in remain available. **More → Account security** lets an account enroll, replace, or disable its authenticator and approve another device's website sign-in with the camera or a short manual pairing code. That approval asks for Face ID or the device passcode.
+On iPhone or iPad, sign in by scanning the one-time QR shown in **Organization → Account security → Sign in on iPhone or iPad** on an already signed-in Hostwatch website. Compare the six-digit number on both screens and approve on the website. The QR expires after two minutes and can only sign in the device that claimed it. QR links use the registered `hostwatch://` scheme to open the installed app from the system camera; the app validates the control-plane origin. Release signing also declares the hosted universal-link domain. Password and authenticator-code sign-in remain available. **More → Account security** lets an account enroll, replace, or disable its authenticator and approve another device's website sign-in with the camera or a short manual pairing code. That approval asks for Face ID or the device passcode.
 
 The minimum deployment target is iOS 15, so the same build runs on current iPhones and older iPads such as iPad mini 4 (15.8). The four primary areas are Overview, Traffic, Database and Runtime; only the selected tab stays mounted. Workloads and less frequent controls are under **More**. iPad keeps a sidebar. Links to a request destination or external advisory open in the system browser, outside the app. Live refresh loads only the visible page: topology pulses host/site snapshots every 3s and the heavier inventory every 30s; other pages refresh every 8s without re-downloading request/error buffers.
 
-On launch, a native Hostwatch splash stays visible while the saved server session is checked. After the first successful sign-in the session cookies are stored in the device keychain so they survive app death; **Face ID / Touch ID / passcode** (on by default when the device can evaluate it) unlocks that session on the next launch and after the app goes to the background. Signing out removes the saved session. This is an on-device unlock for a stored control-plane session, not a substitute for account two-factor policy. Disk scans show progress and errors, and directory drilldown preserves the host summary while loading child entries.
+On launch, a native Hostwatch splash stays visible while the saved server session is checked. After the first successful sign-in the session cookies are stored in the device keychain so they survive app death; **Face ID / Touch ID / passcode** (on by default when the device can evaluate it) unlocks that session on the next launch and after the app goes to the background. The eight-hour access cookie is automatically renewed with a rotating device credential valid for up to 90 days of inactivity. The controller stores only its hash; Keychain holds the actual credential. Password or two-factor changes revoke the saved authorization. Signing out removes and revokes the saved session. This is an on-device unlock for a stored control-plane session, not a substitute for account two-factor policy. Disk scans show progress and errors, and directory drilldown preserves the host summary while loading child entries.
 
 ## Build
 
@@ -56,15 +56,12 @@ The iOS source is public for inspection and evaluation but remains proprietary. 
 
 For App Store review and users, see the [privacy policy](PRIVACY.md) and [support](SUPPORT.md). These links are also available from the signed-out app.
 
-## App Store screenshots
+## Screenshots
 
-Store listing still needs authenticated captures from a provisioned account. Until then, Debug fixture captures (banner **SAMPLE DATA · DEBUG BUILD**) document the current cyberboard and fleet UI:
+<img src="docs/screenshots/iphone-sign-in.png" width="320" alt="Hostwatch 1.0.4 native sign-in with Password, Scan website QR, Support, Terms and Privacy controls" />
 
-- [Topology](docs/screenshots/iphone-topology.png) — Traffic: live packets, runtime volumes only
-- [Towers](docs/screenshots/iphone-topology-towers.png) — stacked services + Weavatrix layers
-- [Project graph](docs/screenshots/iphone-topology-eppy.png) — Eppy frontend / backend / database
-- [Tower lock](docs/screenshots/iphone-topology-lock.png) — Electron-style right frame + dossier
-- [Fleet](docs/screenshots/iphone-fleet.png) — home heartbeat, IP change, admission
-- [Overview](docs/screenshots/iphone-overview.png) — host resources
+Current simulator capture of version 1.0.4 against an isolated local controller. No sample traffic or customer credentials are shown.
 
-They are development previews, not App Store assets. Authenticated Release captures remain required before submission.
+Only captures from an authenticated shipping build should be uploaded to App Store Connect. Development fixture images under `docs/screenshots/` explicitly show SAMPLE DATA and are not current server telemetry or Store assets. See [capture checklist](docs/APP_STORE.md#screenshots); the listing must include both supported device families.
+
+Public policies: [Privacy](https://gethostwatch.com/privacy), [Terms of use](https://gethostwatch.com/terms), [Support](https://gethostwatch.com/support). The same links are available before sign-in and in Account security.
