@@ -174,6 +174,7 @@ struct DataService: Codable, Identifiable {
     let siteId: String?
     let siteName: String?
     let container: ContainerInfo
+    var cache: CacheMetrics? = nil
 }
 
 struct DataFile: Decodable, Identifiable {

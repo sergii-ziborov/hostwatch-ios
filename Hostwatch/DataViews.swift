@@ -278,33 +278,35 @@ struct DataTableRowsView: View {
 struct DataServiceDetailView: View {
     @EnvironmentObject private var model: AppModel
     let service: DataService
-    private var site: Site? { model.sites.first { $0.id == service.siteId } }
+    private var liveService: DataService { model.dataServices.first { $0.id == service.id } ?? service }
+    private var site: Site? { model.sites.first { $0.id == liveService.siteId } }
     private var relatedFiles: [DataFile] {
-        model.dataFiles.filter { $0.siteId == service.siteId && $0.siteId != nil }
+        model.dataFiles.filter { $0.siteId == liveService.siteId && $0.siteId != nil }
     }
 
     var body: some View {
         List {
             Section("Service") {
-                HWLabeled("Type", value: service.type)
-                HWLabeled("Role", value: service.role)
-                HWLabeled("State", value: service.container.state)
-                HWLabeled("Status", value: service.container.status)
-                HWLabeled("Project", value: service.siteName ?? "Host & shared runtime")
+                HWLabeled("Type", value: liveService.type)
+                HWLabeled("Role", value: liveService.role)
+                HWLabeled("State", value: liveService.container.state)
+                HWLabeled("Status", value: liveService.container.status)
+                HWLabeled("Project", value: liveService.siteName ?? "Host & shared runtime")
             }
             Section("Load") {
-                HWLabeled("CPU", value: Format.percent(service.container.cpuPercent))
-                HWLabeled("Memory", value: Format.bytes(service.container.memoryBytes))
-                HWLabeled("Memory limit", value: Format.bytes(service.container.memoryLimit))
-                HWLabeled("Processes", value: service.container.pids.formatted())
-                HWLabeled("Network received", value: Format.bytes(service.container.networkRxBytes))
-                HWLabeled("Network sent", value: Format.bytes(service.container.networkTxBytes))
+                HWLabeled("CPU", value: Format.percent(liveService.container.cpuPercent))
+                HWLabeled("Memory", value: Format.bytes(liveService.container.memoryBytes))
+                HWLabeled("Memory limit", value: Format.bytes(liveService.container.memoryLimit))
+                HWLabeled("Processes", value: liveService.container.pids.formatted())
+                HWLabeled("Network received", value: Format.bytes(liveService.container.networkRxBytes))
+                HWLabeled("Network sent", value: Format.bytes(liveService.container.networkTxBytes))
             }
+            if let cache = liveService.cache { CacheMetricsSection(metrics: cache) }
             Section("Runtime evidence") {
-                HWLabeled("Image", value: service.container.image)
-                HWLabeled("Compose project", value: service.container.project)
-                HWLabeled("Container ID", value: service.container.id)
-                HWLabeled("Runtime", value: "\(service.container.engine ?? "docker") · \(service.container.runtimeId ?? "docker-main")")
+                HWLabeled("Image", value: liveService.container.image)
+                HWLabeled("Compose project", value: liveService.container.project)
+                HWLabeled("Container ID", value: liveService.container.id)
+                HWLabeled("Runtime", value: "\(liveService.container.engine ?? "docker") · \(liveService.container.runtimeId ?? "docker-main")")
             }
             if !relatedFiles.isEmpty {
                 Section("Discovered files") {
@@ -315,13 +317,15 @@ struct DataServiceDetailView: View {
                     }
                 }
             }
-            Section { Text("Query rate, active connections and cache hit ratio require a database exporter. SQLite files attached to this project can be opened from the Database tab.")
-                .font(.footnote).foregroundStyle(HW.secondary) }
+            if liveService.cache == nil {
+                Section { Text("Query rate and connections need a native service endpoint or exporter. SQLite files can be opened from the Database tab.")
+                    .font(.footnote).foregroundStyle(HW.secondary) }
+            }
             if let site { Section { NavigationLink("Open \(site.name) workload") { WorkloadDetailView(site: site) } } }
         }
         .hwHiddenScrollBackground()
         .background(HW.background)
-        .navigationTitle(service.type)
+        .navigationTitle(liveService.type)
         .navigationBarTitleDisplayMode(.inline)
     }
 }

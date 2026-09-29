@@ -7,7 +7,7 @@ Native SwiftUI control-plane client for Hostwatch. The iPhone and iPad app is in
 ## Product structure
 
 - **Overview** — host resources and capacity with resource drilldowns. A loader stays on the page while that snapshot arrives instead of fading the whole interface.
-- **Database** — its own tab for running data-service containers and observed files. SQLite files can list tables and preview rows; PostgreSQL/Redis stay at container evidence. File size is disk evidence; query rate and cache hit ratio require a dedicated exporter.
+- **Database** — its own tab for running data-service containers and observed files. SQLite files can list tables and preview rows; PostgreSQL stays at container evidence; Redis/Valkey also shows native INFO counters. File size is disk evidence; SQL query rates require a dedicated exporter.
 - **Cleanup** — preview and explicitly remove only old APT downloads, generated manual-page caches, and unused Docker build records. The disk inspector links to the same section. Actual filesystem space freed by Docker may be lower than its virtual cache size.
 - **Network** — the host Network card shows all interface ingress and egress and a live local/remote port socket snapshot. Port counts are not per-port byte totals.
 - **Two QR paths** — a signed-in app can approve a website sign-in under More → Account security → Approve a sign-in. To sign in to the app by QR, first sign in on the website with a password, then open Organization → Account security → Sign in on iPhone or iPad. The app's first sign-in defaults to email and password.
@@ -79,3 +79,5 @@ Public policies: [Privacy](https://gethostwatch.com/privacy), [Terms of use](htt
 Native request lists include Bots and Dangerous bots filters, a red threat badge, the agent's category/reason and site-scoped exploit-probe blocking. Existing IP blocking remains available for external visitor addresses. Runtime traffic controls can add/remove the fixed probe signature group. New evidence fields decode optionally so older agents remain compatible.
 
 Simulator compilation and the evidence/backward-compatibility decoding test passed. A signed local iPhone build was produced; physical installation requires the paired phone to be connected and unlocked. The local development signing profile lacks Associated Domains, so only that local build omits the universal-link entitlement; release project entitlements remain intact. App Store release was not performed.
+
+Native Redis/Valkey details display operations per second, cache memory/limit/policy, clients, keys, hit ratio and command CPU averages alongside container load. The open detail follows live inventory; absent native measurements remain unavailable. The simulator suite passed 37 tests with one opt-in live sign-in test skipped. This update publishes source; no App Store distribution was submitted.
