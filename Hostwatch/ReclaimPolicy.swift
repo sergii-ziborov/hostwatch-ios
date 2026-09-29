@@ -11,7 +11,7 @@ enum ReclaimPolicy {
     static func classify(_ entry: StorageEntry) -> (String, String) {
         let path = entry.path.lowercased()
         let haystack = "\(path) \(entry.category) \(entry.kind)".lowercased()
-        if contains(haystack, "overlay2", "containerd", "docker image") {
+        if contains(haystack, "overlay2", "containerd", "docker image", "/containers/storage", "podman image", "runtime:") {
             return ("protected", "Shared container layers. Unused image prune can break a running or next deploy.")
         }
         if contains(haystack, "postgres", "database", "backup", "/srv/data/backups") {

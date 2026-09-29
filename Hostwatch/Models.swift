@@ -159,12 +159,16 @@ struct NetworkPorts: Codable {
 }
 
 struct ContainerInfo: Codable, Identifiable {
+    var runtimeId: String? = nil
+    var engine: String? = nil
+    var metricsStatus: String? = nil
+    var networkMetricsStatus: String? = nil
     let id: String; let name: String; let project: String; let state: String; let status: String; let image: String; let imageId: String
     let cpuPercent: Double; let memoryBytes: Double; let memoryLimit: Double; let networkRxBytes: Double; let networkTxBytes: Double; let pids: Int
 }
 
 struct DataService: Codable, Identifiable {
-    var id: String { container.id }
+    var id: String { "\(container.runtimeId ?? "docker-main"):\(container.id)" }
     let type: String
     let role: String
     let siteId: String?
@@ -188,6 +192,7 @@ struct DataServicesResponse: Decodable {
     let services: [DataService]
     let files: [DataFile]
     let dockerHealthy: Bool
+    let runtimeHealthy: Bool?
     let scannedAt: String
     let scanError: String?
 
@@ -195,7 +200,7 @@ struct DataServicesResponse: Decodable {
     // readable while accepting the current response with discovered data files.
     init(from decoder: Decoder) throws {
         if let legacy = try? [DataService](from: decoder) {
-            services = legacy; files = []; dockerHealthy = true; scannedAt = ""
+            services = legacy; files = []; dockerHealthy = true; runtimeHealthy = nil; scannedAt = ""
             scanError = "This node agent does not report database files yet."
             return
         }
@@ -203,11 +208,12 @@ struct DataServicesResponse: Decodable {
         services = try values.decode([DataService].self, forKey: .services)
         files = try values.decode([DataFile].self, forKey: .files)
         dockerHealthy = try values.decode(Bool.self, forKey: .dockerHealthy)
+        runtimeHealthy = try values.decodeIfPresent(Bool.self, forKey: .runtimeHealthy)
         scannedAt = try values.decode(String.self, forKey: .scannedAt)
         scanError = try values.decodeIfPresent(String.self, forKey: .scanError)
     }
 
-    private enum CodingKeys: String, CodingKey { case services, files, dockerHealthy, scannedAt, scanError }
+    private enum CodingKeys: String, CodingKey { case services, files, dockerHealthy, runtimeHealthy, scannedAt, scanError }
 }
 
 struct DataTableInfo: Decodable, Identifiable {
@@ -421,7 +427,7 @@ struct StorageResponse: Codable {
 }
 
 struct CleanupTarget: Codable, Identifiable {
-    var id: String { kind }
+    var id: String { "\(kind):\(path)" }
     let kind: String; let name: String; let path: String
     let bytes: Double; let items: Int; let available: Bool
     let description: String; let consequence: String; let error: String?

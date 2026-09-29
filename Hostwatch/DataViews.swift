@@ -304,6 +304,7 @@ struct DataServiceDetailView: View {
                 HWLabeled("Image", value: service.container.image)
                 HWLabeled("Compose project", value: service.container.project)
                 HWLabeled("Container ID", value: service.container.id)
+                HWLabeled("Runtime", value: "\(service.container.engine ?? "docker") · \(service.container.runtimeId ?? "docker-main")")
             }
             if !relatedFiles.isEmpty {
                 Section("Discovered files") {

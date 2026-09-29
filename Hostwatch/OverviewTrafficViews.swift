@@ -444,7 +444,7 @@ struct InternalRouteDetail: View {
                 HWLabeled("Response bytes", value: Format.bytes(route.bytes))
             }
             Section("Evidence") {
-                Text("A Docker service is named only when the log IP uniquely matches a running container. Nginx does not observe direct container-to-container calls. Older or expired individual requests cannot be reconstructed.")
+                Text("A container service is named only when the log IP uniquely matches a running container. Nginx does not observe direct container-to-container calls. Older or expired individual requests cannot be reconstructed.")
                     .font(.footnote).foregroundStyle(HW.secondary)
                 PagedRows(items: matching) { request in NavigationLink { RequestDetailView(request: request) } label: { RequestRow(request: request) } }
                 if matching.isEmpty { Text("No matching individual request remains in the bounded live buffer.").foregroundStyle(HW.secondary) }
@@ -542,7 +542,7 @@ struct RequestDetailView: View {
                     StatCard(title: "Origin", value: request.origin.title, detail: "\(request.origin.detail) · \(request.origin.sourceLabel(for: request))", color: request.origin == .ourService ? HW.amber : HW.teal, icon: request.origin == .ourService ? "point.3.connected.trianglepath.dotted" : "globe")
                     StatCard(title: "Response", value: "\(request.status) \(HTTPURLResponse.localizedString(forStatusCode: request.status).capitalized)", detail: "\(request.durationMs.formatted()) ms · \(Format.bytes(request.bytes))", color: request.status >= 400 ? HW.red : HW.teal, icon: "arrow.left.arrow.right")
                     StatCard(title: "Client", value: request.clientIp, detail: "\(request.city ?? "Unknown"), \(request.country)", icon: "network")
-                    if request.origin == .ourService { StatCard(title: "Calling service", value: request.clientService ?? "Unknown private peer", detail: "Docker IP match when available", color: HW.amber, icon: "point.3.connected.trianglepath.dotted") }
+                    if request.origin == .ourService { StatCard(title: "Calling service", value: request.clientService ?? "Unknown private peer", detail: "Container IP match when available", color: HW.amber, icon: "point.3.connected.trianglepath.dotted") }
                     StatCard(title: "Referrer", value: request.source, detail: request.referrerPath ?? "Campaign / Referer — not the calling service", color: HW.amber, icon: "arrow.triangle.branch")
                     StatCard(title: "Agent", value: request.bot ?? "Browser / service", detail: request.userAgent, icon: "person.text.rectangle")
                 }

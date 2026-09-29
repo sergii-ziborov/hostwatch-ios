@@ -106,6 +106,17 @@ final class HostwatchTests: XCTestCase {
         XCTAssertEqual(inventory.files.first?.sizeBytes, 1_048_576)
     }
 
+    func testPodmanDataServicesDecodeRuntimeOwnership() throws {
+        let payload = Data("""
+        {"services":[{"type":"Redis / Valkey","role":"Cache","siteId":"app","container":{"id":"same","runtimeId":"podman-main","engine":"podman","name":"redis","project":"app","state":"running","status":"Up","image":"redis:7.4","imageId":"image","cpuPercent":0,"memoryBytes":0,"memoryLimit":100,"networkRxBytes":0,"networkTxBytes":0,"pids":1,"metricsStatus":"unavailable","networkMetricsStatus":"unsupported"}}],"files":[],"dockerHealthy":false,"runtimeHealthy":true,"scannedAt":"2026-09-29T10:00:00Z"}
+        """.utf8)
+        let inventory = try JSONDecoder().decode(DataServicesResponse.self, from: payload)
+        XCTAssertEqual(inventory.runtimeHealthy, true)
+        XCTAssertEqual(inventory.services.first?.id, "podman-main:same")
+        XCTAssertEqual(inventory.services.first?.container.engine, "podman")
+        XCTAssertEqual(inventory.services.first?.container.networkMetricsStatus, "unsupported")
+    }
+
     func testChartTimeUsesTimestampsAndAcceptsFractionalSeconds() {
         guard let start = ChartTime.parse("2026-09-13T08:00:00Z"),
               let end = ChartTime.parse("2026-09-13T08:05:00.123Z") else {
@@ -354,11 +365,13 @@ final class HostwatchTests: XCTestCase {
             .init(path: "/var/lib/postgresql", kind: "directory", category: "Databases", siteId: nil, siteName: "Host", bytes: 100, direct: false),
             .init(path: "/var/cache/apt/archives", kind: "directory", category: "Caches", siteId: nil, siteName: "Host", bytes: 20, direct: false),
             .init(path: "/var/lib/containerd", kind: "Docker images, snapshots, writable layers and build cache", category: "Container runtime", siteId: nil, siteName: "Host", bytes: 200, direct: false),
+            .init(path: "/var/lib/containers/storage", kind: "Podman image layers", category: "Container runtime", siteId: nil, siteName: "Host", bytes: 80, direct: false),
             .init(path: "/srv/apps/applydjinn/uploads", kind: "directory", category: "Images & media", siteId: "applydjinn", siteName: "ApplyDjinn", bytes: 50, direct: false)
         ])
         XCTAssertEqual(advice.first { $0.path.hasSuffix("postgresql") }?.className, "protected")
         XCTAssertEqual(advice.first { $0.path.contains("apt") }?.className, "safe")
         XCTAssertEqual(advice.first { $0.path.contains("containerd") }?.className, "protected")
+        XCTAssertEqual(advice.first { $0.path.contains("containers/storage") }?.className, "protected")
         XCTAssertEqual(advice.first { $0.path.contains("uploads") }?.className, "review")
     }
 

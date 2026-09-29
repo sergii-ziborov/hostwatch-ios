@@ -31,7 +31,7 @@ struct CleanupView: View {
                     .padding(12).frame(maxWidth: .infinity, alignment: .leading).panel()
             }
             if let preview = model.cleanupPreview {
-                let fileBytes = preview.targets.filter { $0.kind != "docker-build-cache" && $0.available }.reduce(0.0) { $0 + $1.bytes }
+                let fileBytes = preview.targets.filter { !$0.kind.hasSuffix("build-cache") && $0.available }.reduce(0.0) { $0 + $1.bytes }
                 StatCard(title: "Eligible package & manual caches", value: Format.bytes(fileBytes), detail: "Docker virtual layer sizes are excluded from this total", icon: "internaldrive")
                 ReclaimAdviceList(advice: preview.advice ?? ReclaimPolicy.advise(model.storage?.entries ?? []))
                 ForEach(preview.targets) { target in

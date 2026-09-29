@@ -14,7 +14,7 @@ Native SwiftUI control-plane client for Hostwatch. The iPhone and iPad app is in
 - **Traffic** — requests, errors, destinations, sources, locations and retained evidence. External clients and our services are split and badged; referrers stay campaign labels, not callers. The visitor map uses MapKit annotations for located public clients and keeps our services off the map, with a located / our services / no-geo count. Long destination and request lists autoload in pages, and an open control launches a GET destination in the system browser.
 - **Time and error evidence** — charts use local time on the horizontal axis. Unparsed Nginx requests with no usable Host are labeled as unmapped instead of inventing a website URL.
 - **Incidents & risks** — operational incidents, anomaly signals and vulnerabilities in separate tabs.
-- **Errors** — More → Observe. HTTP 4xx/5xx grouped by project. Opening one request shows the project, earlier matches on the same path, and nearby Docker logs when a container can be attributed. Markdown import/export covers those errors and Weavatrix/CVE advisories.
+- **Errors** — More → Observe. HTTP 4xx/5xx grouped by project. Opening one request shows the project, earlier matches on the same path, and nearby Docker or Podman container logs when a container can be attributed. Markdown import/export covers those errors and Weavatrix/CVE advisories.
 - **Reclaim advisor** — Cleanup and Disk classify measured host paths as safe, review, or protected so you can see what may be deleted without touching databases, backups, or container layers.
 - **Runtime topology** — a native SceneKit cyberboard aligned with the Electron RepoLens board. **Towers** shows stacked runtime + Weavatrix layers and structure roads. **Traffic** hides those layers and runs live packets on the same Manhattan roads, colored by origin: teal public clients, amber our services, green our data. Selecting a project explodes it into frontend, backend and data towers. Side labels stay pinned to their layer; if there are too many, they page with ▲/▼ instead of overlapping. One legend sits at the bottom left. Drag orbits without flipping, two fingers pan, pinch zooms, tap frames a tower from the right.
 - **Fleet** — hybrid edge/home peers, public IP change history, heartbeat freshness, admission (slots, disk, stale), and home load-scaling settings.
@@ -43,6 +43,12 @@ xcodebuild -project Hostwatch.xcodeproj -scheme Hostwatch \
 ```
 
 The simulator test suite covers expired-device password retry, rejected passwords and authenticator codes, rate limiting, response-cookie persistence, and saving after renewal. The optional live sign-in test runs only when `HOSTWATCH_TEST_ORIGIN`, `HOSTWATCH_TEST_EMAIL` and `HOSTWATCH_TEST_PASSWORD` are explicitly supplied to the test runner; it signs out its own temporary session. Never commit credentials. Xcode command-line test runner variables can be supplied using the `TEST_RUNNER_` prefix.
+
+Docker/Podman compatibility checks also cover runtime-scoped data-service identity,
+missing telemetry and protected Podman storage. The updated simulator suite ran
+36 tests on 2026-09-29 with no failures; the opt-in live sign-in test was skipped.
+The native changes are source-published and locally validated; no new App Store
+distribution archive or submission was performed for this runtime update.
 
 For local UI development only, a Debug build may be launched with `HOSTWATCH_FIXTURES=1`. These values are fabricated test fixtures and display a prominent **SAMPLE DATA · DEBUG BUILD** notice instead of a Live status. A Release build ignores the flag and requires a real, authenticated control plane. No fixture screenshot is used as an App Store asset.
 
