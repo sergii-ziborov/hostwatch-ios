@@ -260,9 +260,10 @@ actor APIClient {
         return try await call("/api/v1/storage\(components.percentEncodedQuery.map { "?\($0)" } ?? "")")
     }
     func cleanupPreview() async throws -> CleanupPreview { try await call("/api/v1/cleanup") }
-    func cleanCache(_ kind: String) async throws -> CleanupRun {
-        guard ["docker-build-cache", "apt-archives", "man-cache", "all"].contains(kind) else { throw APIError.invalidResponse }
-        return try await call("/api/v1/cleanup/\(kind)", method: "DELETE")
+    func cleanCache(_ kind: String, runtimeID: String? = nil) async throws -> CleanupRun {
+        guard ["docker-build-cache", "podman-build-cache", "apt-archives", "man-cache", "all"].contains(kind) else { throw APIError.invalidResponse }
+        let suffix = runtimeID.map { "?" + queryItems(["runtimeId": $0]) } ?? ""
+        return try await call("/api/v1/cleanup/\(kind)\(suffix)", method: "DELETE")
     }
     func projects() async throws -> [ProjectHealth] { try await call("/api/v1/projects") }
     func jobs() async throws -> [JobState] { try await call("/api/v1/jobs") }

@@ -543,14 +543,14 @@ final class AppModel: ObservableObject {
         catch { cleanupError = error.localizedDescription }
     }
 
-    func cleanCache(_ kind: String) async {
+    func cleanCache(_ kind: String, runtimeID: String? = nil) async {
         guard !fixtures, ["platform_owner", "owner", "admin"].contains(session.role ?? "") else { return }
         cleanupLoading = true; cleanupError = nil; cleanupNotice = nil
         defer { cleanupLoading = false }
         do {
-            let result = try await client.cleanCache(kind)
+            let result = try await client.cleanCache(kind, runtimeID: runtimeID)
             let count = result.results.reduce(0) { $0 + $1.deletedItems }
-            cleanupNotice = "Removed \(count) eligible cache files or records. Actual freed space depends on shared Docker layers."
+            cleanupNotice = "Removed \(count) eligible cache files or records. Actual freed space depends on shared container layers."
             if let errors = result.errors, !errors.isEmpty {
                 cleanupError = errors.map { "\($0.key): \($0.value)" }.sorted().joined(separator: " · ")
             }

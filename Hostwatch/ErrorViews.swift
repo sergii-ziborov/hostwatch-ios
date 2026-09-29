@@ -47,7 +47,7 @@ struct ErrorsView: View {
                             HStack {
                                 Text(group.projectName).font(.headline)
                                 Spacer()
-                                Text("\(group.count) errors").font(.subheadline.bold()).foregroundStyle(HW.red)
+                                Text("\(group.count) HTTP failures").font(.subheadline.bold()).foregroundStyle(HW.red)
                             }
                             Text(statusSummary(group)).font(.caption).foregroundStyle(HW.secondary)
                             Text("Open project history →").font(.caption2).foregroundStyle(HW.teal)
@@ -108,7 +108,7 @@ struct ErrorsView: View {
 
     private func statusSummary(_ group: ErrorProjectGroup) -> String {
         let parts = (group.statuses ?? [:]).sorted { $0.value > $1.value }.map { "HTTP \($0.key) × \($0.value)" }
-        return parts.isEmpty ? "\(group.count) retained failures" : parts.joined(separator: " · ")
+        return parts.isEmpty ? "\(group.count) observed HTTP failures" : parts.joined(separator: " · ")
     }
 }
 
@@ -118,9 +118,16 @@ struct ErrorProjectDetail: View {
         List {
             Section("Project") {
                 HWLabeled("Name", value: group.projectName)
-                HWLabeled("Retained errors", value: group.count.formatted())
+                HWLabeled("Period HTTP failures", value: group.count.formatted())
+                if let hours = group.windowHours { HWLabeled("Window", value: "\(hours) hours") }
+                if let count = group.serverErrors { HWLabeled("Server errors (5xx)", value: count.formatted()) }
+                if let count = group.blockedRequests { HWLabeled("Nginx rejections (444)", value: count.formatted()) }
+                if let count = group.retainedCount { HWLabeled("Retained examples", value: "\(group.requests.count) of \(count)") }
+                if let count = group.retainedCount, count > group.count {
+                    Text("Aggregate coverage has a gap: at least \(count - group.count) recovered records were absent from recorded totals.").font(.caption).foregroundStyle(HW.secondary)
+                }
             }
-            Section("Retained failures") {
+            Section("Retained examples by response code") {
                 PagedRows(items: group.requests) { request in
                     NavigationLink { RequestDetailView(request: request) } label: { RequestRow(request: request) }
                 }
@@ -140,6 +147,8 @@ struct RequestErrorContextCard: View {
             Text("Project and nearby logs").font(.headline)
             if let context {
                 HWLabeled("Project", value: context.projectName)
+                if let layer = context.layer { HWLabeled("Observed layer", value: layer) }
+                if let summary = context.summary { Text(summary).font(.footnote).foregroundStyle(HW.secondary) }
                 if let hint = context.crashHint, !hint.isEmpty {
                     Label(hint, systemImage: "exclamationmark.octagon.fill").font(.footnote).foregroundStyle(HW.red)
                 }

@@ -390,6 +390,8 @@ enum TrafficOrigin: String, Equatable {
 }
 struct ErrorEvidence: Codable { let windowHours: Int; let site: String?; let interval: String?; let requests: [RequestSample]; let retainedErrors: Int; let retainedFrom: String?; let capped: Bool }
 struct ErrorProjectGroup: Codable, Identifiable {
+    var windowHours: Int? = nil; var countSource: String? = nil; var retainedCount: Int? = nil
+    var serverErrors: Int? = nil; var blockedRequests: Int? = nil; var cancelledRequests: Int? = nil; var unclassifiedCount: Int? = nil
     var id: String { projectId }
     let projectId: String; let projectName: String; let count: Int; let lastTime: String?
     let statuses: [String: Int]?; let requests: [RequestSample]
@@ -399,6 +401,7 @@ struct ErrorLogLine: Codable, Identifiable, Hashable {
     let time: String?; let stream: String; let text: String; let crash: Bool?
 }
 struct ErrorContext: Codable {
+    var outcome: String? = nil; var layer: String? = nil; var summary: String? = nil
     let request: RequestSample; let projectId: String; let projectName: String
     let previous: [RequestSample]; let logs: [ErrorLogLine]
     let logSource: String?; let logError: String?; let crashHint: String?
@@ -430,11 +433,12 @@ struct StorageResponse: Codable {
 struct CleanupTarget: Codable, Identifiable {
     var id: String { "\(kind):\(path)" }
     let kind: String; let name: String; let path: String
+    var runtimeId: String? = nil
     let bytes: Double; let items: Int; let available: Bool
     let description: String; let consequence: String; let error: String?
 }
 struct CleanupPreview: Codable { let targets: [CleanupTarget]; let advice: [ReclaimAdvice]?; let scannedAt: String }
-struct CleanupResult: Codable { let kind: String; let reclaimedBytes: Double; let deletedItems: Int; let completedAt: String }
+struct CleanupResult: Codable { var runtimeId: String? = nil; let kind: String; let reclaimedBytes: Double; let deletedItems: Int; let completedAt: String }
 struct CleanupRun: Codable { let results: [CleanupResult]; let errors: [String: String]?; let completedAt: String }
 
 struct Vulnerability: Codable, Identifiable, Hashable { let id: String; let severity: String; let package: String; let installedVersion: String; let fixedVersion: String; let summary: String; let url: String }
