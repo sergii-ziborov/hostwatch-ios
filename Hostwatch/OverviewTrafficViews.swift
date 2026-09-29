@@ -458,11 +458,13 @@ struct RequestExplorerView: View {
     @State private var query = ""
     @State private var status = "All"
     @State private var origin = "All"
+    @State private var bots = "All"
     private var filtered: [RequestSample] {
         model.requests.filter { row in
-            (query.isEmpty || [row.path, row.clientIp, row.country, row.host, row.source, row.clientService ?? ""].joined(separator: " ").localizedCaseInsensitiveContains(query)) &&
+            (query.isEmpty || [row.path, row.clientIp, row.country, row.host, row.source, row.bot ?? "", row.threatReason ?? "", row.clientService ?? ""].joined(separator: " ").localizedCaseInsensitiveContains(query)) &&
             (status == "All" || (status == "Errors" ? row.status >= 400 : row.status < 400)) &&
-            (origin == "All" || (origin == "Our services" ? row.origin == .ourService : row.origin == .external))
+            (origin == "All" || (origin == "Our services" ? row.origin == .ourService : row.origin == .external)) &&
+            (bots == "All" || (bots == "Dangerous" ? row.dangerousBot == true : row.bot != nil))
         }
     }
     var body: some View {
@@ -472,6 +474,7 @@ struct RequestExplorerView: View {
                 Picker("Status", selection: $status) { Text("All").tag("All"); Text("Successful").tag("Successful"); Text("Errors").tag("Errors") }.pickerStyle(.segmented)
                 Picker("Origin", selection: $origin) { Text("All").tag("All"); Text("External").tag("External"); Text("Our services").tag("Our services") }.pickerStyle(.segmented)
             }
+            Section { Picker("Bots", selection: $bots) { Text("All clients").tag("All"); Text("Bots").tag("Bots"); Text("Dangerous bots").tag("Dangerous") }.pickerStyle(.segmented) }
             Section("\(filtered.count) retained requests") {
                 PagedRows(items: filtered) { request in NavigationLink { RequestDetailView(request: request) } label: { RequestRow(request: request) } }
             }
@@ -499,6 +502,7 @@ struct RequestRow: View {
         VStack(alignment: .leading, spacing: 5) {
             HStack {
                 OriginBadge(origin: request.origin)
+                if request.dangerousBot == true { Text("DANGEROUS BOT").font(.caption2.bold()).foregroundStyle(HW.red) }
                 Text(unparsed ? "UNPARSED" : request.method).font(.caption.bold()).foregroundStyle(unparsed ? HW.amber : HW.teal)
                 Text(unparsed ? "Request target unavailable" : request.path).font(.hw(.body, design: .monospaced, weight: .semibold)).lineLimit(1)
                 Spacer()
@@ -513,6 +517,7 @@ struct RequestDetailView: View {
     @EnvironmentObject private var model: AppModel
     let request: RequestSample
     @State private var confirmBlock = false
+    @State private var confirmProbeBlock = false
     @State private var context: ErrorContext?
     private var mappedSite: Site? { model.sites.first { $0.id == request.site } }
     private var hasObservedHost: Bool { RequestEvidence.usableHost(request.host) }
@@ -524,6 +529,11 @@ struct RequestDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 Eyebrow(text: "Individual HTTP request")
+                if request.dangerousBot == true {
+                    Label("Dangerous bot · \(request.bot ?? "Exploit scanner")", systemImage: "exclamationmark.shield.fill").foregroundStyle(HW.red)
+                    Text(request.threatReason ?? "Known exploit endpoint probe").font(.footnote)
+                    Text("Classified by the requested path. The user agent can be spoofed; this does not show a successful compromise.").font(.caption).foregroundStyle(HW.secondary)
+                }
                 Text(request.method == "UNKNOWN" ? "Unparsed HTTP request" : "\(request.method) \(request.path)")
                     .font(.hw(.title2, design: .rounded, weight: .bold)).textSelection(.enabled)
                 Text("\(ChartTime.parse(request.time)?.formatted(date: .abbreviated, time: .standard) ?? request.time) · \(hasObservedHost ? request.host : "unmapped host")")
@@ -560,6 +570,7 @@ struct RequestDetailView: View {
                         .font(.footnote).foregroundStyle(HW.amber)
                 } else {
                     Button("Block this IP for \(siteName)", systemImage: "hand.raised.fill", role: .destructive) { confirmBlock = true }.buttonStyle(.borderedProminent).tint(HW.red)
+                    if request.dangerousBot == true { Button("Block exploit probes for \(siteName)", systemImage: "shield.lefthalf.filled", role: .destructive) { confirmProbeBlock = true }.buttonStyle(.bordered) }
                 }
             }.padding(20)
         }.background(HW.background).navigationTitle("Request").navigationBarTitleDisplayMode(.inline)
@@ -567,6 +578,9 @@ struct RequestDetailView: View {
         .confirmationDialog("Block \(request.clientIp)?", isPresented: $confirmBlock, titleVisibility: .visible) {
             Button("Block IP", role: .destructive) { Task { await model.block(site: request.site, kind: "ip", value: request.clientIp) } }
         } message: { Text("A project-scoped access rule will be applied to \(siteName).") }
+        .confirmationDialog("Block exploit probes?", isPresented: $confirmProbeBlock, titleVisibility: .visible) {
+            Button("Block probe paths", role: .destructive) { Task { await model.block(site: request.site, kind: "threat", value: "exploit-probes") } }
+        } message: { Text("Blocks WordPress, PHP, repository and secret probes for \(siteName). Use this group only on sites without PHP. Certificate validation is preserved.") }
     }
     private var siteName: String { mappedSite?.name ?? "Unmapped traffic" }
     private var destinationURL: URL? { RequestEvidence.destinationURL(for: request) }

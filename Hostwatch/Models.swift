@@ -349,9 +349,10 @@ struct RequestSample: Codable, Identifiable, Hashable {
     let clientIp: String; let internalRequest: Bool?; let country: String; let countryCode: String; let region: String?; let city: String?; let latitude: Double?; let longitude: Double?
     var clientService: String? = nil; var targetService: String? = nil
     let userAgent: String; let source: String; let referrerPath: String?; let bot: String?
+    var dangerousBot: Bool? = nil; var threatCategory: String? = nil; var threatReason: String? = nil
 
     enum CodingKeys: String, CodingKey {
-        case id,time,site,host,method,path,status,bytes,requestBytes,durationMs,scheme,tlsProtocol,tlsCipher,upstreamAddr,upstreamStatus,upstreamMs,cacheStatus,clientIp,clientService,targetService,country,countryCode,region,city,latitude,longitude,userAgent,source,referrerPath,bot
+        case id,time,site,host,method,path,status,bytes,requestBytes,durationMs,scheme,tlsProtocol,tlsCipher,upstreamAddr,upstreamStatus,upstreamMs,cacheStatus,clientIp,clientService,targetService,country,countryCode,region,city,latitude,longitude,userAgent,source,referrerPath,bot,dangerousBot,threatCategory,threatReason
         case protocolName = "protocol"
         case internalRequest = "internal"
     }

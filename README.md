@@ -67,3 +67,9 @@ Previous simulator capture of version 1.0.4 against an isolated local controller
 Only captures from an authenticated shipping build should be uploaded to App Store Connect. Development fixture images under `docs/screenshots/` explicitly show SAMPLE DATA and are not current server telemetry or Store assets. See [capture checklist](docs/APP_STORE.md#screenshots); the listing must include both supported device families.
 
 Public policies: [Privacy](https://gethostwatch.com/privacy), [Terms of use](https://gethostwatch.com/terms), [Support](https://gethostwatch.com/support). The same links are available before sign-in and in Account security.
+
+## Version 1.0.6 (9): dangerous bot evidence
+
+Native request lists include Bots and Dangerous bots filters, a red threat badge, the agent's category/reason and site-scoped exploit-probe blocking. Existing IP blocking remains available for external visitor addresses. Runtime traffic controls can add/remove the fixed probe signature group. New evidence fields decode optionally so older agents remain compatible.
+
+Simulator compilation and the evidence/backward-compatibility decoding test passed. A signed local iPhone build was produced; physical installation requires the paired phone to be connected and unlocked. The local development signing profile lacks Associated Domains, so only that local build omits the universal-link entitlement; release project entitlements remain intact. App Store release was not performed.

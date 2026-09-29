@@ -5,6 +5,24 @@ import XCTest
 @testable import Hostwatch
 
 final class HostwatchTests: XCTestCase {
+    func testRequestThreatEvidenceAndOlderAgentCompatibility() throws {
+        let sample = Fixtures.requests[0]
+        let encoded = try JSONEncoder().encode(sample)
+        var object = try XCTUnwrap(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+        object.removeValue(forKey: "dangerousBot")
+        object.removeValue(forKey: "threatCategory")
+        object.removeValue(forKey: "threatReason")
+        let older = try JSONDecoder().decode(RequestSample.self, from: JSONSerialization.data(withJSONObject: object))
+        XCTAssertNil(older.dangerousBot)
+        object["dangerousBot"] = true
+        object["threatCategory"] = "wordpress-probe"
+        object["threatReason"] = "WordPress login probe"
+        let threat = try JSONDecoder().decode(RequestSample.self, from: JSONSerialization.data(withJSONObject: object))
+        XCTAssertEqual(threat.dangerousBot, true)
+        XCTAssertEqual(threat.threatCategory, "wordpress-probe")
+        XCTAssertEqual(threat.threatReason, "WordPress login probe")
+    }
+
     func testByteFormattingUsesBinaryUnits() {
         XCTAssertEqual(Format.bytes(1_073_741_824), "1.0 GB")
         XCTAssertEqual(Format.bytes(1024), "1.0 KB")
