@@ -279,6 +279,11 @@ struct DataServiceDetailView: View {
     @EnvironmentObject private var model: AppModel
     let service: DataService
     private var liveService: DataService { model.dataServices.first { $0.id == service.id } ?? service }
+    private var loadAvailable: Bool { liveService.container.metricsStatus == nil || liveService.container.metricsStatus == "ok" }
+    private var networkStatus: String? {
+        guard let status = liveService.container.networkMetricsStatus, status != "ok" else { return nil }
+        return status.capitalized
+    }
     private var site: Site? { model.sites.first { $0.id == liveService.siteId } }
     private var relatedFiles: [DataFile] {
         model.dataFiles.filter { $0.siteId == liveService.siteId && $0.siteId != nil }
@@ -294,12 +299,12 @@ struct DataServiceDetailView: View {
                 HWLabeled("Project", value: liveService.siteName ?? "Host & shared runtime")
             }
             Section("Load") {
-                HWLabeled("CPU", value: Format.percent(liveService.container.cpuPercent))
-                HWLabeled("Memory", value: Format.bytes(liveService.container.memoryBytes))
-                HWLabeled("Memory limit", value: Format.bytes(liveService.container.memoryLimit))
-                HWLabeled("Processes", value: liveService.container.pids.formatted())
-                HWLabeled("Network received", value: Format.bytes(liveService.container.networkRxBytes))
-                HWLabeled("Network sent", value: Format.bytes(liveService.container.networkTxBytes))
+                HWLabeled("CPU", value: loadAvailable ? Format.percent(liveService.container.cpuPercent) : "Unavailable")
+                HWLabeled("Memory", value: loadAvailable ? Format.bytes(liveService.container.memoryBytes) : "Unavailable")
+                HWLabeled("Memory limit", value: loadAvailable ? Format.bytes(liveService.container.memoryLimit) : "Unavailable")
+                HWLabeled("Processes", value: loadAvailable ? liveService.container.pids.formatted() : "Unavailable")
+                HWLabeled("Network received", value: networkStatus ?? Format.bytes(liveService.container.networkRxBytes))
+                HWLabeled("Network sent", value: networkStatus ?? Format.bytes(liveService.container.networkTxBytes))
             }
             if let cache = liveService.cache { CacheMetricsSection(metrics: cache) }
             Section("Runtime evidence") {
