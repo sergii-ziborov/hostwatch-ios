@@ -51,6 +51,18 @@ struct StoredSession: Codable {
     var savedAt: Date
 }
 
+protocol SessionStorage: Sendable {
+    func save(_ value: StoredSession)
+    func load() -> StoredSession?
+    func delete()
+}
+
+struct KeychainSessionStorage: SessionStorage {
+    func save(_ value: StoredSession) { SessionVault.save(value) }
+    func load() -> StoredSession? { SessionVault.load() }
+    func delete() { SessionVault.delete() }
+}
+
 enum SessionVault {
     private static let service = "com.hostwatch.controlplane.session"
     private static let account = "session-v1"

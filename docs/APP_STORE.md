@@ -1,4 +1,4 @@
-# App Store submission — Hostwatch 1.0.4 (7)
+# App Store submission — Hostwatch 1.0.5 (8)
 
 Prepared 2026-09-29. These are submission materials, not a claim that Apple approved or published the app.
 
@@ -24,7 +24,7 @@ Requires access to a Hostwatch control plane. No public account registration, em
 
 What's new:
 
-QR codes open the installed app. Saved device authorization renews expired access sessions. Errors can be exported as Markdown. Secret classification is explicit, and owners can manage shared variables for multiple projects. Privacy, Terms and Support are accessible before sign-in.
+Password and authenticator errors now explain the failed input. A fresh password sign-in replaces expired local authorization, response cookies are saved before the next request, and background saving preserves a renewed session. Password visibility can be toggled during entry. QR pairing, error export, shared settings and policy links remain available.
 
 ## Reviewer instructions
 
@@ -53,10 +53,10 @@ Suggested captures: Overview with time axis, Traffic and request destination, Er
 ## Release gates
 
 - [x] Native SwiftUI client, camera/Face ID usage descriptions and app icon.
-- [x] Version 1.0.4 (7), shared archive scheme, iPhone/iPad targets.
+- [x] Version 1.0.5 (8), shared archive scheme, iPhone/iPad targets.
 - [x] Custom QR URL scheme and associated-domain entitlement in release source.
 - [x] Privacy manifest and accessible Privacy/Terms/Support links.
-- [x] Parser/session API test coverage; 28 native tests passed.
+- [x] Parser/session API test coverage; 34 native tests passed, including an explicitly configured live controller sign-in from the simulator.
 - [ ] Physical QR scan, biometric unlock and eight-hour-expiry renewal on the candidate.
 - [ ] Distribution provisioning with Associated Domains; validated Release archive.
 - [ ] Xcode Cloud build and TestFlight distribution verified for this commit.

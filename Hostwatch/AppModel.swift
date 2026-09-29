@@ -193,6 +193,7 @@ final class AppModel: ObservableObject {
 
     func signIn(email: String, password: String) async {
         loading = true; errorMessage = nil
+        hasSavedSession = false
         defer { loading = false }
         do {
             try await configureClient()
@@ -206,7 +207,7 @@ final class AppModel: ObservableObject {
     }
 
     func verify(otp: String) async {
-        loading = true; defer { loading = false }
+        loading = true; errorMessage = nil; defer { loading = false }
         do {
             session = try await client.verify(otp: otp)
             if session.authenticated {

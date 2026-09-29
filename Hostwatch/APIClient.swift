@@ -23,15 +23,19 @@ actor APIClient {
     private var csrf = ""
     private var selectedNode = ""
     private let session: URLSession
+    private let cookieStorage: HTTPCookieStorage
+    private let sessionStorage: SessionStorage
     private let decoder = JSONDecoder()
     private var renewal: Task<SessionState, Error>?
 
-    init(baseURL: URL) {
+    init(baseURL: URL, configuration: URLSessionConfiguration = .default, sessionStorage: SessionStorage = KeychainSessionStorage()) {
         self.baseURL = baseURL
-        let configuration = URLSessionConfiguration.default
+        self.sessionStorage = sessionStorage
+        let configuration = configuration.copy() as! URLSessionConfiguration
         configuration.timeoutIntervalForRequest = 25
         configuration.timeoutIntervalForResource = 90
-        configuration.httpCookieStorage = .shared
+        cookieStorage = configuration.httpCookieStorage ?? .shared
+        configuration.httpCookieStorage = cookieStorage
         configuration.httpShouldSetCookies = true
         session = URLSession(configuration: configuration)
     }
@@ -58,15 +62,26 @@ actor APIClient {
         }
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
+        // Make response cookies available before persisting or issuing the next auth request.
+        // The Keychain snapshot must contain the new device/challenge credential.
+        let headers = http.allHeaderFields.reduce(into: [String: String]()) { result, item in
+            result[String(describing: item.key)] = String(describing: item.value)
+        }
+        let cookies = HTTPCookie.cookies(withResponseHeaderFields: headers, for: url)
+        cookieStorage.setCookies(cookies, for: url, mainDocumentURL: baseURL)
         guard (200..<300).contains(http.statusCode) else {
+            let server = try? decoder.decode(ServerError.self, from: data)
             if http.statusCode == 401 {
+                // A rejected password/code is an input error, not an expired saved session.
+                if (path == "/api/session" || path == "/api/session/totp") && method == "POST" {
+                    throw APIError.server(server?.error ?? (path.hasSuffix("/totp") ? "Invalid verification code." : "Invalid email or password."))
+                }
                 if retry && !path.hasPrefix("/api/session") {
                     _ = try await renewSession()
                     return try await call(path, method: method, body: body, retry: false)
                 }
                 throw APIError.unauthorized
             }
-            let server = try? decoder.decode(ServerError.self, from: data)
             throw APIError.server(server?.error ?? "Request failed (HTTP \(http.statusCode)).")
         }
         return try decoder.decode(T.self, from: data)
@@ -81,6 +96,7 @@ actor APIClient {
         let task = Task<SessionState, Error> {
             let value: SessionState = try await self.call("/api/session/refresh", method: "POST", retry: false)
             guard value.authenticated else { throw APIError.unauthorized }
+            self.csrf = value.csrf ?? ""
             self.persistAuthenticated(value)
             return value
         }
@@ -98,6 +114,13 @@ actor APIClient {
     }
 
     func signIn(email: String, password: String) async throws -> SessionState {
+        // Start a password sign-in independently of the previous device authorization.
+        if let renewal {
+            renewal.cancel()
+            _ = try? await renewal.value
+            self.renewal = nil
+        }
+        forgetSession()
         let value: SessionState = try await call("/api/session", method: "POST", body: Credentials(email: email, password: password))
         csrf = value.csrf ?? ""
         if value.authenticated { persistAuthenticated(value) }
@@ -157,37 +180,40 @@ actor APIClient {
 
     func forgetSession() {
         csrf = ""; selectedNode = ""
-        let storage = HTTPCookieStorage.shared
-        for cookie in storage.cookies(for: baseURL) ?? [] { storage.deleteCookie(cookie) }
-        SessionVault.delete()
+        let names = ["hostwatch_session", "hostwatch_csrf", "hostwatch_challenge", "hostwatch_device"]
+        for cookie in cookieStorage.cookies(for: baseURL) ?? [] where names.contains(cookie.name) { cookieStorage.deleteCookie(cookie) }
+        sessionStorage.delete()
     }
 
     func hasSavedSession() -> Bool {
-        SessionVault.load()?.snapshot.authenticated == true
+        sessionStorage.load()?.snapshot.authenticated == true
     }
 
     func cachedSnapshot() -> SessionState? {
-        let stored = SessionVault.load()
+        let stored = sessionStorage.load()
         return stored?.snapshot.authenticated == true ? stored?.snapshot : nil
     }
 
     func persistAuthenticated(_ state: SessionState) {
         guard state.authenticated else { return }
-        csrf = state.csrf ?? csrf
-        SessionVault.save(StoredSession(
+        // AppModel can still hold the pre-renewal snapshot when the app backgrounds.
+        // The client's current authorization must remain authoritative.
+        var snapshot = state
+        snapshot.csrf = csrf
+        sessionStorage.save(StoredSession(
             baseURL: baseURL.absoluteString,
             csrf: csrf,
-            cookies: StoredCookie.snapshot(from: .shared, url: baseURL),
-            snapshot: state,
+            cookies: StoredCookie.snapshot(from: cookieStorage, url: baseURL),
+            snapshot: snapshot,
             savedAt: Date()
         ))
     }
 
     func applySavedSession() -> SessionState? {
-        guard let stored = SessionVault.load(), stored.snapshot.authenticated else { return nil }
+        guard let stored = sessionStorage.load(), stored.snapshot.authenticated else { return nil }
         if let url = URL(string: stored.baseURL) { baseURL = url }
         csrf = stored.csrf
-        StoredCookie.apply(stored.cookies, to: .shared)
+        StoredCookie.apply(stored.cookies, to: cookieStorage)
         return stored.snapshot
     }
 

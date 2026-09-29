@@ -4,6 +4,7 @@ struct SignInView: View {
     @EnvironmentObject private var model: AppModel
     @State private var email = ""
     @State private var password = ""
+    @State private var showPassword = false
     @State private var otp = ""
     @State private var showServer = false
     @State private var useQR = false
@@ -75,10 +76,20 @@ struct SignInView: View {
             Text("Sign in").font(.title2.bold())
             Text("Use your company account. After signing in, this app can approve QR sign-ins on the website.")
                 .font(.footnote).foregroundStyle(HW.secondary)
-            TextField("Email", text: $email).textContentType(.username).keyboardType(.emailAddress).textInputAutocapitalization(.never)
+            TextField("Email", text: $email).textContentType(.username).keyboardType(.emailAddress).textInputAutocapitalization(.never).autocorrectionDisabled()
                 .padding(14).background(HW.background).clipShape(RoundedRectangle(cornerRadius: 12))
-            SecureField("Password", text: $password).textContentType(.password)
-                .padding(14).background(HW.background).clipShape(RoundedRectangle(cornerRadius: 12))
+            HStack {
+                Group {
+                    if showPassword { TextField("Password", text: $password) }
+                    else { SecureField("Password", text: $password) }
+                }
+                .textContentType(.password).textInputAutocapitalization(.never).autocorrectionDisabled()
+                Button { showPassword.toggle() } label: {
+                    Image(systemName: showPassword ? "eye.slash" : "eye")
+                }
+                .accessibilityLabel(showPassword ? "Hide password" : "Show password")
+            }
+            .padding(14).background(HW.background).clipShape(RoundedRectangle(cornerRadius: 12))
             Button {
                 Task { await model.signIn(email: email, password: password) }
             } label: {

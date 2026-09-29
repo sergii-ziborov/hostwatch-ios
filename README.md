@@ -2,7 +2,7 @@
 
 Native SwiftUI control-plane client for Hostwatch. The iPhone and iPad app is intended for **public App Store distribution**, while access to a control plane is provisioned by an organization. It uses the same signed-in session and REST API as the web application. There is no public demo or registration flow.
 
-**Version 1.0.4 (7):** includes QR deep links, renewable device sessions, Errors Markdown export, explicit Secret creation and multi-project shared variables. A signed Debug build was installed on the paired iPhone 13 mini on 2026-09-29. The simulator suite passed 28 tests. Physical-camera/Face ID testing and a validated App Store distribution archive remain required; installation is not an App Store release. See [submission materials and release checklist](docs/APP_STORE.md).
+**Version 1.0.5 (8):** fixes password and authenticator error messages, starts a fresh password sign-in after expired device authorization, and preserves renewed session protection when the app backgrounds. Response cookies are saved before the next request or Keychain snapshot; password visibility can be toggled while entering credentials. All 34 tests passed on 2026-09-29, including an explicitly configured live controller sign-in from the iOS simulator. A signed Debug build is prepared. Physical-camera/Face ID testing and a validated App Store distribution archive remain required. See [submission materials and release checklist](docs/APP_STORE.md).
 
 ## Product structure
 
@@ -42,6 +42,8 @@ xcodebuild -project Hostwatch.xcodeproj -scheme Hostwatch \
   -sdk iphonesimulator -configuration Debug CODE_SIGNING_ALLOWED=NO build
 ```
 
+The simulator test suite covers expired-device password retry, rejected passwords and authenticator codes, rate limiting, response-cookie persistence, and saving after renewal. The optional live sign-in test runs only when `HOSTWATCH_TEST_ORIGIN`, `HOSTWATCH_TEST_EMAIL` and `HOSTWATCH_TEST_PASSWORD` are explicitly supplied to the test runner; it signs out its own temporary session. Never commit credentials. Xcode command-line test runner variables can be supplied using the `TEST_RUNNER_` prefix.
+
 For local UI development only, a Debug build may be launched with `HOSTWATCH_FIXTURES=1`. These values are fabricated test fixtures and display a prominent **SAMPLE DATA · DEBUG BUILD** notice instead of a Live status. A Release build ignores the flag and requires a real, authenticated control plane. No fixture screenshot is used as an App Store asset.
 
 All app screens use SwiftUI, SceneKit, MapKit and direct JSON API calls. There are no embedded web pages, WebViews or bundled HTML assets. A shared `Hostwatch` scheme and an Xcode Cloud workflow are configured for this iOS repository. The controller and Go agent remain separate products; this iOS workflow does not build or publish them. Public App Store distribution still requires a validated archive, App Store Connect metadata, review credentials, on-device testing and App Review approval.
@@ -60,7 +62,7 @@ For App Store review and users, see the [privacy policy](PRIVACY.md) and [suppor
 
 <img src="docs/screenshots/iphone-sign-in.png" width="320" alt="Hostwatch 1.0.4 native sign-in with Password, Scan website QR, Support, Terms and Privacy controls" />
 
-Current simulator capture of version 1.0.4 against an isolated local controller. No sample traffic or customer credentials are shown.
+Previous simulator capture of version 1.0.4 against an isolated local controller. No sample traffic or customer credentials are shown; version 1.0.5 also includes a password visibility control.
 
 Only captures from an authenticated shipping build should be uploaded to App Store Connect. Development fixture images under `docs/screenshots/` explicitly show SAMPLE DATA and are not current server telemetry or Store assets. See [capture checklist](docs/APP_STORE.md#screenshots); the listing must include both supported device families.
 
