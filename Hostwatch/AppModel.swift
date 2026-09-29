@@ -52,6 +52,8 @@ final class AppModel: ObservableObject {
     @Published var fleetLinks: [FleetLink] = []
     @Published var hybridError: String?
     @Published var mcpSnapshot: MCPSnapshot?
+    @Published var tlsSite: TLSSite?
+    @Published var tlsNotice: String?
 
     @Published var baseURLText: String {
         didSet { UserDefaults.standard.set(baseURLText, forKey: "controlPlaneURL") }
@@ -312,7 +314,7 @@ final class AppModel: ObservableObject {
     }
 
     func changeNode(_ id: String, page: SidebarPage) async {
-        selectedNode = id; storage = nil; storageBrowse = nil; cleanupPreview = nil
+        selectedNode = id; storage = nil; storageBrowse = nil; cleanupPreview = nil; tlsSite = nil
         await client.select(node: id); await reload(page: page)
     }
 
@@ -433,6 +435,8 @@ final class AppModel: ObservableObject {
                 (guardState, accessRules) = try await (guardCall, rulesCall)
             case .environment:
                 if let site = sites.first(where: { $0.id == selectedSite }) ?? sites.first { environment = try await client.environment(site: site.id) }
+            case .tls:
+                if let site = sites.first(where: { $0.id == selectedSite }) ?? sites.first { tlsSite = try await client.tlsSite(site.id) }
             case .mcp:
                 mcpSnapshot = try await client.mcpSnapshot()
             case .automations:
@@ -457,8 +461,20 @@ final class AppModel: ObservableObject {
         case .workloads: return !sites.isEmpty
         case .topology: return !sites.isEmpty || !projects.isEmpty
         case .mcp: return mcpSnapshot != nil
+        case .tls: return tlsSite != nil
         default: return true
         }
+    }
+
+    func checkTLSRenewal(site: String, lineage: String) async {
+#if DEBUG
+        if fixtures { tlsNotice = "Renewal is unavailable in sample data."; return }
+#endif
+        do {
+            _ = try await client.renewTLS(site: site, lineage: lineage)
+            tlsNotice = "Certbot check started for \(lineage)."
+            await reload(page: .tls, quiet: true)
+        } catch { errorMessage = error.localizedDescription }
     }
 
     func saveMCPGovernance(_ value: MCPGovernance) async {

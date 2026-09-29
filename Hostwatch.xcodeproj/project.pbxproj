@@ -32,6 +32,7 @@
 		8EAD16067175979A2DF3BBB9 /* ReclaimPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = E16B1858ED7B656C6848240B /* ReclaimPolicy.swift */; };
 		93965628E34EC6B52EFAF658 /* OverviewTrafficViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB8618F607DEE2D2E1E2849A /* OverviewTrafficViews.swift */; };
 		963A540C15DF394F13265CD9 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55C640803FA958183F2FE0C2 /* APIClient.swift */; };
+		97FB436C5AD2A169AE1AEF11 /* TLSViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = D15C00D484C9D75BA72B3796 /* TLSViews.swift */; };
 		A283FF16E0B0559681B2DD92 /* SignInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 876AF943DE6092E87224123B /* SignInView.swift */; };
 		A9E4AD4E50375F7CFC0381E5 /* AuthenticationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92C58A79DD847D0EDA249F62 /* AuthenticationTests.swift */; };
 		C5CB06A63E826D0B7023C7CD /* GeoLocation.swift in Sources */ = {isa = PBXBuildFile; fileRef = C25C3FE01E0B2D3B00975C39 /* GeoLocation.swift */; };
@@ -91,6 +92,7 @@
 		C25C3FE01E0B2D3B00975C39 /* GeoLocation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeoLocation.swift; sourceTree = "<group>"; };
 		C3975823A9BDAD4C763B10B2 /* VaultView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultView.swift; sourceTree = "<group>"; };
 		C954B0813358BA2BF2E2817F /* SharedVariablesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedVariablesView.swift; sourceTree = "<group>"; };
+		D15C00D484C9D75BA72B3796 /* TLSViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TLSViews.swift; sourceTree = "<group>"; };
 		D70AB601C45C76CEF7A402A2 /* SessionVault.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionVault.swift; sourceTree = "<group>"; };
 		D8DE859739CA33276FF42DAE /* TopologyCamera.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TopologyCamera.swift; sourceTree = "<group>"; };
 		E16B1858ED7B656C6848240B /* ReclaimPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReclaimPolicy.swift; sourceTree = "<group>"; };
@@ -154,6 +156,7 @@
 				C954B0813358BA2BF2E2817F /* SharedVariablesView.swift */,
 				876AF943DE6092E87224123B /* SignInView.swift */,
 				2F23EFDCF024E30815A1E55E /* Theme.swift */,
+				D15C00D484C9D75BA72B3796 /* TLSViews.swift */,
 				D8DE859739CA33276FF42DAE /* TopologyCamera.swift */,
 				AB39624746B6B3C851E807D8 /* TopologyLayers.swift */,
 				0268161CF78A514986F3C0B2 /* TopologyLayout.swift */,
@@ -290,6 +293,7 @@
 				25EF6D0152F34639E478A0CC /* SessionVault.swift in Sources */,
 				2590C86A7ABF4B5E894043C4 /* SharedVariablesView.swift in Sources */,
 				A283FF16E0B0559681B2DD92 /* SignInView.swift in Sources */,
+				97FB436C5AD2A169AE1AEF11 /* TLSViews.swift in Sources */,
 				7ED8B18934CABF0ACAA3D457 /* Theme.swift in Sources */,
 				0A2B3941E22A5C716D2FD6BD /* TopologyCamera.swift in Sources */,
 				E98DDBBCE0FB0A9382DDF1C5 /* TopologyLayers.swift in Sources */,
@@ -353,7 +357,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -366,7 +370,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 1.0.6;
+				MARKETING_VERSION = 1.0.7;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -469,7 +473,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -488,7 +492,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 1.0.6;
+				MARKETING_VERSION = 1.0.7;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;

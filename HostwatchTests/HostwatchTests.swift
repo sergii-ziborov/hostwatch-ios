@@ -5,6 +5,17 @@ import XCTest
 @testable import Hostwatch
 
 final class HostwatchTests: XCTestCase {
+    func testTLSInventoryKeepsUnknownStatesAndNoPrivateKeyMaterial() throws {
+        let response = #"{"siteId":"hostwatch","name":"Hostwatch","domains":["gethostwatch.com"],"management":"future_adapter","certificates":[{"lineage":"gethostwatch.com","fingerprint":"abcd","issuer":"Let's Encrypt","domains":["gethostwatch.com"],"notAfter":"2026-12-10T14:51:18Z","status":"future_status","renewalOwner":"certbot"}],"observations":[{"domain":"gethostwatch.com","boundary":"public","status":"unreachable","hostnameMatch":false,"trusted":false,"error":"TLS handshake unavailable"}],"scheduler":{"configured":true,"enabled":true},"warnings":[],"observedAt":"2026-09-30T00:00:00Z"}"#
+        let snapshot = try JSONDecoder().decode(TLSSite.self, from: Data(response.utf8))
+        XCTAssertEqual(snapshot.management, "future_adapter")
+        XCTAssertEqual(snapshot.certificates[0].status, "future_status")
+        XCTAssertEqual(snapshot.observations[0].status, "unreachable")
+        XCTAssertNil(snapshot.observations[0].fingerprint)
+        XCTAssertNil(snapshot.certificates[0].lastOperation)
+        XCTAssertFalse(response.contains("privateKey"))
+    }
+
     func testRequestThreatEvidenceAndOlderAgentCompatibility() throws {
         let sample = Fixtures.requests[0]
         let encoded = try JSONEncoder().encode(sample)

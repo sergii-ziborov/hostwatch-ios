@@ -52,7 +52,7 @@ struct RootView: View {
                         )) { EmptyView() }
                     }
                     Section("Observe") { mobileMenu(.incidents); mobileMenu(.errors); mobileMenu(.workloads); mobileMenu(.fleet) }
-                    Section("Control") { mobileMenu(.policies); mobileMenu(.environment); mobileMenu(.mcp); mobileMenu(.cleanup); mobileMenu(.automations) }
+                    Section("Control") { mobileMenu(.policies); mobileMenu(.environment); mobileMenu(.tls); mobileMenu(.mcp); mobileMenu(.cleanup); mobileMenu(.automations) }
                     Section("Analyze") { mobileMenu(.codeHealth) }
                     Section("Company") { mobileMenu(.access); mobileMenu(.security); mobileMenu(.organization) }
                     Section { Button("Sign out", systemImage: "rectangle.portrait.and.arrow.right", role: .destructive) { Task { await model.signOut() } } }
@@ -86,7 +86,7 @@ struct RootView: View {
                     menu(.overview); menu(.traffic); menu(.data); menu(.incidents); menu(.errors); menu(.topology); menu(.workloads); menu(.fleet)
                 }
                 Section("Control") {
-                    menu(.policies); menu(.environment); menu(.mcp); menu(.cleanup); menu(.automations)
+                    menu(.policies); menu(.environment); menu(.tls); menu(.mcp); menu(.cleanup); menu(.automations)
                 }
                 Section("Analyze") { menu(.codeHealth) }
                 Section("Company") { menu(.access); menu(.security); menu(.organization) }
@@ -212,6 +212,7 @@ struct PageContainer: View {
             case .cleanup: CleanupView()
             case .policies: TrafficPoliciesView()
             case .environment: EnvironmentView()
+            case .tls: TLSView()
             case .mcp: MCPView()
             case .codeHealth: CodeHealthView()
             case .automations: AutomationsView()
@@ -344,7 +345,7 @@ struct ScopeBar: View {
     }
 
     private var showsSite: Bool {
-        [.traffic, .data, .topology, .workloads, .policies, .environment].contains(page)
+        [.traffic, .data, .topology, .workloads, .policies, .environment, .tls].contains(page)
     }
 
     private var showsWindow: Bool { [.overview, .traffic].contains(page) }

@@ -512,12 +512,12 @@ struct FleetLink: Codable, Identifiable {
 }
 
 enum SidebarPage: String, CaseIterable, Identifiable {
-    case overview, traffic, data, incidents, errors, topology, workloads, fleet, cleanup, policies, environment, mcp, codeHealth, automations, access, security, organization
+    case overview, traffic, data, incidents, errors, topology, workloads, fleet, cleanup, policies, environment, tls, mcp, codeHealth, automations, access, security, organization
     var id: String { rawValue }
     var title: String {
         switch self {
         case .overview: "Overview"; case .traffic: "Traffic"; case .data: "Database"; case .incidents: "Incidents & risks"; case .errors: "Errors"; case .topology: "Runtime topology"
-        case .workloads: "Workloads"; case .fleet: "Fleet"; case .cleanup: "Cleanup"; case .policies: "Traffic policies"; case .environment: "Environment"; case .mcp: "MCP"
+        case .workloads: "Workloads"; case .fleet: "Fleet"; case .cleanup: "Cleanup"; case .policies: "Traffic policies"; case .environment: "Environment"; case .tls: "SSL / TLS"; case .mcp: "MCP"
         case .codeHealth: "Code health"
         case .automations: "Automations"; case .access: "Access"; case .security: "Account security"; case .organization: "Organization"
         }
@@ -525,9 +525,62 @@ enum SidebarPage: String, CaseIterable, Identifiable {
     var icon: String {
         switch self {
         case .overview: "square.grid.2x2"; case .traffic: "chart.xyaxis.line"; case .data: "cylinder.split.1x2"; case .incidents: "exclamationmark.shield"; case .errors: "exclamationmark.octagon"; case .topology: "point.3.connected.trianglepath.dotted"
-        case .workloads: "shippingbox"; case .fleet: "laptopcomputer.and.iphone"; case .cleanup: "sparkles.rectangle.stack"; case .policies: "shield.lefthalf.filled"; case .environment: "key.horizontal"; case .mcp: "antenna.radiowaves.left.and.right"
+        case .workloads: "shippingbox"; case .fleet: "laptopcomputer.and.iphone"; case .cleanup: "sparkles.rectangle.stack"; case .policies: "shield.lefthalf.filled"; case .environment: "key.horizontal"; case .tls: "lock.shield"; case .mcp: "antenna.radiowaves.left.and.right"
         case .codeHealth: "waveform.path.ecg.rectangle"
         case .automations: "clock.arrow.circlepath"; case .access: "person.2"; case .security: "lock.shield"; case .organization: "building.2"
         }
     }
 }
+
+struct TLSSite: Decodable {
+    let siteId: String
+    let name: String
+    let domains: [String]
+    let management: String
+    let certificates: [TLSCertificate]
+    let observations: [TLSObservation]
+    let scheduler: TLSScheduler
+    let warnings: [String]
+    let observedAt: String
+}
+
+struct TLSCertificate: Decodable, Identifiable {
+    var id: String { lineage }
+    let lineage: String
+    let fingerprint: String
+    let issuer: String
+    let domains: [String]
+    let notAfter: String
+    let status: String
+    let renewalOwner: String
+    let lastOperation: TLSOperation?
+}
+
+struct TLSObservation: Decodable, Identifiable {
+    var id: String { "\(boundary):\(domain)" }
+    let domain: String
+    let boundary: String
+    let status: String
+    let fingerprint: String?
+    let notAfter: String?
+    let hostnameMatch: Bool
+    let trusted: Bool
+    let error: String?
+}
+
+struct TLSScheduler: Decodable {
+    let configured: Bool
+    let enabled: Bool
+    let lastCheck: String?
+    let nextCheck: String?
+    let lastResult: String?
+}
+
+struct TLSOperation: Decodable {
+    let startedAt: String
+    let completedAt: String?
+    let result: String
+}
+
+struct TLSRenewalRequest: Encodable { let lineage: String }
+struct TLSRenewalAccepted: Decodable { let accepted: Bool; let lineage: String }

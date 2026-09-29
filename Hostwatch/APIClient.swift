@@ -223,6 +223,10 @@ actor APIClient {
     func overview() async throws -> Overview { try await call("/api/v1/overview") }
     func networkPorts() async throws -> NetworkPorts { try await call("/api/v1/network-ports") }
     func sites() async throws -> [Site] { try await call("/api/v1/sites") }
+    func tlsSite(_ id: String) async throws -> TLSSite { try await call("/api/v1/tls/sites/\(id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? id)") }
+    func renewTLS(site: String, lineage: String) async throws -> TLSRenewalAccepted {
+        try await call("/api/v1/tls/sites/\(site.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? site)/renew", method: "POST", body: TLSRenewalRequest(lineage: lineage))
+    }
     func dataServices() async throws -> DataServicesResponse { try await call("/api/v1/data-services") }
     func dataTables(path: String) async throws -> DataTablesResponse {
         try await call("/api/v1/data-tables?\(queryItems(["path": path]))")
