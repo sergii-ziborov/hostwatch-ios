@@ -2,7 +2,18 @@
 
 Native SwiftUI control-plane client for Hostwatch. The iPhone and iPad app is intended for **public App Store distribution**, while access to a control plane is provisioned by an organization. It uses the same signed-in session and REST API as the web application. There is no public demo or registration flow.
 
-**Version 1.0.7 (11):** fixes Overview loading when a site has no containers and makes incompatible API fields identifiable in error messages. It also includes the native SSL / TLS view for local certificate files, origin and public HTTPS, Certbot schedule status, and owner-only renewal checks. The node performs renewal; no certificate private key is sent to the app. Physical-camera/Face ID testing and a validated App Store distribution archive remain required. See [submission materials and release checklist](docs/APP_STORE.md).
+**Version 1.0.7 (11):** fixes Overview loading when a site has no containers and makes incompatible API fields identifiable in error messages. It also includes the native SSL / TLS view for local certificate files, origin and public HTTPS, Certbot schedule status, and owner-only renewal checks. The node performs renewal; no certificate private key is sent to the app. See [submission materials and release checklist](docs/APP_STORE.md) for the current TestFlight and App Store status.
+
+## Install and first setup
+
+The iOS beta is distributed by TestFlight invitation. Request access from your organization administrator or [Hostwatch support](mailto:serhii.ziborov@gmail.com?subject=Hostwatch%20iOS%20TestFlight). There is no public download link yet.
+
+1. Install Apple's TestFlight app on the iPhone or iPad, open the invitation sent to your Apple Account, then accept and install Hostwatch.
+2. On the Hostwatch sign-in screen, leave the hosted address in place or expand **Control-plane address** and enter the HTTPS address supplied by your administrator.
+3. Sign in with your organization email and password, followed by an authenticator code if requested. Alternatively, choose **Scan website QR** and scan the device sign-in code from an already authenticated website session under **Organization → Account security → Sign in on iPhone or iPad**.
+4. Select a node on **Overview** and pull down to refresh. Traffic, Database and Runtime use the selected node and your account permissions.
+
+If Overview says **No host snapshot**, confirm the selected node has data on the website, update Hostwatch in TestFlight and refresh. If an error persists, report the exact text, app version, node name and time to support. Never send passwords or API keys. The public [setup and troubleshooting guide](https://gethostwatch.com/support#ios-setup) has more detail.
 
 ## Product structure
 
@@ -52,9 +63,9 @@ distribution archive or submission was performed for this runtime update.
 
 For local UI development only, a Debug build may be launched with `HOSTWATCH_FIXTURES=1`. These values are fabricated test fixtures and display a prominent **SAMPLE DATA · DEBUG BUILD** notice instead of a Live status. A Release build ignores the flag and requires a real, authenticated control plane. No fixture screenshot is used as an App Store asset.
 
-All app screens use SwiftUI, SceneKit, MapKit and direct JSON API calls. There are no embedded web pages, WebViews or bundled HTML assets. A shared `Hostwatch` scheme and an Xcode Cloud workflow are configured for this iOS repository. The controller and Go agent remain separate products; this iOS workflow does not build or publish them. Public App Store distribution still requires a validated archive, App Store Connect metadata, review credentials, on-device testing and App Review approval.
+All app screens use SwiftUI, SceneKit, MapKit and direct JSON API calls. There are no embedded web pages, WebViews or bundled HTML assets. The shared `Hostwatch` scheme supports Xcode archives, and the GitHub Actions release-candidate workflow builds an unsigned archive on stable Xcode for local signing. The controller and Go agent remain separate products. Public App Store distribution still requires a validated archive, App Store Connect metadata, review credentials, on-device testing and App Review approval.
 
-To run on a physical iPhone, open `Hostwatch.xcodeproj` in Xcode and select your device. Automatic signing uses the configured developer team; Xcode must have an authenticated Apple Account. For an Xcode Cloud archive, use the shared `Hostwatch` scheme, verify the selected branch and stable Xcode version, and explicitly enable App Store Connect distribution. Do not turn on automatic public release.
+To run on a physical iPhone, open `Hostwatch.xcodeproj` in Xcode and select your device. Automatic signing uses the configured developer team; Xcode must have an authenticated Apple Account. For a release candidate, run the GitHub Actions `iOS release candidate` workflow on `main`, verify its stable Xcode version, then sign and validate the resulting archive before uploading. Do not turn on automatic public release.
 
 Apple reviewers need a dedicated, working account on a live control plane with representative data and any second-factor instructions. The sign-in screen alone is insufficient for review. The public privacy and support URLs, screenshots of the shipping build, app privacy answers, review notes and tester coverage must match the actual service before submission.
 
@@ -66,9 +77,9 @@ For App Store review and users, see the [privacy policy](PRIVACY.md) and [suppor
 
 ## Screenshots
 
-<img src="docs/screenshots/iphone-sign-in.png" width="320" alt="Hostwatch 1.0.4 native sign-in with Password, Scan website QR, Support, Terms and Privacy controls" />
+<img src="docs/screenshots/iphone-sign-in.png" width="275" alt="Hostwatch 1.0.7 sign-in with Password and Scan website QR options" /> <img src="docs/screenshots/iphone-overview-sample.png" width="275" alt="Hostwatch 1.0.7 Overview with an explicit SAMPLE DATA banner" />
 
-Previous simulator capture of version 1.0.4 against an isolated local controller. No sample traffic or customer credentials are shown; version 1.0.5 also includes a password visibility control.
+Simulator captures of version 1.0.7 (11). The Overview image contains fabricated development fixtures and visibly says **SAMPLE DATA · DEBUG BUILD**. The sign-in image contains no credentials.
 
 Only captures from an authenticated shipping build should be uploaded to App Store Connect. Development fixture images under `docs/screenshots/` explicitly show SAMPLE DATA and are not current server telemetry or Store assets. See [capture checklist](docs/APP_STORE.md#screenshots); the listing must include both supported device families.
 
