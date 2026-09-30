@@ -10,6 +10,8 @@ Updated 2026-09-30. Build 13 is in internal TestFlight testing; Apple has not ap
 - The account holder's internal tester status is `INSTALLED`. TestFlight should offer build 13 as an update; its behavior on the physical device still needs confirmation.
 - The primary node now includes the `weavatrix-hosted` project and scheduled code-health scan. The first report contains 11 modules, 10 communities and 5,504 graph nodes. Its status is `PARTIAL` because the deployed repository has no measured coverage report.
 
+The GitHub Actions archive is intentionally unsigned. Before exporting it locally, sign the archived app with the distribution profile and expanded entitlements: the profile's app/team identifiers plus `applinks:gethostwatch.com` from `Hostwatch.entitlements`. Exporting an unsigned archive directly omits Associated Domains from the IPA. Verify the final IPA's signature includes the domain before Apple validation. Keep the signing certificate, profile and API key outside Git.
+
 ## Listing
 
 - Name: Hostwatch
