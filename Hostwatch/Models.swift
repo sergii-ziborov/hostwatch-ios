@@ -415,6 +415,14 @@ struct ErrorProjectGroup: Codable, Identifiable {
     var id: String { projectId }
     let projectId: String; let projectName: String; let count: Int; let lastTime: String?
     let statuses: [String: Int]?; let requests: [RequestSample]
+
+    var httpErrorCount: Int {
+        let blocked = blockedRequests ?? statuses?["444"] ?? 0
+        let cancelled = cancelledRequests ?? statuses?["499"] ?? 0
+        return max(0, count - blocked - cancelled)
+    }
+
+    var edgeBlockCount: Int { blockedRequests ?? statuses?["444"] ?? 0 }
 }
 struct ErrorLogLine: Codable, Identifiable, Hashable {
     var id: String { "\(time ?? "")|\(stream)|\(text)" }

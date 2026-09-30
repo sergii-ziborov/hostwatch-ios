@@ -2,7 +2,7 @@
 
 Native SwiftUI control-plane client for Hostwatch. The iPhone and iPad app is intended for **public App Store distribution**, while access to a control plane is provisioned by an organization. It uses the same signed-in session and REST API as the web application. There is no public demo or registration flow.
 
-**Version 1.0.7 (14):** available in the internal **Hostwatch Internal** TestFlight group. In Runtime's Traffic view, site name pointers now follow the visible runtime pillars; switching back to Towers restores their full-height positions. The previous build kept the Runtime scene intact and hid false `cancelled` errors when a background refresh was interrupted. The Weavatrix hosted site's code-health scan is configured on the primary node so its tower can show module, community and graph layers. See [submission materials and release checklist](docs/APP_STORE.md) for the current TestFlight and App Store status.
+**Version 1.0.7 (14):** available in the internal **Hostwatch Internal** TestFlight group. The 1.0.8 (15) source corrects Errors totals by separating HTTP errors from Nginx 444 edge blocks; it is not yet distributed. In Runtime's Traffic view, site name pointers follow the visible runtime pillars; switching back to Towers restores their full-height positions. See [submission materials and release checklist](docs/APP_STORE.md) for the current TestFlight and App Store status.
 
 ## Install and first setup
 

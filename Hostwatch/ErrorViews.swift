@@ -14,7 +14,7 @@ struct ErrorsView: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 VStack(alignment: .leading, spacing: 6) {
-                    Eyebrow(text: "HTTP failures by project")
+                    Eyebrow(text: "HTTP errors and edge blocks by project")
                     Text("Errors").font(.title2.bold())
                     Text("Open an error to see the project, earlier matches, and nearby container logs when the agent can attribute a service.").font(.footnote).foregroundStyle(HW.secondary)
                     NavigationLink { ErrorExplorerView() } label: { Text("Status and path aggregates").font(.caption).foregroundStyle(HW.teal) }
@@ -39,7 +39,7 @@ struct ErrorsView: View {
             }
             let groups = model.groupedErrors()
             if groups.isEmpty {
-                EmptyState(icon: "exclamationmark.octagon", title: "No retained project errors", detail: "New 4xx/5xx requests appear here as the live buffer fills. Imported Markdown notes stay below.")
+                EmptyState(icon: "exclamationmark.octagon", title: "No retained project errors", detail: "New HTTP errors and edge blocks appear here as the live buffer fills. Imported Markdown notes stay below.")
             } else {
                 ForEach(groups) { group in
                     NavigationLink { ErrorProjectDetail(group: group) } label: {
@@ -47,7 +47,10 @@ struct ErrorsView: View {
                             HStack {
                                 Text(group.projectName).font(.headline)
                                 Spacer()
-                                Text("\(group.count) HTTP failures").font(.subheadline.bold()).foregroundStyle(HW.red)
+                                Text("\(group.httpErrorCount) HTTP errors").font(.subheadline.bold()).foregroundStyle(group.httpErrorCount > 0 ? HW.red : HW.secondary)
+                            }
+                            if group.edgeBlockCount > 0 {
+                                Text("\(group.edgeBlockCount) edge blocks · 444").font(.caption).foregroundStyle(HW.teal)
                             }
                             Text(statusSummary(group)).font(.caption).foregroundStyle(HW.secondary)
                             Text("Open project history →").font(.caption2).foregroundStyle(HW.teal)
@@ -107,8 +110,11 @@ struct ErrorsView: View {
     }
 
     private func statusSummary(_ group: ErrorProjectGroup) -> String {
-        let parts = (group.statuses ?? [:]).sorted { $0.value > $1.value }.map { "HTTP \($0.key) × \($0.value)" }
-        return parts.isEmpty ? "\(group.count) observed HTTP failures" : parts.joined(separator: " · ")
+        let parts = (group.statuses ?? [:]).sorted { $0.value > $1.value }.map { status, count in
+            let label = status == "444" ? "Blocked 444" : status == "499" ? "Cancelled 499" : "HTTP \(status)"
+            return "\(label) × \(count)"
+        }
+        return parts.isEmpty ? "\(group.count) observed events" : parts.joined(separator: " · ")
     }
 }
 
@@ -118,10 +124,12 @@ struct ErrorProjectDetail: View {
         List {
             Section("Project") {
                 HWLabeled("Name", value: group.projectName)
-                HWLabeled("Period HTTP failures", value: group.count.formatted())
+                HWLabeled("HTTP errors (4xx / 5xx)", value: group.httpErrorCount.formatted())
+                HWLabeled("All observed events", value: group.count.formatted())
                 if let hours = group.windowHours { HWLabeled("Window", value: "\(hours) hours") }
                 if let count = group.serverErrors { HWLabeled("Server errors (5xx)", value: count.formatted()) }
-                if let count = group.blockedRequests { HWLabeled("Nginx rejections (444)", value: count.formatted()) }
+                if group.edgeBlockCount > 0 { HWLabeled("Nginx rejections (444)", value: group.edgeBlockCount.formatted()) }
+                if let count = group.cancelledRequests, count > 0 { HWLabeled("Client cancellations (499)", value: count.formatted()) }
                 if let count = group.retainedCount { HWLabeled("Retained examples", value: "\(group.requests.count) of \(count)") }
                 if let count = group.retainedCount, count > group.count {
                     Text("Aggregate coverage has a gap: at least \(count - group.count) recovered records were absent from recorded totals.").font(.caption).foregroundStyle(HW.secondary)

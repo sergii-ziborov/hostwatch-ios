@@ -366,6 +366,11 @@ final class HostwatchTests: XCTestCase {
         """.utf8))
         XCTAssertEqual(groups.first?.projectId, "applydjinn")
         XCTAssertEqual(groups.first?.count, 2)
+        let mixed = try JSONDecoder().decode([ErrorProjectGroup].self, from: Data("""
+        [{"projectId":"applydjin","projectName":"ApplyDjinn","count":7417,"blockedRequests":7356,"cancelledRequests":2,"lastTime":null,"statuses":{"444":7356,"404":59,"499":2},"requests":[]}]
+        """.utf8))
+        XCTAssertEqual(mixed.first?.httpErrorCount, 59)
+        XCTAssertEqual(mixed.first?.edgeBlockCount, 7356)
     }
 
     func testMarkdownNotesImportAndExportAdvisories() {

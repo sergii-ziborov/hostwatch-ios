@@ -1,6 +1,6 @@
 # App Store submission — Hostwatch 1.0.7 (14)
 
-Updated 2026-09-30. Build 14 is in internal TestFlight testing; Apple has not approved or published a public App Store release.
+Updated 2026-09-30. Build 14 is in internal TestFlight testing; build 15 source separates HTTP errors from edge blocks and awaits distribution signing. Apple has not approved or published a public App Store release.
 
 ## Internal TestFlight status
 
