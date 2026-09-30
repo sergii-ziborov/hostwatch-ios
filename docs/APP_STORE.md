@@ -1,4 +1,4 @@
-# App Store submission — Hostwatch 1.0.7 (11)
+# App Store submission — Hostwatch 1.0.7 (12)
 
 Updated 2026-09-30. These are submission materials, not a claim that Apple approved or published the app.
 
@@ -42,7 +42,7 @@ Organization owners provision accounts. The app has no public sign-up or third-p
 
 The bundled `PrivacyInfo.xcprivacy` declares the UserDefaults reason CA92.1 and account/operational data used for app functionality, linked to the organization account, without tracking. Reconcile the final App Store privacy questionnaire with the live control plane, including user-entered content, log data and network addresses. No location permission is requested; approximate visitor geography belongs to server telemetry. Camera permission is only for QR scanning. Face ID is evaluated by LocalAuthentication; biometric templates never reach Hostwatch.
 
-Confirm export-compliance answers against the actual use of system HTTPS and Keychain before uploading; do not invent an encryption exemption declaration. The app's source-available commercial LICENSE is separate from Apple's user EULA.
+The iOS source uses Apple's URLSession for HTTPS, Security framework Keychain, and CryptoKit AES-GCM to create encrypted environment-share links. It contains no third-party or proprietary cryptography. Apple's [export compliance reference](https://developer.apple.com/help/app-store-connect/reference/export-compliance-documentation-for-encryption/) says encryption limited to Apple's operating system requires no documentation in App Store Connect. Build 12 sets `ITSAppUsesNonExemptEncryption` to `false` in Info.plist on that basis. Recheck this declaration if cryptography changes. The app's source-available commercial LICENSE is separate from Apple's user EULA.
 
 ## Screenshots
 
@@ -53,13 +53,13 @@ Suggested captures: Overview with time axis, Traffic and request destination, Er
 ## Release gates
 
 - [x] Native SwiftUI client, camera/Face ID usage descriptions and app icon.
-- [x] Version 1.0.7 (11), shared archive scheme, iPhone/iPad targets.
+- [x] Version 1.0.7 (12), shared archive scheme, iPhone/iPad targets.
 - [x] Custom QR URL scheme and associated-domain entitlement in release source.
 - [x] Privacy manifest and accessible Privacy/Terms/Support links.
 - [x] Parser/session API test coverage; the 40-test native suite passed with one optional live sign-in test skipped for the previous candidate. The new empty-site decoding test and simulator build passed for this candidate. A full rerun was stopped after simulator launch failures.
 - [ ] Physical QR scan, biometric unlock and eight-hour-expiry renewal on the candidate.
-- [ ] Distribution provisioning with Associated Domains; validated Release archive.
-- [ ] Xcode Cloud build and TestFlight distribution verified for this commit.
+- [x] Distribution provisioning with Associated Domains; build 11 signed and validated by Apple after stable Xcode 26.6 archive. Build 12 must be validated after adding the export-compliance flag.
+- [ ] Build 12 uploaded and available to the internal TestFlight group.
 - [ ] Authenticated iPhone/iPad screenshots and dedicated reviewer account.
 - [ ] Store privacy, age rating and export-compliance forms completed and verified.
 - [ ] App Review submission and approval; public release remains manual.

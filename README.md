@@ -2,13 +2,13 @@
 
 Native SwiftUI control-plane client for Hostwatch. The iPhone and iPad app is intended for **public App Store distribution**, while access to a control plane is provisioned by an organization. It uses the same signed-in session and REST API as the web application. There is no public demo or registration flow.
 
-**Version 1.0.7 (11):** fixes Overview loading when a site has no containers and makes incompatible API fields identifiable in error messages. It also includes the native SSL / TLS view for local certificate files, origin and public HTTPS, Certbot schedule status, and owner-only renewal checks. The node performs renewal; no certificate private key is sent to the app. See [submission materials and release checklist](docs/APP_STORE.md) for the current TestFlight and App Store status.
+**Version 1.0.7 (12):** fixes Overview loading when a site has no containers and makes incompatible API fields identifiable in error messages. It also includes the native SSL / TLS view for local certificate files, origin and public HTTPS, Certbot schedule status, and owner-only renewal checks. The node performs renewal; no certificate private key is sent to the app. See [submission materials and release checklist](docs/APP_STORE.md) for the current TestFlight and App Store status.
 
 ## Install and first setup
 
 The iOS beta is distributed by TestFlight invitation. Request access from your organization administrator or [Hostwatch support](mailto:serhii.ziborov@gmail.com?subject=Hostwatch%20iOS%20TestFlight). There is no public download link yet.
 
-1. Install Apple's TestFlight app on the iPhone or iPad, open the invitation sent to your Apple Account, then accept and install Hostwatch.
+1. On an iPhone or iPad running iOS/iPadOS 16 or later, install [Apple's TestFlight app](https://apps.apple.com/app/testflight/id899247664), open the invitation sent to your Apple Account, then accept and install Hostwatch.
 2. On the Hostwatch sign-in screen, leave the hosted address in place or expand **Control-plane address** and enter the HTTPS address supplied by your administrator.
 3. Sign in with your organization email and password, followed by an authenticator code if requested. Alternatively, choose **Scan website QR** and scan the device sign-in code from an already authenticated website session under **Organization → Account security → Sign in on iPhone or iPad**.
 4. Select a node on **Overview** and pull down to refresh. Traffic, Database and Runtime use the selected node and your account permissions.
@@ -41,7 +41,7 @@ The app supports the hosted control plane and licensed enterprise installations.
 
 On iPhone or iPad, sign in by scanning the one-time QR shown in **Organization → Account security → Sign in on iPhone or iPad** on an already signed-in Hostwatch website. Compare the six-digit number on both screens and approve on the website. The QR expires after two minutes and can only sign in the device that claimed it. QR links use the registered `hostwatch://` scheme to open the installed app from the system camera; the app validates the control-plane origin. Release signing also declares the hosted universal-link domain. Password and authenticator-code sign-in remain available. **More → Account security** lets an account enroll, replace, or disable its authenticator and approve another device's website sign-in with the camera or a short manual pairing code. That approval asks for Face ID or the device passcode.
 
-The minimum deployment target is iOS 15, so the same build runs on current iPhones and older iPads such as iPad mini 4 (15.8). The four primary areas are Overview, Traffic, Database and Runtime; only the selected tab stays mounted. Workloads and less frequent controls are under **More**. iPad keeps a sidebar. Links to a request destination or external advisory open in the system browser, outside the app. Live refresh loads only the visible page: topology pulses host/site snapshots every 3s and the heavier inventory every 30s; other pages refresh every 8s without re-downloading request/error buffers.
+The app's minimum deployment target is iOS 15, but Apple's TestFlight app currently requires iOS/iPadOS 16 or later. The four primary areas are Overview, Traffic, Database and Runtime; only the selected tab stays mounted. Workloads and less frequent controls are under **More**. iPad keeps a sidebar. Links to a request destination or external advisory open in the system browser, outside the app. Live refresh loads only the visible page: topology pulses host/site snapshots every 3s and the heavier inventory every 30s; other pages refresh every 8s without re-downloading request/error buffers.
 
 On launch, a native Hostwatch splash stays visible while the saved server session is checked. After the first successful sign-in the session cookies are stored in the device keychain so they survive app death; **Face ID / Touch ID / passcode** (on by default when the device can evaluate it) unlocks that session on the next launch and after the app goes to the background. The eight-hour access cookie is automatically renewed with a rotating device credential valid for up to 90 days of inactivity. The controller stores only its hash; Keychain holds the actual credential. Password or two-factor changes revoke the saved authorization. Signing out removes and revokes the saved session. This is an on-device unlock for a stored control-plane session, not a substitute for account two-factor policy. Disk scans show progress and errors, and directory drilldown preserves the host summary while loading child entries.
 
@@ -77,9 +77,9 @@ For App Store review and users, see the [privacy policy](PRIVACY.md) and [suppor
 
 ## Screenshots
 
-<img src="docs/screenshots/iphone-sign-in.png" width="275" alt="Hostwatch 1.0.7 sign-in with Password and Scan website QR options" /> <img src="docs/screenshots/iphone-overview-sample.png" width="275" alt="Hostwatch 1.0.7 Overview with an explicit SAMPLE DATA banner" />
+<img src="docs/screenshots/iphone-sign-in.png" width="275" alt="Hostwatch 1.0.7 sign-in with Password and Scan website QR options" /> <img src="docs/screenshots/iphone-overview-sample.png" width="275" alt="Hostwatch 1.0.7 Overview with an explicit SAMPLE DATA banner" /> <img src="docs/screenshots/ipad-sign-in.png" width="390" alt="Hostwatch 1.0.7 sign-in on iPad" />
 
-Simulator captures of version 1.0.7 (11). The Overview image contains fabricated development fixtures and visibly says **SAMPLE DATA · DEBUG BUILD**. The sign-in image contains no credentials.
+Simulator captures of the version 1.0.7 code. The Overview image contains fabricated development fixtures and visibly says **SAMPLE DATA · DEBUG BUILD**. The sign-in images contain no credentials.
 
 Only captures from an authenticated shipping build should be uploaded to App Store Connect. Development fixture images under `docs/screenshots/` explicitly show SAMPLE DATA and are not current server telemetry or Store assets. See [capture checklist](docs/APP_STORE.md#screenshots); the listing must include both supported device families.
 
