@@ -2,7 +2,7 @@
 
 Native SwiftUI control-plane client for Hostwatch. The iPhone and iPad app is intended for **public App Store distribution**, while access to a control plane is provisioned by an organization. It uses the same signed-in session and REST API as the web application. There is no public demo or registration flow.
 
-**Version 1.0.7 (12):** fixes Overview loading when a site has no containers and makes incompatible API fields identifiable in error messages. It also includes the native SSL / TLS view for local certificate files, origin and public HTTPS, Certbot schedule status, and owner-only renewal checks. The node performs renewal; no certificate private key is sent to the app. See [submission materials and release checklist](docs/APP_STORE.md) for the current TestFlight and App Store status.
+**Version 1.0.7 (12):** available in the internal **Hostwatch Internal** TestFlight group. It fixes Overview loading when a site has no containers and makes incompatible API fields identifiable in error messages. It also includes the native SSL / TLS view for local certificate files, origin and public HTTPS, Certbot schedule status, and owner-only renewal checks. The node performs renewal; no certificate private key is sent to the app. See [submission materials and release checklist](docs/APP_STORE.md) for the current TestFlight and App Store status.
 
 ## Install and first setup
 
@@ -58,12 +58,11 @@ The simulator test suite covers expired-device password retry, rejected password
 Docker/Podman compatibility checks also cover runtime-scoped data-service identity,
 missing telemetry and protected Podman storage. The updated simulator suite ran
 36 tests on 2026-09-29 with no failures; the opt-in live sign-in test was skipped.
-The native changes are source-published and locally validated; no new App Store
-distribution archive or submission was performed for this runtime update.
+Those results describe the earlier runtime update. Version 1.0.7 (12) was archived with stable Xcode 26.6 in GitHub Actions, signed locally and uploaded to internal TestFlight on 2026-09-30. The targeted empty-site regression test and simulator build passed; the full candidate suite was stopped after simulator launch failures.
 
 For local UI development only, a Debug build may be launched with `HOSTWATCH_FIXTURES=1`. These values are fabricated test fixtures and display a prominent **SAMPLE DATA · DEBUG BUILD** notice instead of a Live status. A Release build ignores the flag and requires a real, authenticated control plane. No fixture screenshot is used as an App Store asset.
 
-All app screens use SwiftUI, SceneKit, MapKit and direct JSON API calls. There are no embedded web pages, WebViews or bundled HTML assets. The shared `Hostwatch` scheme supports Xcode archives, and the GitHub Actions release-candidate workflow builds an unsigned archive on stable Xcode for local signing. The controller and Go agent remain separate products. Public App Store distribution still requires a validated archive, App Store Connect metadata, review credentials, on-device testing and App Review approval.
+All app screens use SwiftUI, SceneKit, MapKit and direct JSON API calls. There are no embedded web pages, WebViews or bundled HTML assets. The shared `Hostwatch` scheme supports Xcode archives, and the GitHub Actions release-candidate workflow builds an unsigned archive on stable Xcode for local signing. The controller and Go agent remain separate products. Public App Store distribution still requires App Store Connect metadata, review credentials, on-device testing and App Review approval.
 
 To run on a physical iPhone, open `Hostwatch.xcodeproj` in Xcode and select your device. Automatic signing uses the configured developer team; Xcode must have an authenticated Apple Account. For a release candidate, run the GitHub Actions `iOS release candidate` workflow on `main`, verify its stable Xcode version, then sign and validate the resulting archive before uploading. Do not turn on automatic public release.
 
