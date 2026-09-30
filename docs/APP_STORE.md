@@ -5,8 +5,8 @@ Updated 2026-09-30. Build 16 is in the internal TestFlight group; Apple has not 
 ## Internal TestFlight status
 
 - Version **1.0.8 (16)** was archived by GitHub Actions with stable **Xcode 26.6**, signed for App Store distribution, validated and uploaded on 2026-09-30. The exported IPA's signed entitlements include `applinks:gethostwatch.com`.
-- Apple reports processing state `VALID` and `USES-NON-EXEMPT-ENCRYPTION: false`.
-- Build 16 is assigned to the **Hostwatch Internal** group. Its changes clear stale node data and policy state when switching between the primary server and the host-only Mac; traffic controls are unavailable on host-only nodes.
+- Apple reports processing state `VALID`, internal state `IN_BETA_TESTING` and `USES-NON-EXEMPT-ENCRYPTION: false`.
+- Build 16 is assigned to the **Hostwatch Internal** group. Its “What to Test” note asks testers to switch between the primary server and host-only Mac and check Overview, traffic policies and Runtime topology. The build clears stale node data and policy state on each switch; traffic controls are unavailable on host-only nodes.
 - TestFlight should offer build 16 as an update to internal testers. Its behavior on the physical device still needs confirmation.
 - The label placement was inspected in simulator Debug fixture captures in both modes. These images are development evidence, not App Store screenshots.
 - The primary node now includes the `weavatrix-hosted` project and scheduled code-health scan. The first report contains 11 modules, 10 communities and 5,504 graph nodes. Its status is `PARTIAL` because the deployed repository has no measured coverage report.
