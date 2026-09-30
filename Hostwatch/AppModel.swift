@@ -285,13 +285,20 @@ final class AppModel: ObservableObject {
 
     private func clearPrivateData() {
         liveTask?.cancel(); liveTask = nil
+        clearNodeData()
+        members = []; license = nil
+        nodes = []; selectedNode = ""; selectedSite = ""
+    }
+
+    private func clearNodeData() {
         overview = nil; sites = []; dataServices = []; dataFiles = []; dataServicesScannedAt = nil; dataServicesScanError = nil; dataServicesError = nil; history = []; traffic = []
         requests = []; errorEvidence = nil; errorGroups = []; importedNotes = []; importNotice = nil; paths = []; storage = nil; storageBrowse = nil
-        storageError = nil; cleanupPreview = nil; cleanupError = nil; cleanupNotice = nil
-        projects = []; jobs = []; members = []; license = nil; environment = nil
-        nodes = []; selectedNode = ""; selectedSite = ""
+        storageLoading = false; storageError = nil; cleanupPreview = nil; cleanupLoading = false; cleanupError = nil; cleanupNotice = nil
+        projects = []; jobs = []; environment = nil
         hybridPeers = []; hybridSettings = nil; hybridAdmission = nil; fleetLinks = []; hybridError = nil
-        mcpSnapshot = nil
+        guardState = nil; accessRules = AccessRuleState(rules: [], managed: false, updatedAt: nil, error: nil)
+        sources = Sources(windowHours: hours, site: nil, sources: [], countries: [], bots: [])
+        mcpSnapshot = nil; tlsSite = nil; tlsNotice = nil; errorMessage = nil
     }
 
     private func configureClient() async throws {
@@ -313,8 +320,13 @@ final class AppModel: ObservableObject {
     }
 
     func changeNode(_ id: String, page: SidebarPage) async {
-        selectedNode = id; storage = nil; storageBrowse = nil; cleanupPreview = nil; tlsSite = nil
-        await client.select(node: id); await reload(page: page)
+        guard nodes.contains(where: { $0.id == id }) else { return }
+        liveTask?.cancel(); liveTask = nil
+        clearNodeData()
+        selectedNode = id; selectedSite = ""
+        await client.select(node: id)
+        await reload(page: page)
+        if live { setLive(true, page: page) }
     }
 
     func setLive(_ enabled: Bool, page: SidebarPage) {
@@ -440,6 +452,11 @@ final class AppModel: ObservableObject {
             case .cleanup:
                 await refreshCleanup()
             case .policies:
+                if overview?.platform == "darwin" || overview?.platform == "windows" {
+                    guardState = nil
+                    accessRules = AccessRuleState(rules: [], managed: false, updatedAt: nil, error: nil)
+                    break
+                }
                 async let guardCall = client.trafficGuard()
                 async let rulesCall = client.accessRules(site: selectedSite)
                 (guardState, accessRules) = try await (guardCall, rulesCall)

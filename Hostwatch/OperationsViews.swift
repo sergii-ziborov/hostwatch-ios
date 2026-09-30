@@ -500,6 +500,10 @@ struct TrafficPoliciesView: View {
     }
 
     var body: some View {
+        Group {
+        if model.overview?.platform == "darwin" || model.overview?.platform == "windows" {
+            EmptyState(icon: "shield.slash", title: "Traffic controls unavailable", detail: "This host-only node does not manage Nginx sites or traffic rules.")
+        } else {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 8) {
                 Eyebrow(text: "Why traffic is limited")
@@ -525,6 +529,10 @@ struct TrafficPoliciesView: View {
             HStack { Text("Traffic block rules").font(.title2.bold()); Spacer(); Button("Add rule", systemImage: "plus") { showAddRule = true }.buttonStyle(.bordered) }
             ForEach(model.accessRules.rules) { rule in HStack { Image(systemName: rule.kind == "country" ? "globe" : "network").foregroundStyle(HW.red); VStack(alignment: .leading) { Text(rule.value).font(.headline); Text("\(rule.kind.capitalized) · \(rule.label ?? "Manual block") · \(rule.site)").font(.caption).foregroundStyle(HW.secondary) }; Spacer(); Button(role: .destructive) { Task { await model.removeRule(rule) } } label: { Image(systemName: "trash") } }.padding(15).panel() }
         }.sheet(isPresented: $showAddRule) { AddRuleView() }
+        }
+        }
+        .onChange(of: model.selectedNode) { _ in policy = nil; showAddRule = false }
+        .onChange(of: model.guardState?.policy.updatedAt) { _ in policy = model.guardState?.policy }
     }
     private func slider(_ title: String, value: Binding<Double>, range: ClosedRange<Double>, suffix: String) -> some View { VStack(alignment: .leading) { HStack { Text(title); Spacer(); Text("\(Int(value.wrappedValue)) \(suffix)").monospacedDigit().foregroundStyle(HW.teal) }; Slider(value: value, in: range) } }
 }
