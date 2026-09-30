@@ -357,9 +357,21 @@ final class AppModel: ObservableObject {
                 overview = loaded.0
                 sites = loaded.1
             }
+            errorMessage = nil
         } catch {
-            errorMessage = error.localizedDescription
+            recordPageError(error)
         }
+    }
+
+    private func recordPageError(_ error: Error) {
+        guard !Task.isCancelled, !Self.isRequestCancellation(error) else { return }
+        errorMessage = error.localizedDescription
+    }
+
+    private static func isRequestCancellation(_ error: Error) -> Bool {
+        if error is CancellationError { return true }
+        let failure = error as NSError
+        return failure.domain == NSURLErrorDomain && failure.code == NSURLErrorCancelled
     }
 
     func reload(page: SidebarPage, quiet: Bool = false) async {
@@ -447,7 +459,7 @@ final class AppModel: ObservableObject {
                 break
             }
             errorMessage = nil
-        } catch { errorMessage = error.localizedDescription }
+        } catch { recordPageError(error) }
     }
 
     func hasCachedContent(for page: SidebarPage) -> Bool {
@@ -513,6 +525,7 @@ final class AppModel: ObservableObject {
             dataServicesScanError = inventory.scanError
             dataServicesError = nil
         } catch {
+            guard !Task.isCancelled, !Self.isRequestCancellation(error) else { return }
             dataServices = []
             dataFiles = []
             dataServicesScannedAt = nil

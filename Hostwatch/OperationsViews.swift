@@ -242,7 +242,8 @@ struct TopologyView: View {
         if let flow = focusedRoad.flatMap({ TopologyFlow.parse(roadName: $0) }) { return flowCaption(flow) }
         guard let focusedSiteID else { return "" }
         if let site = sites.first(where: { $0.id == focusedSiteID }) {
-            return "\(Int(site.requestsPerMinute))/min · \(Format.percent(site.errorRate)) errors · \(TopologyLayer.layers(for: site, project: project(for: site)).count) layers"
+            let count = TopologyLayer.layers(for: site, project: project(for: site)).count
+            return "\(Int(site.requestsPerMinute))/min · \(Format.percent(site.errorRate)) errors · \(count) \(count == 1 ? "layer" : "layers")"
         }
         if let service = model.dataServices.first(where: { "ext:\($0.id)" == focusedSiteID }) {
             return "Our data · \(service.role) · \(service.container.state)"
