@@ -2,7 +2,7 @@
 
 Native SwiftUI control-plane client for Hostwatch. The iPhone and iPad app is intended for **public App Store distribution**, while access to a control plane is provisioned by an organization. It uses the same signed-in session and REST API as the web application. There is no public demo or registration flow.
 
-**Version 1.0.8 (15):** available in the internal **Hostwatch Internal** TestFlight group. Errors now separates HTTP error totals from Nginx 444 edge blocks and client cancellations. In Runtime's Traffic view, site name pointers follow the visible runtime pillars; switching back to Towers restores their full-height positions. See [submission materials and release checklist](docs/APP_STORE.md) for the current TestFlight and App Store status.
+**Version 1.0.8 (16):** available in the internal **Hostwatch Internal** TestFlight group. Switching between the primary Linux node and a host-only Mac now clears the prior node's data and policies. Traffic controls are shown as unavailable on host-only nodes. The previous build separated HTTP errors from Nginx 444 blocks and client cancellations and fixed Runtime labels in Traffic mode. See [submission materials and release checklist](docs/APP_STORE.md) for the current TestFlight and App Store status.
 
 ## Install and first setup
 
@@ -30,7 +30,7 @@ If Overview says **No host snapshot**, confirm the selected node has data on the
 - **Runtime topology** — a native SceneKit cyberboard aligned with the Electron RepoLens board. **Towers** shows stacked runtime + Weavatrix layers and structure roads. **Traffic** hides those layers and runs live packets on the same Manhattan roads, colored by origin: teal public clients, amber our services, green our data. Selecting a project explodes it into frontend, backend and data towers. Side labels stay pinned to their layer; if there are too many, they page with ▲/▼ instead of overlapping. One legend sits at the bottom left. Drag orbits without flipping, two fingers pan, pinch zooms, tap frames a tower from the right.
 - **Fleet** — hybrid edge/home peers, public IP change history, heartbeat freshness, admission (slots, disk, stale), and home load-scaling settings.
 - **Workloads** — project traffic, processes, storage, limits and controls.
-- **Traffic policies** — bandwidth, anomaly and IP/country access rules.
+- **Traffic policies** — bandwidth, anomaly and IP/country access rules on capable Linux nodes. A host-only Mac shows these controls as unavailable instead of reusing policy data from another node.
 - **Managed secrets** — the Environment page keeps client-encrypted `.env` links separate from node-stored vault secrets. Owners can create and rotate values, set expiry, issue scoped application tokens with IP and read limits, review access, and revoke grants. MCP insertion is independently disabled by default in the MCP governance screen.
 - **MCP** — under Control: turn MCP off, allow or deny reads and changes, block tools, cap hourly mutations, and see which computers are talking to this company through MCP plus a redacted tool history. Limits are enforced on the Hostwatch node; a local MCP process cannot lift them.
 - **Environment** — per-project variables with explicit Text/Secret choice, encrypted vault application and shared values assigned to multiple projects. Owners can rotate a shared value and retry projects whose sync failed.
@@ -58,7 +58,7 @@ The simulator test suite covers expired-device password retry, rejected password
 Docker/Podman compatibility checks also cover runtime-scoped data-service identity,
 missing telemetry and protected Podman storage. The updated simulator suite ran
 36 tests on 2026-09-29 with no failures; the opt-in live sign-in test was skipped.
-Those results describe the earlier runtime update. Version 1.0.8 (15) was archived with stable Xcode 26.6 in GitHub Actions, signed locally and uploaded to internal TestFlight on 2026-09-30. Its simulator build and targeted error-total regression test passed; the test covers mixed HTTP errors, 444 blocks and 499 cancellations. Build 14's debug fixture captures were inspected in both Towers and Traffic modes to check label placement. The full candidate suite was stopped after simulator launch failures on an earlier build.
+Those results describe the earlier runtime update. Version 1.0.8 (16) was archived with stable Xcode 26.6 in GitHub Actions, signed locally, validated by Apple and added to internal TestFlight on 2026-09-30. Its simulator suite passed 32 tests. Build 15 fixed mixed HTTP error totals and Runtime labels; build 14's debug fixture captures were inspected in both Towers and Traffic modes to check label placement. Physical-device verification of build 16 remains pending.
 
 For local UI development only, a Debug build may be launched with `HOSTWATCH_FIXTURES=1`. These values are fabricated test fixtures and display a prominent **SAMPLE DATA · DEBUG BUILD** notice instead of a Live status. A Release build ignores the flag and requires a real, authenticated control plane. No fixture screenshot is used as an App Store asset.
 
