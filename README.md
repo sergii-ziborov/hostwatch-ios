@@ -2,7 +2,7 @@
 
 Native SwiftUI control-plane client for Hostwatch. The iPhone and iPad app is intended for **public App Store distribution**, while access to a control plane is provisioned by an organization. It uses the same signed-in session and REST API as the web application. There is no public demo or registration flow.
 
-**Version 1.0.7 (10):** adds the native SSL / TLS view for local certificate files, origin and public HTTPS, Certbot schedule status, and owner-only renewal checks. The node performs renewal; no certificate private key is sent to the app. Physical-camera/Face ID testing and a validated App Store distribution archive remain required. See [submission materials and release checklist](docs/APP_STORE.md).
+**Version 1.0.7 (11):** fixes Overview loading when a site has no containers and makes incompatible API fields identifiable in error messages. It also includes the native SSL / TLS view for local certificate files, origin and public HTTPS, Certbot schedule status, and owner-only renewal checks. The node performs renewal; no certificate private key is sent to the app. Physical-camera/Face ID testing and a validated App Store distribution archive remain required. See [submission materials and release checklist](docs/APP_STORE.md).
 
 ## Product structure
 

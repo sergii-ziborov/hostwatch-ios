@@ -170,7 +170,6 @@ final class AppModel: ObservableObject {
                 hasSavedSession = true
                 try await loadNodes()
                 await reload(page: .overview)
-                errorMessage = nil
             } else {
                 await client.forgetSession()
                 session = SessionState()
@@ -375,9 +374,8 @@ final class AppModel: ObservableObject {
             if !quiet || overview == nil || sites.isEmpty {
                 async let commonOverview = client.overview()
                 async let commonSites = client.sites()
-                let common = try await (commonOverview, commonSites)
-                overview = common.0
-                sites = common.1
+                overview = try await commonOverview
+                sites = try await commonSites
             }
             switch page {
             case .overview:

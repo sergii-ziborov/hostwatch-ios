@@ -5,6 +5,14 @@ import XCTest
 @testable import Hostwatch
 
 final class HostwatchTests: XCTestCase {
+    func testSiteWithoutContainersDecodesFromAgentResponse() throws {
+        let response = #"{"id":"static","name":"Static site","domains":null,"sharedNginx":false,"containers":null,"cpuPercent":0,"memoryBytes":0,"memoryLimit":0,"requestsPerMinute":0,"bytesPerMinute":0,"errorRate":0,"p95Ms":0}"#
+        let site = try JSONDecoder().decode(Site.self, from: Data(response.utf8))
+        XCTAssertEqual(site.id, "static")
+        XCTAssertTrue(site.domains.isEmpty)
+        XCTAssertTrue(site.containers.isEmpty)
+    }
+
     func testTLSInventoryKeepsUnknownStatesAndNoPrivateKeyMaterial() throws {
         let response = #"{"siteId":"hostwatch","name":"Hostwatch","domains":["gethostwatch.com"],"management":"future_adapter","certificates":[{"lineage":"gethostwatch.com","fingerprint":"abcd","issuer":"Let's Encrypt","domains":["gethostwatch.com"],"notAfter":"2026-12-10T14:51:18Z","status":"future_status","renewalOwner":"certbot"}],"observations":[{"domain":"gethostwatch.com","boundary":"public","status":"unreachable","hostnameMatch":false,"trusted":false,"error":"TLS handshake unavailable"}],"scheduler":{"configured":true,"enabled":true},"warnings":[],"observedAt":"2026-09-30T00:00:00Z"}"#
         let snapshot = try JSONDecoder().decode(TLSSite.self, from: Data(response.utf8))

@@ -84,7 +84,20 @@ actor APIClient {
             }
             throw APIError.server(server?.error ?? "Request failed (HTTP \(http.statusCode)).")
         }
-        return try decoder.decode(T.self, from: data)
+        do {
+            return try decoder.decode(T.self, from: data)
+        } catch let error as DecodingError {
+            let location: String
+            switch error {
+            case .keyNotFound(let key, let context):
+                location = (context.codingPath + [key]).map(\.stringValue).joined(separator: ".")
+            case .typeMismatch(_, let context), .valueNotFound(_, let context), .dataCorrupted(let context):
+                location = context.codingPath.map(\.stringValue).joined(separator: ".")
+            @unknown default:
+                location = ""
+            }
+            throw APIError.server("The response from \(path) has incompatible data\(location.isEmpty ? "" : " at \(location)").")
+        }
     }
 
     private func empty(_ path: String, method: String, body: Encodable? = nil) async throws {

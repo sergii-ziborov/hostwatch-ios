@@ -321,6 +321,26 @@ struct Site: Codable, Identifiable, Hashable {
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
 
+extension Site {
+    // Go encodes nil slices as null. A site can have no matching containers,
+    // and older configurations can omit domains, so both represent empty lists.
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        id = try values.decode(String.self, forKey: .id)
+        name = try values.decode(String.self, forKey: .name)
+        domains = try values.decodeIfPresent([String].self, forKey: .domains) ?? []
+        sharedNginx = try values.decode(Bool.self, forKey: .sharedNginx)
+        containers = try values.decodeIfPresent([ContainerInfo].self, forKey: .containers) ?? []
+        cpuPercent = try values.decode(Double.self, forKey: .cpuPercent)
+        memoryBytes = try values.decode(Double.self, forKey: .memoryBytes)
+        memoryLimit = try values.decode(Double.self, forKey: .memoryLimit)
+        requestsPerMinute = try values.decode(Double.self, forKey: .requestsPerMinute)
+        bytesPerMinute = try values.decode(Double.self, forKey: .bytesPerMinute)
+        errorRate = try values.decode(Double.self, forKey: .errorRate)
+        p95Ms = try values.decode(Double.self, forKey: .p95Ms)
+    }
+}
+
 struct TrafficPoint: Codable, Identifiable {
     var id: String { time }
     let time: String; let requests: Double; let bytes: Double; let errors4xx: Double; let errors5xx: Double; let averageMs: Double

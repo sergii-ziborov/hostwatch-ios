@@ -1,4 +1,4 @@
-# App Store submission — Hostwatch 1.0.7 (10)
+# App Store submission — Hostwatch 1.0.7 (11)
 
 Updated 2026-09-30. These are submission materials, not a claim that Apple approved or published the app.
 
@@ -24,7 +24,7 @@ Requires access to a Hostwatch control plane. No public account registration, em
 
 What's new:
 
-SSL / TLS now shows local certificate validity, served origin and public HTTPS, and the existing Certbot renewal schedule for each managed site. Organization owners can request a renewal check when due; the operation continues on the server. Password and authenticator feedback, QR pairing, error export, shared settings and policy links remain available.
+Overview now loads when a site has no containers, and an incompatible server response identifies its affected field. SSL / TLS shows local certificate validity, served origin and public HTTPS, and the existing Certbot renewal schedule for each managed site. Organization owners can request a renewal check when due; the operation continues on the server. Password and authenticator feedback, QR pairing, error export, shared settings and policy links remain available.
 
 ## Reviewer instructions
 
@@ -53,10 +53,10 @@ Suggested captures: Overview with time axis, Traffic and request destination, Er
 ## Release gates
 
 - [x] Native SwiftUI client, camera/Face ID usage descriptions and app icon.
-- [x] Version 1.0.7 (10), shared archive scheme, iPhone/iPad targets.
+- [x] Version 1.0.7 (11), shared archive scheme, iPhone/iPad targets.
 - [x] Custom QR URL scheme and associated-domain entitlement in release source.
 - [x] Privacy manifest and accessible Privacy/Terms/Support links.
-- [x] Parser/session API test coverage; the 40-test native suite passed with one optional live sign-in test skipped, then the new TLS decode test passed separately. Release simulator build passed.
+- [x] Parser/session API test coverage; the 40-test native suite passed with one optional live sign-in test skipped for the previous candidate. The new empty-site decoding test and simulator build passed for this candidate. A full rerun was stopped after simulator launch failures.
 - [ ] Physical QR scan, biometric unlock and eight-hour-expiry renewal on the candidate.
 - [ ] Distribution provisioning with Associated Domains; validated Release archive.
 - [ ] Xcode Cloud build and TestFlight distribution verified for this commit.
