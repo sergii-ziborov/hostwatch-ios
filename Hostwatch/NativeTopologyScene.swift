@@ -118,6 +118,7 @@ struct NativeTopologyScene: UIViewRepresentable {
         private var towerHeights: [String: Float] = [:]
         private var towerGroups: [String: SCNNode] = [:]
         private var towerBaseHeights: [String: Float] = [:]
+        private var trafficTowerTops: [String: Float] = [:]
         private var roads: [(from: String, to: String, kind: String, nodes: [SCNNode])] = []
         private var packets: [LivePacket] = []
         private var layerMids: [String: [Float]] = [:]
@@ -203,6 +204,7 @@ struct NativeTopologyScene: UIViewRepresentable {
             scene.rootNode.childNodes.forEach { if $0 !== camera { $0.removeFromParentNode() } }
             roads.removeAll(); packets.removeAll(); anchors.removeAll(); layerMids.removeAll()
             towerBases.removeAll(); towerHeights.removeAll(); towerGroups.removeAll(); towerBaseHeights.removeAll()
+            trafficTowerTops.removeAll()
             if camera.parent == nil {
                 let lens = SCNCamera()
                 lens.fieldOfView = 52
@@ -352,16 +354,19 @@ struct NativeTopologyScene: UIViewRepresentable {
             group.name = "tower:\(site.id)"
             var cursor: Float = 0
             var mids: [Float] = []
+            var runtimeTop: Float = 0
             for (index, layer) in layers.enumerated() {
                 let slabHeight = heights.indices.contains(index) ? heights[index] : 0.24
                 let midY = cursor + slabHeight * 0.5
+                let visibleHeight = max(0.16, slabHeight - 0.04)
                 let slab: SCNNode
                 if layer.kind == .runtime {
-                    let cylinder = SCNCylinder(radius: 0.52, height: CGFloat(max(0.16, slabHeight - 0.04)))
+                    let cylinder = SCNCylinder(radius: 0.52, height: CGFloat(visibleHeight))
                     cylinder.radialSegmentCount = 28
                     slab = SCNNode(geometry: cylinder)
+                    runtimeTop = midY + visibleHeight * 0.5
                 } else {
-                    slab = SCNNode(geometry: SCNBox(width: 1.05, height: CGFloat(max(0.16, slabHeight - 0.04)), length: 1.05, chamferRadius: 0.03))
+                    slab = SCNNode(geometry: SCNBox(width: 1.05, height: CGFloat(visibleHeight), length: 1.05, chamferRadius: 0.03))
                 }
                 slab.geometry?.firstMaterial = material(layer.color, emission: 0.24)
                 slab.position = SCNVector3(0, midY, 0)
@@ -393,6 +398,7 @@ struct NativeTopologyScene: UIViewRepresentable {
             scene.rootNode.addChildNode(group)
             towerGroups[site.id] = group
             towerBaseHeights[site.id] = baseHeight
+            trafficTowerTops[site.id] = runtimeTop
             layerMids[site.id] = mids
             addRing(at: SCNVector3(position.x, 0.04, position.z), radius: 0.86, color: layers.first?.color ?? .cyan, to: scene)
             anchors.append(.init(id: "name:\(site.id)", siteID: site.id,
@@ -600,7 +606,10 @@ struct NativeTopologyScene: UIViewRepresentable {
 
         private func resolvedWorld(_ anchor: LabelAnchor) -> SCNVector3 {
             guard anchor.usesTower, let group = towerGroups[anchor.siteID] else { return anchor.world }
-            return group.presentation.convertPosition(SCNVector3(0, anchor.localY, 0), to: nil)
+            let localY = mode.showsPackets && anchor.rank == .name
+                ? (trafficTowerTops[anchor.siteID] ?? anchor.localY)
+                : anchor.localY
+            return group.presentation.convertPosition(SCNVector3(0, localY, 0), to: nil)
         }
 
         private func syncLabels() {
