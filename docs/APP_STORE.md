@@ -1,14 +1,14 @@
-# App Store submission — Hostwatch 1.0.7 (12)
+# App Store submission — Hostwatch 1.0.7 (13)
 
-Updated 2026-09-30. Build 12 is in internal TestFlight testing; Apple has not approved or published a public App Store release.
+Updated 2026-09-30. Build 13 is in internal TestFlight testing; Apple has not approved or published a public App Store release.
 
 ## Internal TestFlight status
 
-- Version **1.0.7 (12)** was archived by GitHub Actions with stable **Xcode 26.6**, signed for App Store distribution, validated and uploaded on 2026-09-30.
+- Version **1.0.7 (13)** was archived by GitHub Actions with stable **Xcode 26.6**, signed for App Store distribution, validated and uploaded on 2026-09-30. The exported IPA's signed entitlements include `applinks:gethostwatch.com`.
 - Apple reports processing state `VALID`, `USES-NON-EXEMPT-ENCRYPTION: false`, and internal state `IN_BETA_TESTING`.
-- The build belongs to the **Hostwatch Internal** group. Its “What to Test” note covers the empty-container Overview fix and checks of the selected node, Traffic, Database, Runtime and SSL / TLS.
-- The App Store Connect account holder has been invited by email to that internal group. They must accept the invitation in TestFlight on their iPhone or iPad before the app can be tested on a physical device.
-- This is a beta distribution only. A successful upload and invitation do not prove that the original device issue has been resolved; confirm Overview against a live node after installing the build.
+- The build belongs to the **Hostwatch Internal** group. Its “What to Test” note covers the Weavatrix Runtime tower and interrupted refreshes.
+- The account holder's internal tester status is `INSTALLED`. TestFlight should offer build 13 as an update; its behavior on the physical device still needs confirmation.
+- The primary node now includes the `weavatrix-hosted` project and scheduled code-health scan. The first report contains 11 modules, 10 communities and 5,504 graph nodes. Its status is `PARTIAL` because the deployed repository has no measured coverage report.
 
 ## Listing
 
@@ -61,13 +61,13 @@ Suggested captures: Overview with time axis, Traffic and request destination, Er
 ## Release gates
 
 - [x] Native SwiftUI client, camera/Face ID usage descriptions and app icon.
-- [x] Version 1.0.7 (12), shared archive scheme, iPhone/iPad targets.
+- [x] Version 1.0.7 (13), shared archive scheme, iPhone/iPad targets.
 - [x] Custom QR URL scheme and associated-domain entitlement in release source.
 - [x] Privacy manifest and accessible Privacy/Terms/Support links.
 - [x] Parser/session API test coverage; the 40-test native suite passed with one optional live sign-in test skipped for the previous candidate. The new empty-site decoding test and simulator build passed for this candidate. A full rerun was stopped after simulator launch failures.
 - [ ] Physical QR scan, biometric unlock and eight-hour-expiry renewal on the candidate.
-- [x] Distribution provisioning with Associated Domains; build 12 archived using stable Xcode 26.6, signed, validated and uploaded. Apple recognized its export-compliance flag.
-- [x] Build 12 available in the internal TestFlight group, with the account holder invited by email; invite acceptance and physical-device verification remain pending.
+- [x] Distribution provisioning with Associated Domains; build 13 archived using stable Xcode 26.6, signed, validated and uploaded. The final IPA signature contains the domain entitlement, and Apple recognized its export-compliance flag.
+- [x] Build 13 available in the internal TestFlight group; account holder tester state is `INSTALLED`. Physical-device verification of this build remains pending.
 - [ ] Authenticated iPhone/iPad screenshots and dedicated reviewer account.
 - [ ] Store privacy, age rating and export-compliance forms completed and verified.
 - [ ] App Review submission and approval; public release remains manual.

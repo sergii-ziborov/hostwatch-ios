@@ -2,7 +2,7 @@
 
 Native SwiftUI control-plane client for Hostwatch. The iPhone and iPad app is intended for **public App Store distribution**, while access to a control plane is provisioned by an organization. It uses the same signed-in session and REST API as the web application. There is no public demo or registration flow.
 
-**Version 1.0.7 (12):** available in the internal **Hostwatch Internal** TestFlight group. It fixes Overview loading when a site has no containers and makes incompatible API fields identifiable in error messages. It also includes the native SSL / TLS view for local certificate files, origin and public HTTPS, Certbot schedule status, and owner-only renewal checks. The node performs renewal; no certificate private key is sent to the app. See [submission materials and release checklist](docs/APP_STORE.md) for the current TestFlight and App Store status.
+**Version 1.0.7 (13):** available in the internal **Hostwatch Internal** TestFlight group. It keeps the Runtime scene intact and hides false `cancelled` errors when a background refresh is interrupted. The Weavatrix hosted site's code-health scan is configured on the primary node so its tower can show module, community and graph layers. The prior build fixed Overview loading when a site has no containers and identified incompatible API fields in error messages. See [submission materials and release checklist](docs/APP_STORE.md) for the current TestFlight and App Store status.
 
 ## Install and first setup
 
@@ -58,7 +58,7 @@ The simulator test suite covers expired-device password retry, rejected password
 Docker/Podman compatibility checks also cover runtime-scoped data-service identity,
 missing telemetry and protected Podman storage. The updated simulator suite ran
 36 tests on 2026-09-29 with no failures; the opt-in live sign-in test was skipped.
-Those results describe the earlier runtime update. Version 1.0.7 (12) was archived with stable Xcode 26.6 in GitHub Actions, signed locally and uploaded to internal TestFlight on 2026-09-30. The targeted empty-site regression test and simulator build passed; the full candidate suite was stopped after simulator launch failures.
+Those results describe the earlier runtime update. Version 1.0.7 (13) was archived with stable Xcode 26.6 in GitHub Actions, signed locally and uploaded to internal TestFlight on 2026-09-30. The simulator build passed; the prior build's targeted empty-site regression test passed. The full candidate suite was stopped after simulator launch failures on the prior build.
 
 For local UI development only, a Debug build may be launched with `HOSTWATCH_FIXTURES=1`. These values are fabricated test fixtures and display a prominent **SAMPLE DATA · DEBUG BUILD** notice instead of a Live status. A Release build ignores the flag and requires a real, authenticated control plane. No fixture screenshot is used as an App Store asset.
 
