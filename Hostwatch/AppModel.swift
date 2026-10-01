@@ -393,7 +393,7 @@ final class AppModel: ObservableObject {
             return
         }
 #endif
-        if !quiet { loading = true }; defer { if !quiet { loading = false } }
+        if !quiet { loading = true; errorMessage = nil }; defer { if !quiet { loading = false } }
         do {
             if !quiet || overview == nil || sites.isEmpty {
                 async let commonOverview = client.overview()

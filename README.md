@@ -2,7 +2,7 @@
 
 Native SwiftUI control-plane client for Hostwatch. The iPhone and iPad app is intended for **public App Store distribution**, while access to a control plane is provisioned by an organization. It uses the same signed-in session and REST API as the web application. There is no public demo or registration flow.
 
-**Version 1.0.9 (17):** available in the internal **Hostwatch Internal** TestFlight group. Workloads now shows each site's normal and peak memory limits, warns when usage exceeds the normal limit, and lets authorized operators edit both limits. Peak capacity is granted automatically only when the host has spare memory and attack mitigation is inactive. See [submission materials and release checklist](docs/APP_STORE.md) for the current TestFlight and App Store status.
+**Version 1.0.9 (18):** improves pull-to-refresh: the system spinner is the only progress indicator for that gesture, a retry clears the previous error, and an in-progress reload cannot be started again. The previous build added normal and peak memory limits to Workloads. See [submission materials and release checklist](docs/APP_STORE.md) for the current TestFlight and App Store status.
 
 ## Install and first setup
 
@@ -17,7 +17,7 @@ If Overview says **No host snapshot**, confirm the selected node has data on the
 
 ## Product structure
 
-- **Overview** — host resources and capacity with resource drilldowns. A loader stays on the page while that snapshot arrives instead of fading the whole interface.
+- **Overview** — host resources and capacity with resource drilldowns. Pull down to refresh with the system indicator; the page's own loading indicator is reserved for other reloads. A loader stays on the page while the first snapshot arrives instead of fading the whole interface.
 - **Database** — its own tab for running data-service containers and observed files. SQLite files can list tables and preview rows; PostgreSQL stays at container evidence; Redis/Valkey also shows native INFO counters. File size is disk evidence; SQL query rates require a dedicated exporter.
 - **Cleanup** — preview and explicitly remove only old APT downloads, generated manual-page caches, and unused Docker build records and opted-in Podman intermediate-image cache per runtime. The disk inspector links to the same section. Actual filesystem space freed by container cache cleanup may be lower than its virtual cache size.
 - **Network** — the host Network card shows all interface ingress and egress and a live local/remote port socket snapshot. Port counts are not per-port byte totals.

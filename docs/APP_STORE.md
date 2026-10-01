@@ -1,9 +1,10 @@
-# App Store submission — Hostwatch 1.0.9 (17)
+# App Store submission — Hostwatch 1.0.9 (18)
 
-Updated 2026-10-01. Build 17 is in the internal TestFlight group; Apple has not approved or published a public App Store release.
+Updated 2026-10-01. Build 18 is being prepared for the internal TestFlight group; Apple has not approved or published a public App Store release.
 
 ## Internal TestFlight status
 
+- Build 18 removes the duplicate custom `Updating…` indicator during pull-to-refresh and clears an earlier error when the user retries. Its archive, upload and processing status must be verified before claiming TestFlight availability.
 - Version **1.0.9 (17)** was archived by GitHub Actions with stable **Xcode 26.6**, signed for App Store distribution, validated and uploaded on 2026-10-01. The exported IPA's signed entitlements include `applinks:gethostwatch.com`.
 - Apple reports processing state `VALID`, internal state `IN_BETA_TESTING` and `USES-NON-EXEMPT-ENCRYPTION: false`.
 - Build 17 is assigned to the **Hostwatch Internal** group. Its “What to Test” note asks testers to inspect a site's normal and peak memory limits, overflow warning, and persisted edits while checking that other resource limits remain intact.

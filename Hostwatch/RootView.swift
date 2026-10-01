@@ -133,6 +133,7 @@ struct RootView: View {
 struct PageContainer: View {
     @EnvironmentObject private var model: AppModel
     @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @State private var isPullRefreshing = false
     let page: SidebarPage
 
     var body: some View {
@@ -163,14 +164,19 @@ struct PageContainer: View {
                     }
                 }
             }
-            if model.loading {
+            if model.loading && !isPullRefreshing {
                 PageLoadingOverlay(hasContent: model.hasCachedContent(for: page))
             }
         }
         .background(HW.background)
         .navigationTitle(page.title)
         .navigationBarTitleDisplayMode(.inline)
-        .refreshable { await model.reload(page: page) }
+        .refreshable {
+            guard !model.loading else { return }
+            isPullRefreshing = true
+            defer { isPullRefreshing = false }
+            await model.reload(page: page)
+        }
         .task(id: page) {
             await model.reload(page: page)
             if model.live { model.setLive(true, page: page) }
@@ -334,6 +340,7 @@ struct ScopeBar: View {
     private var refreshButton: some View {
         Button { Task { await model.reload(page: page) } } label: { Image(systemName: "arrow.clockwise") }
             .buttonStyle(.bordered).accessibilityLabel("Refresh")
+            .disabled(model.loading)
     }
 
     private func scopeLabel(_ text: String, icon: String) -> some View {
