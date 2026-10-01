@@ -1,13 +1,13 @@
-# App Store submission — Hostwatch 1.0.8 (16)
+# App Store submission — Hostwatch 1.0.9 (17)
 
-Updated 2026-09-30. Build 16 is in the internal TestFlight group; Apple has not approved or published a public App Store release.
+Updated 2026-10-01. Build 17 is in the internal TestFlight group; Apple has not approved or published a public App Store release.
 
 ## Internal TestFlight status
 
-- Version **1.0.8 (16)** was archived by GitHub Actions with stable **Xcode 26.6**, signed for App Store distribution, validated and uploaded on 2026-09-30. The exported IPA's signed entitlements include `applinks:gethostwatch.com`.
+- Version **1.0.9 (17)** was archived by GitHub Actions with stable **Xcode 26.6**, signed for App Store distribution, validated and uploaded on 2026-10-01. The exported IPA's signed entitlements include `applinks:gethostwatch.com`.
 - Apple reports processing state `VALID`, internal state `IN_BETA_TESTING` and `USES-NON-EXEMPT-ENCRYPTION: false`.
-- Build 16 is assigned to the **Hostwatch Internal** group. Its “What to Test” note asks testers to switch between the primary server and host-only Mac and check Overview, traffic policies and Runtime topology. The build clears stale node data and policy state on each switch; traffic controls are unavailable on host-only nodes.
-- TestFlight should offer build 16 as an update to internal testers. Its behavior on the physical device still needs confirmation.
+- Build 17 is assigned to the **Hostwatch Internal** group. Its “What to Test” note asks testers to inspect a site's normal and peak memory limits, overflow warning, and persisted edits while checking that other resource limits remain intact.
+- TestFlight should offer build 17 as an update to internal testers. Its behavior on the physical device still needs confirmation.
 - The label placement was inspected in simulator Debug fixture captures in both modes. These images are development evidence, not App Store screenshots.
 - The primary node now includes the `weavatrix-hosted` project and scheduled code-health scan. The first report contains 11 modules, 10 communities and 5,504 graph nodes. Its status is `PARTIAL` because the deployed repository has no measured coverage report.
 
@@ -35,7 +35,7 @@ Requires access to a Hostwatch control plane. No public account registration, em
 
 What's new:
 
-Switching nodes now clears data and policy state from the previous node, and host-only Mac nodes show traffic controls as unavailable. The previous build separated HTTP error totals from Nginx 444 edge blocks and client cancellations (499), and fixed Runtime site name pointers in Traffic and Towers. Earlier updates let Overview load when a site has no containers and improved errors for incompatible server responses.
+Workloads now shows each site's normal and peak memory limits and warns when usage exceeds the normal limit. Authorized operators can edit both limits; automatic peak capacity remains subject to host headroom and attack mitigation. The previous build cleared stale data and policy state when switching nodes.
 
 ## Reviewer instructions
 
@@ -64,13 +64,13 @@ Suggested captures: Overview with time axis, Traffic and request destination, Er
 ## Release gates
 
 - [x] Native SwiftUI client, camera/Face ID usage descriptions and app icon.
-- [x] Version 1.0.8 (16), shared archive scheme, iPhone/iPad targets.
+- [x] Version 1.0.9 (17), shared archive scheme, iPhone/iPad targets.
 - [x] Custom QR URL scheme and associated-domain entitlement in release source.
 - [x] Privacy manifest and accessible Privacy/Terms/Support links.
-- [x] Parser/session API test coverage; build 16's simulator suite passed 32 tests. Earlier candidates passed additional targeted checks, including mixed HTTP errors and Runtime labels.
+- [x] Parser/session API test coverage; build 17's simulator suite passed 43 tests with one optional test skipped. Earlier candidates passed additional targeted checks, including mixed HTTP errors and Runtime labels.
 - [ ] Physical QR scan, biometric unlock and eight-hour-expiry renewal on the candidate.
-- [x] Distribution provisioning with Associated Domains; build 16 archived using stable Xcode 26.6, signed, validated and uploaded. The final IPA signature contains the domain entitlement, and Apple recognized its export-compliance flag.
-- [x] Build 16 assigned to the internal TestFlight group. Physical-device verification of this build remains pending.
+- [x] Distribution provisioning with Associated Domains; build 17 archived using stable Xcode 26.6, signed, validated and uploaded. The final IPA signature contains the domain entitlement, and Apple recognized its export-compliance flag.
+- [x] Build 17 assigned to the internal TestFlight group. Physical-device verification of this build remains pending.
 - [ ] Authenticated iPhone/iPad screenshots and dedicated reviewer account.
 - [ ] Store privacy, age rating and export-compliance forms completed and verified.
 - [ ] App Review submission and approval; public release remains manual.
