@@ -11,18 +11,31 @@ struct CleanupView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                VStack(alignment: .leading, spacing: 6) {
-                    Eyebrow(text: "Host maintenance")
+            VStack(alignment: .leading, spacing: 6) {
+                Eyebrow(text: "Host maintenance")
+                HStack {
                     Text("Safe cleanup").font(.title2.bold())
-                    Text("Preview fixed, allowlisted caches before removing them. Reclaim advice classifies the rest of host storage as safe, review, or protected.").font(.footnote).foregroundStyle(HW.secondary)
+                    Spacer(minLength: 8)
+                    if !model.cleanupLoading {
+                        Button { Task { await model.refreshCleanup() } } label: { Image(systemName: "arrow.clockwise") }
+                            .buttonStyle(.bordered)
+                            .accessibilityLabel("Refresh cleanup preview")
+                    }
                 }
-                Spacer()
-                Button { Task { await model.refreshCleanup() } } label: { Image(systemName: "arrow.clockwise") }
-                    .buttonStyle(.bordered).disabled(model.cleanupLoading)
-                    .accessibilityLabel("Refresh cleanup preview")
+                Text("Preview fixed, allowlisted caches before removing them. Reclaim advice classifies the rest of host storage as safe, review, or protected.")
+                    .font(.footnote).foregroundStyle(HW.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            if model.cleanupLoading { ProgressView("Checking eligible cache files…").tint(HW.teal) }
+            if model.cleanupLoading {
+                HStack(alignment: .center, spacing: 12) {
+                    ProgressView().tint(HW.teal)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Checking eligible cache files…").font(.subheadline.weight(.semibold))
+                        Text("This read-only preview can take up to a minute.").font(.caption).foregroundStyle(HW.secondary)
+                    }
+                }
+                .padding(16).frame(maxWidth: .infinity, alignment: .leading).panel()
+            }
             if let error = model.cleanupError {
                 Label(error, systemImage: "exclamationmark.triangle.fill").font(.footnote).foregroundStyle(HW.red)
                     .padding(12).frame(maxWidth: .infinity, alignment: .leading).panel()

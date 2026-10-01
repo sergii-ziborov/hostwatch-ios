@@ -203,21 +203,21 @@ struct AddEnvironmentVariableView: View {
 
 struct CodeHealthView: View {
     @EnvironmentObject private var model: AppModel
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var importing = false
     @State private var importProject = ""
     @State private var draft = ""
     @State private var exportText = ""
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                VStack(alignment: .leading) { Eyebrow(text: "Repository evidence"); Text("Code intelligence, Git & vulnerabilities").font(.title2.bold()) }
-                Spacer()
-                MarkdownExportButton(kind: "vulnerability")
-                Menu("Markdown") {
-                    Button("Import advisories") { importProject = model.selectedSite; importing = true }
-                    Button("Copy vulnerability Markdown") { Task { if let value = await model.exportMarkdown(kind: "vulnerability") { exportText = value; UIPasteboard.general.string = value } } }
-                }.buttonStyle(.bordered)
+            VStack(alignment: .leading, spacing: 10) {
+                Eyebrow(text: "Repository evidence")
+                Text("Code intelligence, Git & vulnerabilities")
+                    .font(.title2.bold())
+                    .fixedSize(horizontal: false, vertical: true)
+                actions
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             if !exportText.isEmpty {
                 Text(exportText).font(.system(.caption, design: .monospaced)).textSelection(.enabled).lineLimit(10).padding(12).panel()
             }
@@ -244,6 +244,29 @@ struct CodeHealthView: View {
             }
         }
     }
+
+    @ViewBuilder private var actions: some View {
+        if dynamicTypeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: 8) { exportButton; markdownMenu }
+        } else {
+            HStack(spacing: 10) { exportButton; markdownMenu }
+        }
+    }
+
+    private var exportButton: some View {
+        MarkdownExportButton(kind: "vulnerability")
+            .buttonStyle(.bordered)
+            .fixedSize(horizontal: true, vertical: false)
+    }
+
+    private var markdownMenu: some View {
+        Menu("Markdown") {
+            Button("Import advisories") { importProject = model.selectedSite; importing = true }
+            Button("Copy vulnerability Markdown") { Task { if let value = await model.exportMarkdown(kind: "vulnerability") { exportText = value; UIPasteboard.general.string = value } } }
+        }
+        .buttonStyle(.bordered)
+        .fixedSize(horizontal: true, vertical: false)
+    }
 }
 
 struct CodeProjectRow: View {
@@ -251,7 +274,18 @@ struct CodeProjectRow: View {
     var critical: Int { (project.vulnerabilities ?? []).filter { $0.severity.lowercased() == "critical" }.count }
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack { VStack(alignment: .leading) { Text(project.name).font(.title3.bold()); Text(project.root).font(.caption).foregroundStyle(HW.secondary).lineLimit(1) }; Spacer(); Text(project.completeness).font(.caption2.bold()).foregroundStyle(project.completeness == "CURRENT" ? HW.teal : HW.amber).padding(.horizontal, 9).padding(.vertical, 5).background((project.completeness == "CURRENT" ? HW.teal : HW.amber).opacity(0.15)).clipShape(Capsule()) }
+            VStack(alignment: .leading, spacing: 4) {
+                Text(project.name).font(.title3.bold())
+                Text(project.root).font(.caption).foregroundStyle(HW.secondary).lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Text(project.completeness)
+                .font(.caption.bold())
+                .foregroundStyle(project.completeness == "CURRENT" ? HW.teal : HW.amber)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 10).padding(.vertical, 7)
+                .background((project.completeness == "CURRENT" ? HW.teal : HW.amber).opacity(0.15))
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 110))], alignment: .leading, spacing: 10) {
                 mini("Code graph", "\(project.graph?.nodes ?? 0) nodes"); mini("Modules", (project.analysis?.modules?.count ?? 0).formatted()); mini("Critical", critical.formatted()); mini("Findings", (project.findings?.count ?? 0).formatted())
             }
