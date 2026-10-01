@@ -316,7 +316,11 @@ struct MCPSnapshot: Decodable {
 
 struct Site: Codable, Identifiable, Hashable {
     let id: String; let name: String; let domains: [String]; let sharedNginx: Bool; let containers: [ContainerInfo]
-    let cpuPercent: Double; let memoryBytes: Double; let memoryLimit: Double; let requestsPerMinute: Double; let bytesPerMinute: Double; let errorRate: Double; let p95Ms: Double
+    let cpuPercent: Double; var memoryBytes: Double; let memoryLimit: Double; let requestsPerMinute: Double; let bytesPerMinute: Double; let errorRate: Double; let p95Ms: Double
+    var normalMemoryBytes: Double? = nil
+    var peakMemoryBytes: Double? = nil
+    var memoryMode: String? = nil
+    var memoryNote: String? = nil
     static func == (lhs: Site, rhs: Site) -> Bool { lhs.id == rhs.id }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
@@ -334,10 +338,82 @@ extension Site {
         cpuPercent = try values.decode(Double.self, forKey: .cpuPercent)
         memoryBytes = try values.decode(Double.self, forKey: .memoryBytes)
         memoryLimit = try values.decode(Double.self, forKey: .memoryLimit)
+        normalMemoryBytes = try values.decodeIfPresent(Double.self, forKey: .normalMemoryBytes)
+        peakMemoryBytes = try values.decodeIfPresent(Double.self, forKey: .peakMemoryBytes)
+        memoryMode = try values.decodeIfPresent(String.self, forKey: .memoryMode)
+        memoryNote = try values.decodeIfPresent(String.self, forKey: .memoryNote)
         requestsPerMinute = try values.decode(Double.self, forKey: .requestsPerMinute)
         bytesPerMinute = try values.decode(Double.self, forKey: .bytesPerMinute)
         errorRate = try values.decode(Double.self, forKey: .errorRate)
         p95Ms = try values.decode(Double.self, forKey: .p95Ms)
+    }
+}
+
+enum SiteMemoryPressure: Equatable {
+    case unavailable, normal, approachingNormal, overflow, nearPeak
+}
+
+extension Site {
+    var normalMemoryLimit: Double { max(0, normalMemoryBytes ?? memoryLimit) }
+    var peakMemoryLimit: Double { max(normalMemoryLimit, peakMemoryBytes ?? normalMemoryLimit) }
+    var memoryPressure: SiteMemoryPressure {
+        guard normalMemoryLimit > 0 else { return .unavailable }
+        if memoryBytes >= peakMemoryLimit * 0.9 { return .nearPeak }
+        if memoryBytes >= normalMemoryLimit { return .overflow }
+        if memoryBytes >= normalMemoryLimit * 0.8 { return .approachingNormal }
+        return .normal
+    }
+    var memoryStatus: String {
+        switch memoryPressure {
+        case .unavailable: return "Memory limit unavailable"
+        case .nearPeak: return "Near peak limit"
+        case .overflow: return "Above normal limit"
+        case .approachingNormal: return "Approaching normal limit"
+        case .normal: return memoryMode == "overflow" ? "Peak active · cooling down" : "Within normal limit"
+        }
+    }
+}
+
+struct SiteLimits: Decodable {
+    let requestsPerSecond: Int
+    let cpuPercent: Double
+    let memoryBytes: Int64
+    let normalMemoryBytes: Int64?
+    let peakMemoryBytes: Int64?
+    let pids: Int64
+    let managed: Bool
+    let memoryMode: String?
+    let memoryNote: String?
+
+    var normal: Int64 { normalMemoryBytes ?? memoryBytes }
+    var peak: Int64 { peakMemoryBytes ?? normal }
+}
+
+struct SiteLimitsDetail: Decodable { let limits: SiteLimits }
+
+enum SiteLimitInputError: LocalizedError {
+    case invalidMemory
+    var errorDescription: String? { "Enter normal memory of at least 64 MiB and a peak no lower than normal." }
+}
+
+struct SiteLimitUpdate: Encodable {
+    let requestsPerSecond: Int
+    let cpuPercent: Double
+    let memoryBytes: Int64
+    let normalMemoryBytes: Int64
+    let peakMemoryBytes: Int64
+    let pids: Int64
+
+    init(limits: SiteLimits, normalMiB: Int64, peakMiB: Int64) throws {
+        guard (64...1_048_576).contains(normalMiB), (normalMiB...1_048_576).contains(peakMiB) else {
+            throw SiteLimitInputError.invalidMemory
+        }
+        requestsPerSecond = limits.requestsPerSecond
+        cpuPercent = limits.cpuPercent
+        memoryBytes = normalMiB * 1_048_576
+        normalMemoryBytes = memoryBytes
+        peakMemoryBytes = peakMiB * 1_048_576
+        pids = limits.pids
     }
 }
 

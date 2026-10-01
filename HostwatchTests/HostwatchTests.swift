@@ -11,6 +11,38 @@ final class HostwatchTests: XCTestCase {
         XCTAssertEqual(site.id, "static")
         XCTAssertTrue(site.domains.isEmpty)
         XCTAssertTrue(site.containers.isEmpty)
+        XCTAssertEqual(site.normalMemoryLimit, 0)
+        XCTAssertEqual(site.peakMemoryLimit, 0)
+        XCTAssertEqual(site.memoryPressure, .unavailable)
+    }
+
+    func testSiteMemoryPolicyDecodesBothLimitsAndWarnsAtThresholds() throws {
+        let response = #"{"id":"kablay-us","name":"Kablay US","domains":["kablay.us"],"sharedNginx":false,"containers":[],"cpuPercent":20,"memoryBytes":220200960,"memoryLimit":268435456,"normalMemoryBytes":268435456,"peakMemoryBytes":524288000,"memoryMode":"normal","requestsPerMinute":12,"bytesPerMinute":0,"errorRate":0,"p95Ms":80}"#
+        var site = try JSONDecoder().decode(Site.self, from: Data(response.utf8))
+        XCTAssertEqual(site.normalMemoryLimit, 268_435_456)
+        XCTAssertEqual(site.peakMemoryLimit, 524_288_000)
+        XCTAssertEqual(site.memoryPressure, .approachingNormal)
+        site.memoryBytes = 300_000_000
+        site.memoryMode = "overflow"
+        XCTAssertEqual(site.memoryPressure, .overflow)
+        XCTAssertEqual(site.memoryStatus, "Above normal limit")
+        site.memoryBytes = 480_000_000
+        XCTAssertEqual(site.memoryPressure, .nearPeak)
+        site.memoryBytes = 100_000_000
+        XCTAssertEqual(site.memoryStatus, "Peak active · cooling down")
+    }
+
+    func testMemoryLimitUpdatePreservesTrafficAndProcessCaps() throws {
+        let response = #"{"requestsPerSecond":400,"cpuPercent":140,"memoryBytes":1207959552,"normalMemoryBytes":1207959552,"peakMemoryBytes":1476395008,"pids":512,"managed":true,"memoryMode":"normal"}"#
+        let limits = try JSONDecoder().decode(SiteLimits.self, from: Data(response.utf8))
+        let update = try SiteLimitUpdate(limits: limits, normalMiB: 1_152, peakMiB: 1_408)
+        let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(update)) as? [String: Any])
+        XCTAssertEqual(payload["memoryBytes"] as? Int64, 1_207_959_552)
+        XCTAssertEqual(payload["peakMemoryBytes"] as? Int64, 1_476_395_008)
+        XCTAssertEqual(payload["requestsPerSecond"] as? Int, 400)
+        XCTAssertEqual(payload["cpuPercent"] as? Double, 140)
+        XCTAssertEqual(payload["pids"] as? Int64, 512)
+        XCTAssertThrowsError(try SiteLimitUpdate(limits: limits, normalMiB: 1_152, peakMiB: 1_000))
     }
 
     func testTLSInventoryKeepsUnknownStatesAndNoPrivateKeyMaterial() throws {

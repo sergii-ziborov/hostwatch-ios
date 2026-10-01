@@ -346,7 +346,7 @@ struct TopologyTowerInspector: View {
                 }
                 Section("Resources") {
                     HWLabeled("CPU", value: Format.percent(site.cpuPercent))
-                    HWLabeled("Memory", value: "\(Format.bytes(site.memoryBytes)) of \(Format.bytes(site.memoryLimit))")
+                    HWLabeled("Memory", value: "\(Format.bytes(site.memoryBytes)) · normal \(Format.bytes(site.normalMemoryLimit)) · peak \(Format.bytes(site.peakMemoryLimit))")
                     HWLabeled("Traffic", value: "\(Format.bytes(site.bytesPerMinute))/min")
                 }
                 if let layer, layers.indices.contains(layer) {
@@ -447,7 +447,7 @@ struct WorkloadsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 280), spacing: 12)], spacing: 12) {
-            ForEach(filtered) { site in NavigationLink { WorkloadDetailView(site: site) } label: { VStack(alignment: .leading, spacing: 13) { HStack { VStack(alignment: .leading) { Text(site.name).font(.title3.bold()); Text(site.domains.joined(separator: ", ")).font(.caption).foregroundStyle(HW.secondary) }; Spacer(); Text(site.errorRate > 2 ? "AT RISK" : "HEALTHY").font(.caption2.bold()).foregroundStyle(site.errorRate > 2 ? HW.red : HW.teal) }; HStack { mini("Requests", "\(site.requestsPerMinute.formatted())/min"); mini("CPU", Format.percent(site.cpuPercent)); mini("Memory", Format.bytes(site.memoryBytes)) }; ProgressView(value: site.memoryBytes, total: max(1, site.memoryLimit)).tint(site.memoryBytes / max(1, site.memoryLimit) > 0.85 ? HW.red : HW.teal); HStack { Text("Open requests, processes, storage & limits").font(.caption).foregroundStyle(HW.teal); Spacer(); Image(systemName: "chevron.right") } }.padding(16).panel() }.buttonStyle(.plain) }
+            ForEach(filtered) { site in NavigationLink { WorkloadDetailView(site: site) } label: { VStack(alignment: .leading, spacing: 13) { HStack { VStack(alignment: .leading) { Text(site.name).font(.title3.bold()); Text(site.domains.joined(separator: ", ")).font(.caption).foregroundStyle(HW.secondary) }; Spacer(); Text(site.errorRate > 2 ? "AT RISK" : "HEALTHY").font(.caption2.bold()).foregroundStyle(site.errorRate > 2 ? HW.red : HW.teal) }; HStack { mini("Requests", "\(site.requestsPerMinute.formatted())/min"); mini("CPU", Format.percent(site.cpuPercent)); mini("Memory", Format.bytes(site.memoryBytes)) }; SiteMemoryGauge(site: site); HStack { Text("Open requests, processes, storage & limits").font(.caption).foregroundStyle(HW.teal); Spacer(); Image(systemName: "chevron.right") } }.padding(16).panel() }.buttonStyle(.plain) }
         }
         }
     }
@@ -459,6 +459,9 @@ struct WorkloadDetailView: View {
     let site: Site
     @State private var tab = "Requests"
     @State private var pendingAction: String?
+    @State private var showLimitEditor = false
+    private var liveSite: Site { model.sites.first(where: { $0.id == site.id }) ?? site }
+    private var canEditLimits: Bool { ["platform_owner", "owner", "admin", "operator"].contains(model.session.role ?? "") }
     var body: some View {
         List {
             Section { LazyVGrid(columns: [GridItem(.adaptive(minimum: 145))], spacing: 10) { StatCard(title: "Requests", value: "\(site.requestsPerMinute.formatted())/min"); StatCard(title: "CPU", value: Format.percent(site.cpuPercent)); StatCard(title: "Memory", value: Format.bytes(site.memoryBytes), color: HW.amber); StatCard(title: "p95", value: "\(site.p95Ms.formatted()) ms") }.listRowInsets(EdgeInsets()) }
@@ -466,9 +469,23 @@ struct WorkloadDetailView: View {
             if tab == "Requests" { Section { PagedRows(items: model.requests.filter { $0.site == site.id }) { row in NavigationLink { RequestDetailView(request: row) } label: { RequestRow(request: row) } } } }
             else if tab == "Processes" { Section { if site.containers.isEmpty { Text("No container process snapshot is available yet.").foregroundStyle(HW.secondary) }; ForEach(site.containers) { item in VStack(alignment: .leading) { Text(item.name).font(.headline); Text("\(item.image) · \(Format.percent(item.cpuPercent)) CPU · \(Format.bytes(item.memoryBytes))").foregroundStyle(HW.secondary) } } } }
             else if tab == "Storage" { Section { NavigationLink("Inspect files, databases, images and container layers") { StorageInspectorView() } } }
-            else { Section { HWLabeled("Memory limit", value: Format.bytes(site.memoryLimit)); HWLabeled("Shared Nginx", value: site.sharedNginx ? "Yes" : "No"); Text("Limit editing is restricted to operators and owners.").font(.caption).foregroundStyle(HW.secondary) } }
+            else {
+                Section("Memory policy") {
+                    SiteMemoryGauge(site: liveSite)
+                    HWLabeled("Normal limit", value: Format.bytes(liveSite.normalMemoryLimit))
+                    HWLabeled("Peak limit", value: Format.bytes(liveSite.peakMemoryLimit))
+                    HWLabeled("Current runtime cap", value: Format.bytes(liveSite.memoryLimit))
+                    if canEditLimits {
+                        Button("Set normal and peak limits") { showLimitEditor = true }
+                    } else {
+                        Text("Limit editing is restricted to operators and owners.").font(.caption).foregroundStyle(HW.secondary)
+                    }
+                }
+                Section { HWLabeled("Shared Nginx", value: site.sharedNginx ? "Yes" : "No") }
+            }
             Section("Controls") { Button("Restart", systemImage: "arrow.clockwise") { pendingAction = "restart" }; Button("Stop", systemImage: "stop.fill", role: .destructive) { pendingAction = "stop" } }
         }.hwHiddenScrollBackground().background(HW.background).navigationTitle(site.name)
+        .sheet(isPresented: $showLimitEditor) { SiteMemoryLimitEditor(site: liveSite).environmentObject(model) }
         .confirmationDialog("\((pendingAction ?? "Action").capitalized) \(site.name)?", isPresented: Binding(get: { pendingAction != nil }, set: { if !$0 { pendingAction = nil } })) { if let action = pendingAction { Button(action.capitalized, role: action == "stop" ? .destructive : nil) { Task { await model.runSiteAction(site, action: action) }; pendingAction = nil } } } message: { Text("This changes the running service on the selected node.") }
     }
 }

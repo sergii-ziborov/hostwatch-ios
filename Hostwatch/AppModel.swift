@@ -607,6 +607,27 @@ final class AppModel: ObservableObject {
         do { try await client.siteAction(site.id, action: action); await reload(page: .workloads) } catch { errorMessage = error.localizedDescription }
     }
 
+    func siteLimits(_ site: Site) async throws -> SiteLimits {
+#if DEBUG
+        if fixtures {
+            let bytes = Int64(site.normalMemoryLimit)
+            return SiteLimits(requestsPerSecond: 400, cpuPercent: 100, memoryBytes: bytes,
+                              normalMemoryBytes: bytes, peakMemoryBytes: Int64(site.peakMemoryLimit),
+                              pids: 256, managed: true, memoryMode: site.memoryMode, memoryNote: site.memoryNote)
+        }
+#endif
+        return try await client.siteLimits(site.id)
+    }
+
+    func setSiteLimits(_ site: Site, update: SiteLimitUpdate) async throws -> SiteLimits {
+        guard !fixtures, ["platform_owner", "owner", "admin", "operator"].contains(session.role ?? "") else {
+            throw APIError.server("An operator or owner is required to change site limits.")
+        }
+        let limits = try await client.setSiteLimits(site.id, update: update)
+        if let refreshed = try? await client.sites() { sites = refreshed }
+        return limits
+    }
+
     func block(site: String, kind: String, value: String) async {
         guard !fixtures else { return }
         do {
