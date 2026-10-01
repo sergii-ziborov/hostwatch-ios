@@ -2,7 +2,7 @@
 
 Native SwiftUI control-plane client for Hostwatch. The iPhone and iPad app is intended for **public App Store distribution**, while access to a control plane is provisioned by an organization. It uses the same signed-in session and REST API as the web application. There is no public demo or registration flow.
 
-**Version 1.0.9 (18):** improves pull-to-refresh: the system spinner is the only progress indicator for that gesture, a retry clears the previous error, and an in-progress reload cannot be started again. The previous build added normal and peak memory limits to Workloads. See [submission materials and release checklist](docs/APP_STORE.md) for the current TestFlight and App Store status.
+**Version 1.0.9 (18):** available in the internal **Hostwatch Internal** TestFlight group. Pull-to-refresh now uses only the system spinner, a retry clears the previous error, and an in-progress reload cannot be started again. The previous build added normal and peak memory limits to Workloads. See [submission materials and release checklist](docs/APP_STORE.md) for the current TestFlight and App Store status.
 
 ## Install and first setup
 
@@ -59,6 +59,7 @@ Docker/Podman compatibility checks also cover runtime-scoped data-service identi
 missing telemetry and protected Podman storage. The updated simulator suite ran
 36 tests on 2026-09-29 with no failures; the opt-in live sign-in test was skipped.
 Those results describe the earlier runtime update. Version 1.0.9 (17) was archived with stable Xcode 26.6 in GitHub Actions, signed locally, validated by Apple and added to internal TestFlight on 2026-10-01. Its simulator suite passed 43 tests with one optional test skipped. Build 16 fixed node-switch data and policy state. Physical-device verification of build 17 remains pending.
+Version 1.0.9 (18) followed the same stable-Xcode archive and signing process on 2026-10-01. Apple accepted and processed it, and the internal TestFlight group has access. Its pull-to-refresh change built successfully with the local simulator SDK; physical-device verification is still needed.
 
 For local UI development only, a Debug build may be launched with `HOSTWATCH_FIXTURES=1`. These values are fabricated test fixtures and display a prominent **SAMPLE DATA · DEBUG BUILD** notice instead of a Live status. A Release build ignores the flag and requires a real, authenticated control plane. No fixture screenshot is used as an App Store asset.
 

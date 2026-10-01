@@ -1,14 +1,14 @@
 # App Store submission — Hostwatch 1.0.9 (18)
 
-Updated 2026-10-01. Build 18 is being prepared for the internal TestFlight group; Apple has not approved or published a public App Store release.
+Updated 2026-10-01. Build 18 is in the internal TestFlight group; Apple has not approved or published a public App Store release.
 
 ## Internal TestFlight status
 
-- Build 18 removes the duplicate custom `Updating…` indicator during pull-to-refresh and clears an earlier error when the user retries. Its archive, upload and processing status must be verified before claiming TestFlight availability.
+- Version **1.0.9 (18)** removes the duplicate custom `Updating…` indicator during pull-to-refresh, prevents a second manual reload while one is running, and clears an earlier error when the user retries. It was archived on stable Xcode, signed, validated and uploaded on 2026-10-01. Apple reports `VALID` processing and `IN_BETA_TESTING`; assignment to **Hostwatch Internal** was verified through App Store Connect. Physical-device verification of this build remains pending.
 - Version **1.0.9 (17)** was archived by GitHub Actions with stable **Xcode 26.6**, signed for App Store distribution, validated and uploaded on 2026-10-01. The exported IPA's signed entitlements include `applinks:gethostwatch.com`.
 - Apple reports processing state `VALID`, internal state `IN_BETA_TESTING` and `USES-NON-EXEMPT-ENCRYPTION: false`.
 - Build 17 is assigned to the **Hostwatch Internal** group. Its “What to Test” note asks testers to inspect a site's normal and peak memory limits, overflow warning, and persisted edits while checking that other resource limits remain intact.
-- TestFlight should offer build 17 as an update to internal testers. Its behavior on the physical device still needs confirmation.
+- TestFlight should offer build 18 as an update to internal testers. Its behavior on a physical device still needs confirmation.
 - The label placement was inspected in simulator Debug fixture captures in both modes. These images are development evidence, not App Store screenshots.
 - The primary node now includes the `weavatrix-hosted` project and scheduled code-health scan. The first report contains 11 modules, 10 communities and 5,504 graph nodes. Its status is `PARTIAL` because the deployed repository has no measured coverage report.
 
@@ -36,7 +36,7 @@ Requires access to a Hostwatch control plane. No public account registration, em
 
 What's new:
 
-Workloads now shows each site's normal and peak memory limits and warns when usage exceeds the normal limit. Authorized operators can edit both limits; automatic peak capacity remains subject to host headroom and attack mitigation. The previous build cleared stale data and policy state when switching nodes.
+Pull-to-refresh now uses the iOS progress indicator without a second in-app spinner. Starting a new refresh clears an earlier error, and the refresh button waits while a reload is running. The previous build added normal and peak memory controls to Workloads.
 
 ## Reviewer instructions
 
@@ -65,13 +65,14 @@ Suggested captures: Overview with time axis, Traffic and request destination, Er
 ## Release gates
 
 - [x] Native SwiftUI client, camera/Face ID usage descriptions and app icon.
-- [x] Version 1.0.9 (17), shared archive scheme, iPhone/iPad targets.
+- [x] Version 1.0.9 (18), shared archive scheme, iPhone/iPad targets.
 - [x] Custom QR URL scheme and associated-domain entitlement in release source.
 - [x] Privacy manifest and accessible Privacy/Terms/Support links.
 - [x] Parser/session API test coverage; build 17's simulator suite passed 43 tests with one optional test skipped. Earlier candidates passed additional targeted checks, including mixed HTTP errors and Runtime labels.
 - [ ] Physical QR scan, biometric unlock and eight-hour-expiry renewal on the candidate.
 - [x] Distribution provisioning with Associated Domains; build 17 archived using stable Xcode 26.6, signed, validated and uploaded. The final IPA signature contains the domain entitlement, and Apple recognized its export-compliance flag.
 - [x] Build 17 assigned to the internal TestFlight group. Physical-device verification of this build remains pending.
+- [x] Build 18 assigned to the internal TestFlight group. Apple reports `VALID` and `IN_BETA_TESTING`; physical-device verification remains pending.
 - [ ] Authenticated iPhone/iPad screenshots and dedicated reviewer account.
 - [ ] Store privacy, age rating and export-compliance forms completed and verified.
 - [ ] App Review submission and approval; public release remains manual.
