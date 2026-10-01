@@ -1,15 +1,16 @@
-# App Store submission — Hostwatch 1.0.9 (19)
+# App Store submission — Hostwatch 1.0.9 (20)
 
-Updated 2026-10-01. Build 19 is in the internal TestFlight group; Apple has not approved or published a public App Store release.
+Updated 2026-10-01. Build 20 is in the internal TestFlight group; Apple has not approved or published a public App Store release.
 
 ## Internal TestFlight status
 
+- Version **1.0.9 (20)** reserves a separate row for the PUBLIC edge in Runtime topology, preventing it from merging with Weavatrix when the site grid grows. Traffic labels now use free space near each tower instead of cascading to the bottom of the scene. The nine-site Debug fixture was inspected in both scene modes on an iPhone 17 Pro simulator; 44 tests passed, one optional test was skipped. The stable-Xcode archive was signed, validated and uploaded on 2026-10-01. Apple reports `VALID` and `IN_BETA_TESTING`; assignment to **Hostwatch Internal** was verified. A “What to Test” note asks testers to inspect Towers and Traffic, rotate and zoom, and report overlaps. Physical-device verification remains pending.
 - Version **1.0.9 (19)** reflows Code health and Cleanup on iPhone: titles and descriptions use the available width, long coverage text sits below the project name, Markdown actions do not split, and Cleanup's scan message stays in one panel. The release archive was built on stable Xcode, signed, validated and uploaded on 2026-10-01. Apple reports `VALID` and `IN_BETA_TESTING`; assignment to **Hostwatch Internal** was verified. Physical-device verification remains pending.
 - Version **1.0.9 (18)** removes the duplicate custom `Updating…` indicator during pull-to-refresh, prevents a second manual reload while one is running, and clears an earlier error when the user retries. It was archived on stable Xcode, signed, validated and uploaded on 2026-10-01. Apple reports `VALID` processing and `IN_BETA_TESTING`; assignment to **Hostwatch Internal** was verified through App Store Connect. Physical-device verification of this build remains pending.
 - Version **1.0.9 (17)** was archived by GitHub Actions with stable **Xcode 26.6**, signed for App Store distribution, validated and uploaded on 2026-10-01. The exported IPA's signed entitlements include `applinks:gethostwatch.com`.
 - Apple reports processing state `VALID`, internal state `IN_BETA_TESTING` and `USES-NON-EXEMPT-ENCRYPTION: false`.
 - Build 17 is assigned to the **Hostwatch Internal** group. Its “What to Test” note asks testers to inspect a site's normal and peak memory limits, overflow warning, and persisted edits while checking that other resource limits remain intact.
-- TestFlight should offer build 19 as an update to internal testers. Its behavior on a physical device still needs confirmation.
+- TestFlight should offer build 20 as an update to internal testers. Its behavior on a physical device still needs confirmation.
 - The label placement was inspected in simulator Debug fixture captures in both modes. These images are development evidence, not App Store screenshots.
 - The primary node now includes the `weavatrix-hosted` project and scheduled code-health scan. The first report contains 11 modules, 10 communities and 5,504 graph nodes. Its status is `PARTIAL` because the deployed repository has no measured coverage report.
 
@@ -37,7 +38,7 @@ Requires access to a Hostwatch control plane. No public account registration, em
 
 What's new:
 
-Code health now presents its heading, Markdown actions and long project status without narrow columns or broken words. Cleanup keeps its description full width and displays scan progress in one aligned panel. The previous build removed the duplicate pull-to-refresh indicator.
+Runtime topology now keeps the PUBLIC edge separate from application towers and places labels near their nodes on dense scenes. The previous build improved Code health and Cleanup layouts.
 
 ## Reviewer instructions
 
@@ -66,7 +67,7 @@ Suggested captures: Overview with time axis, Traffic and request destination, Er
 ## Release gates
 
 - [x] Native SwiftUI client, camera/Face ID usage descriptions and app icon.
-- [x] Version 1.0.9 (19), shared archive scheme, iPhone/iPad targets.
+- [x] Version 1.0.9 (20), shared archive scheme, iPhone/iPad targets.
 - [x] Custom QR URL scheme and associated-domain entitlement in release source.
 - [x] Privacy manifest and accessible Privacy/Terms/Support links.
 - [x] Parser/session API test coverage; build 17's simulator suite passed 43 tests with one optional test skipped. Earlier candidates passed additional targeted checks, including mixed HTTP errors and Runtime labels.
@@ -75,6 +76,7 @@ Suggested captures: Overview with time axis, Traffic and request destination, Er
 - [x] Build 17 assigned to the internal TestFlight group. Physical-device verification of this build remains pending.
 - [x] Build 18 assigned to the internal TestFlight group. Apple reports `VALID` and `IN_BETA_TESTING`; physical-device verification remains pending.
 - [x] Build 19 assigned to the internal TestFlight group. Apple reports `VALID` and `IN_BETA_TESTING`; iPhone simulator layout inspection passed, physical-device verification remains pending.
+- [x] Build 20 assigned to the internal TestFlight group. Apple reports `VALID` and `IN_BETA_TESTING`; nine-site iPhone simulator inspection passed, physical-device verification remains pending.
 - [ ] Authenticated iPhone/iPad screenshots and dedicated reviewer account.
 - [ ] Store privacy, age rating and export-compliance forms completed and verified.
 - [ ] App Review submission and approval; public release remains manual.
