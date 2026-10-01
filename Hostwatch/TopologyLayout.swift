@@ -116,7 +116,13 @@ enum TopologyLayout {
         )
     }
 
-    static func hubPosition() -> TopologyPoint { TopologyPoint(x: 0, z: 3.6) }
+    /// Reserve a full grid row in front of the site towers for the public edge.
+    /// A fixed Z puts the hub inside the last row once the grid has three rows.
+    static func hubPosition(siteCount: Int) -> TopologyPoint {
+        guard siteCount > 0 else { return TopologyPoint(x: 0, z: spacing - 1) }
+        let lastSite = gridPosition(index: siteCount - 1, count: siteCount)
+        return TopologyPoint(x: 0, z: lastSite.z + spacing)
+    }
 
     static func externalPosition(index: Int, count: Int, siteXs: [Float], siteZs: [Float]) -> TopologyPoint {
         let maxX = (siteXs.max() ?? 0) + spacing + 0.2

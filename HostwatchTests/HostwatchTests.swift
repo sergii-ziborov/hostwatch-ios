@@ -349,6 +349,18 @@ final class HostwatchTests: XCTestCase {
         XCTAssertEqual(path.last, b)
     }
 
+    func testPublicEdgeNeverOccupiesASiteTowerPlate() {
+        for count in 1...15 {
+            let hub = TopologyLayout.hubPosition(siteCount: count)
+            for index in 0..<count {
+                let site = TopologyLayout.gridPosition(index: index, count: count)
+                let distance = hypot(hub.x - site.x, hub.z - site.z)
+                XCTAssertGreaterThanOrEqual(distance, TopologyLayout.spacing - 0.001,
+                                            "Public edge overlaps site \(index) in a \(count)-site scene")
+            }
+        }
+    }
+
     func testHybridFleetContractDecodesAgentJSON() throws {
         let payload = Data("""
         {"id":"home-main","kind":"home-compute","publicIp":"203.0.113.44","previousIp":"203.0.113.10","fresh":true,"ipChanged":true,"diskFreeBytes":4096,"runningJobs":1,"cpuPercent":12.5,"lastSeen":"2026-09-19T00:00:00Z"}

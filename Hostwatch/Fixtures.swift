@@ -34,6 +34,23 @@ enum Fixtures {
         ], cpuPercent: 0.6, memoryBytes: 96_000_000, memoryLimit: 536_870_912, requestsPerMinute: 2.4, bytesPerMinute: 48_000, errorRate: 0.0, p95Ms: 42)
     ]
 
+    // Reproduce the dense production topology where the eighth site formerly
+    // occupied the same position as the PUBLIC edge.
+    static let topologySites: [Site] = sites + [
+        .init(id: "nikogips", name: "NikoGips", domains: ["nikogips.example"], sharedNginx: true, containers: [],
+              cpuPercent: 1.4, memoryBytes: 120_000_000, memoryLimit: 536_870_912,
+              requestsPerMinute: 3, bytesPerMinute: 45_000, errorRate: 0, p95Ms: 92),
+        .init(id: "granttap-web", name: "GrantTap Web", domains: ["granttap.example"], sharedNginx: true, containers: [],
+              cpuPercent: 2.2, memoryBytes: 160_000_000, memoryLimit: 536_870_912,
+              requestsPerMinute: 5, bytesPerMinute: 65_000, errorRate: 0, p95Ms: 110),
+        .init(id: "weavatrix", name: "Weavatrix", domains: ["weavatrix.example"], sharedNginx: true, containers: [],
+              cpuPercent: 3.1, memoryBytes: 210_000_000, memoryLimit: 536_870_912,
+              requestsPerMinute: 7, bytesPerMinute: 90_000, errorRate: 0, p95Ms: 130),
+        .init(id: "hostwatch", name: "Hostwatch", domains: ["gethostwatch.com"], sharedNginx: true, containers: [],
+              cpuPercent: 2.5, memoryBytes: 180_000_000, memoryLimit: 536_870_912,
+              requestsPerMinute: 4, bytesPerMinute: 55_000, errorRate: 0, p95Ms: 105)
+    ]
+
     private static func container(_ id: String, _ name: String, _ project: String, _ state: String, _ cpu: Double, _ memory: Double) -> ContainerInfo {
         .init(id: id, name: name, project: project, state: state, status: "Up 3 days", image: "\(project):latest", imageId: "sha256:\(id)", cpuPercent: cpu, memoryBytes: memory, memoryLimit: 1_073_741_824, networkRxBytes: 12_000_000, networkTxBytes: 4_000_000, pids: 12)
     }

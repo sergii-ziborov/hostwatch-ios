@@ -111,6 +111,7 @@ struct NativeTopologyScene: UIViewRepresentable {
         private var previousSiteIDs: [String] = []
         private var pose = TopologyCamera.Pose(target: SCNVector3(0, 1.2, 0), yaw: 0.55, pitch: 0.62, distance: 18)
         private var fitDistance: Float = 18
+        private var fitTarget = SCNVector3(0, 1.2, 0)
         private let camera = SCNNode()
         private let labels = TopologyLabelCanvas()
         private var anchors: [LabelAnchor] = []
@@ -188,7 +189,7 @@ struct NativeTopologyScene: UIViewRepresentable {
                     if let id = focusedSiteID.wrappedValue, let base = towerBases[id] {
                         pose = TopologyCamera.lock(base: base, height: towerHeights[id] ?? 2, aspect: viewAspect)
                     } else {
-                        pose = TopologyCamera.Pose(target: SCNVector3(0, 1.2, 0), yaw: 0.55, pitch: 0.62, distance: fitDistance)
+                        pose = TopologyCamera.Pose(target: fitTarget, yaw: 0.55, pitch: 0.62, distance: fitDistance)
                     }
                     TopologyCamera.apply(camera, pose: pose)
                 }
@@ -217,7 +218,8 @@ struct NativeTopologyScene: UIViewRepresentable {
             addLights(to: scene)
             addFloor(to: scene, radius: max(9, Float(snapshot.sites.count) * 1.2 + 2))
 
-            let hub = TopologyLayout.hubPosition()
+            let count = snapshot.sites.count
+            let hub = TopologyLayout.hubPosition(siteCount: count)
             let hubNode = SCNNode(geometry: SCNCylinder(radius: 0.62, height: 0.55))
             hubNode.geometry?.firstMaterial = material(red: 0.13, green: 0.36, blue: 0.39, emission: 0.22)
             hubNode.position = SCNVector3(hub.x, 0.28, hub.z)
@@ -230,9 +232,10 @@ struct NativeTopologyScene: UIViewRepresentable {
                                  localY: 0.7, usesTower: false,
                                  text: snapshot.node.name, detail: "public edge", color: TopologyLayer.healthy, rank: .name))
 
-            let count = snapshot.sites.count
             let rows = Int(ceil(Double(count) / Double(TopologyLayout.columns(for: count))))
-            fitDistance = max(17, Float(rows) * 5.0 + Float(snapshot.services.count) * 0.5)
+            let firstSiteZ = count > 0 ? TopologyLayout.gridPosition(index: 0, count: count).z : 0
+            fitTarget = SCNVector3(0, 1.2, (firstSiteZ + hub.z) / 2)
+            fitDistance = max(17, Float(rows + 1) * 5.0 + Float(snapshot.services.count) * 0.5)
             pose.distance = max(pose.distance, fitDistance * 0.92)
             let maxEgress = max(1, snapshot.sites.map(\.bytesPerMinute).max() ?? 1)
             var bases: [String: TopologyPoint] = [:]
@@ -731,7 +734,7 @@ struct NativeTopologyScene: UIViewRepresentable {
         func apply(_ action: TopologyCameraAction) {
             switch action {
             case .fit:
-                pose = TopologyCamera.Pose(target: SCNVector3(0, 1.2, 0), yaw: 0.55, pitch: 0.62, distance: fitDistance)
+                pose = TopologyCamera.Pose(target: fitTarget, yaw: 0.55, pitch: 0.62, distance: fitDistance)
                 focusedSiteID.wrappedValue = nil
                 focusedRoad.wrappedValue = nil
                 labels.resetWindow()
@@ -739,7 +742,7 @@ struct NativeTopologyScene: UIViewRepresentable {
                 applyPresentation()
             case .zoomIn: pose.distance = max(TopologyCamera.minDistance, pose.distance * 0.76)
             case .zoomOut: pose.distance = min(TopologyCamera.maxDistance, pose.distance * 1.31)
-            case .top: pose.target = SCNVector3(0, 0, 0); pose.pitch = TopologyCamera.maxPitch
+            case .top: pose.target = SCNVector3(fitTarget.x, 0, fitTarget.z); pose.pitch = TopologyCamera.maxPitch
             case .isometric: pose.pitch = 0.78; pose.yaw = 0.42
             case .focus:
                 if let id = focusedSiteID.wrappedValue, let base = towerBases[id] {
@@ -1198,26 +1201,42 @@ private final class TopologyLabelCanvas: UIView {
 
     private func place(_ items: [Item], band: ClosedRange<CGFloat>?, into leaders: inout [(CGPoint, CGPoint, UIColor)]) {
         let measured = measure(items)
-        var cursor: CGFloat = -1_000
+        var placedFrames: [CGRect] = []
         for row in measured {
-            var top = row.item.point.y - row.height / 2
-            if top < cursor + 3 { top = cursor + 3 }
+            let preferredTop = row.item.point.y - row.height / 2
+            var top = preferredTop
             if let band {
                 top = min(max(band.lowerBound, top), band.upperBound - row.height)
+            } else {
+                top = min(max(8, preferredTop), max(8, bounds.maxY - row.height - 8))
+                let step = row.height + 4
+                let offsets: [CGFloat] = [0] + (1...12).flatMap { [CGFloat($0) * step, -CGFloat($0) * step] }
+                for offset in offsets {
+                    let candidate = min(max(8, preferredTop + offset), max(8, bounds.maxY - row.height - 8))
+                    let frame = chipFrame(for: row, top: candidate)
+                    if !placedFrames.contains(where: { $0.insetBy(dx: -3, dy: -3).intersects(frame) }) {
+                        top = candidate
+                        break
+                    }
+                }
             }
-            cursor = top + row.height
+            placedFrames.append(chipFrame(for: row, top: top))
             place(row, top: top, into: &leaders)
         }
     }
 
     private func place(_ row: (item: Item, chip: UILabel, width: CGFloat, height: CGFloat), top: CGFloat, into leaders: inout [(CGPoint, CGPoint, UIColor)]) {
-        let maxX = bounds.maxX - row.width - 8
-        let x = min(max(8, row.item.point.x + 14), max(8, maxX))
-        row.chip.frame = CGRect(x: x, y: top, width: row.width, height: row.height)
+        row.chip.frame = chipFrame(for: row, top: top)
         row.chip.isHidden = false
         if row.chip.superview == nil { addSubview(row.chip) }
         chips[row.item.id] = row.chip
         leaders.append((row.item.point, CGPoint(x: row.chip.frame.minX, y: row.chip.frame.midY), row.item.color))
+    }
+
+    private func chipFrame(for row: (item: Item, chip: UILabel, width: CGFloat, height: CGFloat), top: CGFloat) -> CGRect {
+        let maxX = bounds.maxX - row.width - 8
+        let x = min(max(8, row.item.point.x + 14), max(8, maxX))
+        return CGRect(x: x, y: top, width: row.width, height: row.height)
     }
 
     private func configureMore(_ button: UIButton) {

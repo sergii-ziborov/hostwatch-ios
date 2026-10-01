@@ -62,6 +62,11 @@ struct TopologyView: View {
     private var projectScope: Bool { !model.selectedSite.isEmpty }
 
     private var sites: [Site] {
+        #if DEBUG
+        if !projectScope, ProcessInfo.processInfo.environment["HOSTWATCH_TOPOLOGY_9_SITES"] == "1" {
+            return Fixtures.topologySites
+        }
+        #endif
         guard projectScope, let site = parentSites.first else { return model.sites }
         return TopologyLayer.explode(site, project: model.projects.first { $0.id == site.id }, services: model.dataServices)
     }
