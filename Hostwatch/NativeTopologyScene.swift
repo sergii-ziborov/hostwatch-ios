@@ -17,6 +17,12 @@ struct TopologySelection: Identifiable {
     let siteID: String
     let layer: Int?
     var id: String { "\(siteID):\(layer.map(String.init) ?? "all")" }
+
+    static func sceneLayer(_ name: String) -> TopologySelection? {
+        let parts = name.split(separator: ":")
+        guard parts.count >= 4, parts[0] == "site", let layer = Int(parts[2]) else { return nil }
+        return TopologySelection(siteID: String(parts[1]), layer: layer)
+    }
 }
 
 struct TopologyLabelInfo: Identifiable {
@@ -170,7 +176,7 @@ struct NativeTopologyScene: UIViewRepresentable {
             guard let view, let scene = view.scene else { return }
             self.mode = mode
             let siteStructure = snapshot.sites.map { site -> String in
-                let project = snapshot.projects.first { site.id == $0.id || site.id.hasPrefix($0.id + "/") }
+                let project = TopologyLayer.project(for: site.id, in: snapshot.projects)
                 let layers = TopologyLayer.layers(for: site, project: project)
                     .map { "\($0.kind.rawValue):\($0.title)" }.joined(separator: ",")
                 return "\(site.id)[\(layers)]"
@@ -242,7 +248,7 @@ struct NativeTopologyScene: UIViewRepresentable {
             for (index, site) in snapshot.sites.enumerated() {
                 let placed = TopologyLayout.gridPosition(index: index, count: count)
                 let height = TopologyLayer.towerHeight(bytes: site.bytesPerMinute, maxBytes: maxEgress)
-                let project = snapshot.projects.first { site.id == $0.id || site.id.hasPrefix($0.id + "/") }
+                let project = TopologyLayer.project(for: site.id, in: snapshot.projects)
                 bases[site.id] = placed
                 towerBases[site.id] = SCNVector3(placed.x, 0, placed.z)
                 towerHeights[site.id] = height
@@ -659,9 +665,10 @@ struct NativeTopologyScene: UIViewRepresentable {
                 }
                 let top = calloutOrigin(for: topWorld).y
                 let bottom = calloutOrigin(for: bottomWorld).y
-                let lo = max(10, min(top, bottom))
-                let hi = min(labels.bounds.maxY - 10, max(top, bottom))
-                if hi - lo > 12 { band = lo...hi }
+                band = TopologyLayout.focusedLabelBand(
+                    centerY: (top + bottom) / 2,
+                    viewportHeight: labels.bounds.height
+                )
             }
             labels.render(names: names, layers: layers, band: band, focusID: focus)
         }
@@ -872,16 +879,10 @@ struct NativeTopologyScene: UIViewRepresentable {
                 apply(.fit)
                 return
             }
-            if name.hasPrefix("site:") {
-                let parts = name.split(separator: ":")
-                if parts.count >= 2 {
-                    focusedSiteID.wrappedValue = String(parts[1])
-                    if parts.count == 3, let layer = Int(parts[2]) {
-                        selection.wrappedValue = TopologySelection(siteID: String(parts[1]), layer: layer)
-                    }
-                    lock(String(parts[1]), elevate: true)
-                    return
-                }
+            if let picked = TopologySelection.sceneLayer(name) {
+                lock(picked.siteID, elevate: true)
+                selection.wrappedValue = picked
+                return
             }
             if name.hasPrefix("ext:") || name == "host" { lock(name, elevate: true); return }
             apply(.fit)
@@ -1057,8 +1058,10 @@ private final class TopologyLabelCanvas: UIView {
         for (start, end, color) in leaders {
             context.setStrokeColor(color.withAlphaComponent(0.7).cgColor)
             context.setLineWidth(1)
+            let bendX = (start.x + end.x) / 2
             context.move(to: start)
-            context.addLine(to: CGPoint(x: (start.x + end.x) / 2, y: start.y))
+            context.addLine(to: CGPoint(x: bendX, y: start.y))
+            context.addLine(to: CGPoint(x: bendX, y: end.y))
             context.addLine(to: end)
             context.strokePath()
             if end.x > start.x + 8 {
@@ -1191,7 +1194,10 @@ private final class TopologyLabelCanvas: UIView {
     private func measure(_ items: [Item]) -> [(item: Item, chip: UILabel, width: CGFloat, height: CGFloat)] {
         items.map { item in
             let chip = chips[item.id] ?? makeChip()
-            chip.text = item.detail.isEmpty ? "  \(item.text)  " : "  \(item.text)   \(item.detail)  "
+            let prefix = item.rank == .runtime || item.rank == .analysis ? "  ⓘ " : "  "
+            chip.text = item.detail.isEmpty
+                ? "\(prefix)\(item.text)  "
+                : "\(prefix)\(item.text)   \(item.detail)  "
             chip.textColor = item.color
             chip.sizeToFit()
             chips[item.id] = chip

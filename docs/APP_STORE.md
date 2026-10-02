@@ -1,9 +1,10 @@
-# App Store submission — Hostwatch 1.0.9 (20)
+# App Store submission — Hostwatch 1.0.9 (21 candidate)
 
-Updated 2026-10-01. Build 20 is in the internal TestFlight group; Apple has not approved or published a public App Store release.
+Updated 2026-10-02. Build 20 is in the internal TestFlight group; build 21 is a release candidate pending upload. Apple has not approved or published a public App Store release.
 
 ## Internal TestFlight status
 
+- Version **1.0.9 (21 candidate)** makes each selected Runtime topology layer's title, kind, evidence and available container data the first content in its details sheet. The status-bar action is labeled **Tower** for the whole-tower overview. Short towers use the same screen-space label-list height as tall towers, and connector lines bend toward their labels. The iPhone 17 Pro Debug fixture was inspected with a one-layer tower and with two distinct ApplyDjinn layers; 47 simulator tests passed and one optional live sign-in test was skipped. Upload to internal TestFlight is pending.
 - Version **1.0.9 (20)** reserves a separate row for the PUBLIC edge in Runtime topology, preventing it from merging with Weavatrix when the site grid grows. Traffic labels now use free space near each tower instead of cascading to the bottom of the scene. The nine-site Debug fixture was inspected in both scene modes on an iPhone 17 Pro simulator; 44 tests passed, one optional test was skipped. The stable-Xcode archive was signed, validated and uploaded on 2026-10-01. Apple reports `VALID` and `IN_BETA_TESTING`; assignment to **Hostwatch Internal** was verified. A “What to Test” note asks testers to inspect Towers and Traffic, rotate and zoom, and report overlaps. Physical-device verification remains pending.
 - Version **1.0.9 (19)** reflows Code health and Cleanup on iPhone: titles and descriptions use the available width, long coverage text sits below the project name, Markdown actions do not split, and Cleanup's scan message stays in one panel. The release archive was built on stable Xcode, signed, validated and uploaded on 2026-10-01. Apple reports `VALID` and `IN_BETA_TESTING`; assignment to **Hostwatch Internal** was verified. Physical-device verification remains pending.
 - Version **1.0.9 (18)** removes the duplicate custom `Updating…` indicator during pull-to-refresh, prevents a second manual reload while one is running, and clears an earlier error when the user retries. It was archived on stable Xcode, signed, validated and uploaded on 2026-10-01. Apple reports `VALID` processing and `IN_BETA_TESTING`; assignment to **Hostwatch Internal** was verified through App Store Connect. Physical-device verification of this build remains pending.
@@ -38,7 +39,7 @@ Requires access to a Hostwatch control plane. No public account registration, em
 
 What's new:
 
-Runtime topology now keeps the PUBLIC edge separate from application towers and places labels near their nodes on dense scenes. The previous build improved Code health and Cleanup layouts.
+Runtime topology now opens details for the selected tower layer, gives short and tall towers equal room for callouts, and bends connector lines to the labels.
 
 ## Reviewer instructions
 
@@ -77,6 +78,7 @@ Suggested captures: Overview with time axis, Traffic and request destination, Er
 - [x] Build 18 assigned to the internal TestFlight group. Apple reports `VALID` and `IN_BETA_TESTING`; physical-device verification remains pending.
 - [x] Build 19 assigned to the internal TestFlight group. Apple reports `VALID` and `IN_BETA_TESTING`; iPhone simulator layout inspection passed, physical-device verification remains pending.
 - [x] Build 20 assigned to the internal TestFlight group. Apple reports `VALID` and `IN_BETA_TESTING`; nine-site iPhone simulator inspection passed, physical-device verification remains pending.
+- [ ] Build 21 signed, uploaded and assigned to the internal TestFlight group.
 - [ ] Authenticated iPhone/iPad screenshots and dedicated reviewer account.
 - [ ] Store privacy, age rating and export-compliance forms completed and verified.
 - [ ] App Review submission and approval; public release remains manual.

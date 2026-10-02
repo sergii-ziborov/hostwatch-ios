@@ -237,6 +237,17 @@ enum TopologyLayout {
         var moreBelow: Int
     }
 
+    /// Give every focused tower the same screen-space callout height. Short towers
+    /// can use space above and below their geometry instead of crushing the list.
+    static func focusedLabelBand(centerY: CGFloat, viewportHeight: CGFloat) -> ClosedRange<CGFloat>? {
+        let inset: CGFloat = 12
+        let available = viewportHeight - inset * 2
+        guard available > 48 else { return nil }
+        let height = min(available, min(320, max(180, available * 0.55)))
+        let top = min(max(inset, centerY - height / 2), viewportHeight - inset - height)
+        return top...(top + height)
+    }
+
     /// Pin each chip to its section. If they cannot fit without overlap, show a scroll window
     /// instead of squeezing them into a smear. UIKit Y grows downward.
     static func arrangeLabels(

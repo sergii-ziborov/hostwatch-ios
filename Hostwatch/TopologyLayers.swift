@@ -61,6 +61,10 @@ struct TopologyLayer {
     let weight: Float
     let container: ContainerInfo?
 
+    static func project(for siteID: String, in projects: [ProjectHealth]) -> ProjectHealth? {
+        projects.first { siteID == $0.id || siteID.hasPrefix($0.id + "/") }
+    }
+
     static let healthy = UIColor(red: 0.23, green: 0.87, blue: 0.78, alpha: 1)
     static let warning = UIColor(red: 1, green: 0.68, blue: 0.31, alpha: 1)
     static let critical = UIColor(red: 1, green: 0.34, blue: 0.42, alpha: 1)

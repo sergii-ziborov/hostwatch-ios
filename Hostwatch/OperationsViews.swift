@@ -77,7 +77,7 @@ struct TopologyView: View {
     }
 
     private func project(for site: Site) -> ProjectHealth? {
-        projects.first { site.id.hasPrefix($0.id) || $0.id == site.id }
+        TopologyLayer.project(for: site.id, in: projects)
     }
 
     private var componentLinks: [TopologyLink] {
@@ -158,7 +158,7 @@ struct TopologyView: View {
                 .sheet(item: $selection) { picked in
                     if let site = sites.first(where: { $0.id == picked.siteID }) {
                         TopologyTowerInspector(site: site,
-                                               project: projects.first(where: { picked.siteID.hasPrefix($0.id) || $0.id == site.id }),
+                                               project: project(for: site),
                                                layer: picked.layer)
                     }
                 }
@@ -201,9 +201,15 @@ struct TopologyView: View {
             if ProcessInfo.processInfo.environment["HOSTWATCH_MODE"] == "towers" {
                 mode = .towers
             }
-            if ProcessInfo.processInfo.environment["HOSTWATCH_FOCUS"] == "1", focusedSiteID == nil, let first = sites.first {
-                focusedSiteID = first.id
+            if ProcessInfo.processInfo.environment["HOSTWATCH_FOCUS"] == "1", focusedSiteID == nil {
+                let requested = ProcessInfo.processInfo.environment["HOSTWATCH_FOCUS_SITE_ID"]
+                guard let site = sites.first(where: { $0.id == requested }) ?? sites.first else { return }
+                focusedSiteID = site.id
                 send(.focus)
+                if let rawLayer = ProcessInfo.processInfo.environment["HOSTWATCH_FOCUS_LAYER"],
+                   let layer = Int(rawLayer) {
+                    selection = TopologySelection(siteID: site.id, layer: layer)
+                }
             }
         }
         #endif
@@ -222,7 +228,8 @@ struct TopologyView: View {
                 }
                 Spacer(minLength: 0)
                 if let site = sites.first(where: { $0.id == focusedSiteID }) {
-                    Button("Details") { selection = TopologySelection(siteID: site.id, layer: nil) }
+                    Button("Tower") { selection = TopologySelection(siteID: site.id, layer: nil) }
+                        .accessibilityLabel("Tower details")
                 }
                 Button { send(.fit) } label: { Image(systemName: "xmark.circle.fill") }
                     .accessibilityLabel("Release target")
@@ -333,31 +340,23 @@ struct TopologyTowerInspector: View {
     let layer: Int?
 
     private var selectedContainer: ContainerInfo? {
-        guard let layer, layers.indices.contains(layer) else { return nil }
-        return layers[layer].container
+        selectedLayer?.container
     }
 
     private var layers: [TopologyLayer] { TopologyLayer.layers(for: site, project: project) }
+    private var selectedLayer: TopologyLayer? {
+        guard let layer, layers.indices.contains(layer) else { return nil }
+        return layers[layer]
+    }
 
     var body: some View {
         HWStackNavigation {
             List {
-                Section {
-                    HWLabeled("Project", value: site.name)
-                    HWLabeled("Domains", value: site.domains.joined(separator: ", "))
-                    HWLabeled("Requests", value: "\(site.requestsPerMinute.formatted())/min")
-                    HWLabeled("Errors", value: Format.percent(site.errorRate))
-                    HWLabeled("p95 latency", value: "\(site.p95Ms.formatted()) ms")
-                }
-                Section("Resources") {
-                    HWLabeled("CPU", value: Format.percent(site.cpuPercent))
-                    HWLabeled("Memory", value: "\(Format.bytes(site.memoryBytes)) · normal \(Format.bytes(site.normalMemoryLimit)) · peak \(Format.bytes(site.peakMemoryLimit))")
-                    HWLabeled("Traffic", value: "\(Format.bytes(site.bytesPerMinute))/min")
-                }
-                if let layer, layers.indices.contains(layer) {
+                if let selectedLayer, let layer {
                     Section("Selected layer · \(layer + 1) of \(layers.count)") {
-                        HWLabeled("Name", value: layers[layer].title)
-                        Text(layers[layer].detail).foregroundStyle(HW.secondary)
+                        HWLabeled("Name", value: selectedLayer.title)
+                        HWLabeled("Type", value: selectedLayer.kind.rawValue.capitalized)
+                        Text(selectedLayer.detail).foregroundStyle(HW.secondary)
                     }
                 }
                 if let container = selectedContainer {
@@ -368,6 +367,18 @@ struct TopologyTowerInspector: View {
                         HWLabeled("Memory", value: Format.bytes(container.memoryBytes))
                         HWLabeled("Processes", value: container.pids.formatted())
                     }
+                }
+                Section("Tower overview") {
+                    HWLabeled("Project", value: site.name)
+                    HWLabeled("Domains", value: site.domains.joined(separator: ", "))
+                    HWLabeled("Requests", value: "\(site.requestsPerMinute.formatted())/min")
+                    HWLabeled("Errors", value: Format.percent(site.errorRate))
+                    HWLabeled("p95 latency", value: "\(site.p95Ms.formatted()) ms")
+                }
+                Section("Resources") {
+                    HWLabeled("CPU", value: Format.percent(site.cpuPercent))
+                    HWLabeled("Memory", value: "\(Format.bytes(site.memoryBytes)) · normal \(Format.bytes(site.normalMemoryLimit)) · peak \(Format.bytes(site.peakMemoryLimit))")
+                    HWLabeled("Traffic", value: "\(Format.bytes(site.bytesPerMinute))/min")
                 }
                 Section("Services inside") {
                     ForEach(Array(layers.filter { $0.kind == .runtime }.enumerated()), id: \.offset) { index, layer in
@@ -420,7 +431,7 @@ struct TopologyTowerInspector: View {
             }
             .hwHiddenScrollBackground()
             .background(HW.background)
-            .navigationTitle(site.name)
+            .navigationTitle(selectedLayer?.title ?? site.name)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } } }
         }

@@ -339,6 +339,35 @@ final class HostwatchTests: XCTestCase {
         }
     }
 
+    func testFocusedLabelBandKeepsTheSameHeightForShortAndTallTowers() {
+        let shortTower = TopologyLayout.focusedLabelBand(centerY: 490, viewportHeight: 600)!
+        let tallTower = TopologyLayout.focusedLabelBand(centerY: 220, viewportHeight: 600)!
+        XCTAssertEqual(shortTower.upperBound - shortTower.lowerBound,
+                       tallTower.upperBound - tallTower.lowerBound, accuracy: 0.01)
+        XCTAssertEqual(shortTower.upperBound - shortTower.lowerBound, 316.8, accuracy: 0.01)
+        XCTAssertGreaterThanOrEqual(shortTower.lowerBound, 12)
+        XCTAssertLessThanOrEqual(shortTower.upperBound, 588)
+        XCTAssertGreaterThanOrEqual(tallTower.lowerBound, 12)
+        XCTAssertLessThanOrEqual(tallTower.upperBound, 588)
+    }
+
+    func testSceneLayerSelectionIdentifiesEachLayer() {
+        let runtime = TopologySelection.sceneLayer("site:kablay-us:0:runtime")
+        let graph = TopologySelection.sceneLayer("site:kablay-us:11:graph")
+        XCTAssertEqual(runtime?.siteID, "kablay-us")
+        XCTAssertEqual(runtime?.layer, 0)
+        XCTAssertEqual(graph?.layer, 11)
+        XCTAssertNotEqual(runtime?.id, graph?.id)
+        XCTAssertNil(TopologySelection.sceneLayer("tower:kablay-us"))
+    }
+
+    func testTopologyDetailsResolveTheExactProject() {
+        let projects = Fixtures.projects
+        XCTAssertEqual(TopologyLayer.project(for: "kablay-us", in: projects)?.id, "kablay-us")
+        XCTAssertEqual(TopologyLayer.project(for: "kablay-us/frontend-1", in: projects)?.id, "kablay-us")
+        XCTAssertNil(TopologyLayer.project(for: "kablay-unknown", in: projects))
+    }
+
     func testManhattanRoadsStayOrthogonalOnTheCyberboard() {
         let a = TopologyPoint(x: -4.4, z: -1)
         let b = TopologyPoint(x: 4.4, z: 3.4)
