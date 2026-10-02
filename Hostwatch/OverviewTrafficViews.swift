@@ -194,7 +194,7 @@ struct ResourceDetailView: View {
     @ViewBuilder private func detailRows(_ value: Overview) -> some View {
         VStack(spacing: 0) {
             metricRow("Host", value.hostname)
-            metricRow("Collected", value.timestamp)
+            metricRow("Collected", ChartTime.parse(value.timestamp)?.formatted(date: .abbreviated, time: .shortened) ?? value.timestamp)
             metricRow("Uptime", Format.duration(value.uptimeSeconds))
             metricRow("Selected window", "\(model.hours) hours")
         }.padding(.horizontal, 16).panel()
