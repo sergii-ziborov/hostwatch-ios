@@ -9,8 +9,10 @@
 /* Begin PBXBuildFile section */
 		092FB80D1163628AE680C79F /* DataViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D4506FD3F7EB41B64B8CB32 /* DataViews.swift */; };
 		0A2B3941E22A5C716D2FD6BD /* TopologyCamera.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8DE859739CA33276FF42DAE /* TopologyCamera.swift */; };
+		0D1EA1F11F3B7ABABA1F37F4 /* StorageSnapshotCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC0E29F4C597CD4BB33389F9 /* StorageSnapshotCacheTests.swift */; };
 		12B7D017099F6381B5EDF7F9 /* Compat.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11DBB53B9174FB9548074A20 /* Compat.swift */; };
 		1426677D7A95564CD3B94C63 /* CacheMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 325045175E917A61B8F76107 /* CacheMetrics.swift */; };
+		1AADE3C62176A0B7494CF103 /* StorageSnapshotCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C8AA46D1A2EDF506E71534 /* StorageSnapshotCache.swift */; };
 		205C7B38AA7F39C8549EB03F /* AdminViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B81C8E5DDA41AFCD8723E518 /* AdminViews.swift */; };
 		2397C7CB62CE9336F19578EB /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6B5BF4296604636AF818D8AF /* Assets.xcassets */; };
 		2590C86A7ABF4B5E894043C4 /* SharedVariablesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C954B0813358BA2BF2E2817F /* SharedVariablesView.swift */; };
@@ -89,7 +91,9 @@
 		AB39624746B6B3C851E807D8 /* TopologyLayers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TopologyLayers.swift; sourceTree = "<group>"; };
 		AB8618F607DEE2D2E1E2849A /* OverviewTrafficViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverviewTrafficViews.swift; sourceTree = "<group>"; };
 		B1198D9719CE65286D18E435 /* MarkdownExportButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownExportButton.swift; sourceTree = "<group>"; };
+		B2C8AA46D1A2EDF506E71534 /* StorageSnapshotCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorageSnapshotCache.swift; sourceTree = "<group>"; };
 		B81C8E5DDA41AFCD8723E518 /* AdminViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminViews.swift; sourceTree = "<group>"; };
+		BC0E29F4C597CD4BB33389F9 /* StorageSnapshotCacheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorageSnapshotCacheTests.swift; sourceTree = "<group>"; };
 		C25C3FE01E0B2D3B00975C39 /* GeoLocation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeoLocation.swift; sourceTree = "<group>"; };
 		C3975823A9BDAD4C763B10B2 /* VaultView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultView.swift; sourceTree = "<group>"; };
 		C954B0813358BA2BF2E2817F /* SharedVariablesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedVariablesView.swift; sourceTree = "<group>"; };
@@ -158,6 +162,7 @@
 				C954B0813358BA2BF2E2817F /* SharedVariablesView.swift */,
 				876AF943DE6092E87224123B /* SignInView.swift */,
 				FCFD93658E3AC28A11CEBB23 /* SiteMemoryViews.swift */,
+				B2C8AA46D1A2EDF506E71534 /* StorageSnapshotCache.swift */,
 				2F23EFDCF024E30815A1E55E /* Theme.swift */,
 				D15C00D484C9D75BA72B3796 /* TLSViews.swift */,
 				D8DE859739CA33276FF42DAE /* TopologyCamera.swift */,
@@ -174,6 +179,7 @@
 				92C58A79DD847D0EDA249F62 /* AuthenticationTests.swift */,
 				004069A7A14FC40712567BCC /* CacheMetricsTests.swift */,
 				F82A7AF0AADF24B29949F0F2 /* HostwatchTests.swift */,
+				BC0E29F4C597CD4BB33389F9 /* StorageSnapshotCacheTests.swift */,
 			);
 			path = HostwatchTests;
 			sourceTree = "<group>";
@@ -297,6 +303,7 @@
 				2590C86A7ABF4B5E894043C4 /* SharedVariablesView.swift in Sources */,
 				A283FF16E0B0559681B2DD92 /* SignInView.swift in Sources */,
 				B3273104802A4FC5CFD1C797 /* SiteMemoryViews.swift in Sources */,
+				1AADE3C62176A0B7494CF103 /* StorageSnapshotCache.swift in Sources */,
 				97FB436C5AD2A169AE1AEF11 /* TLSViews.swift in Sources */,
 				7ED8B18934CABF0ACAA3D457 /* Theme.swift in Sources */,
 				0A2B3941E22A5C716D2FD6BD /* TopologyCamera.swift in Sources */,
@@ -313,6 +320,7 @@
 				A9E4AD4E50375F7CFC0381E5 /* AuthenticationTests.swift in Sources */,
 				87571B61FC91AB9DBD718274 /* CacheMetricsTests.swift in Sources */,
 				E32E989754F3E88256ADC83C /* HostwatchTests.swift in Sources */,
+				0D1EA1F11F3B7ABABA1F37F4 /* StorageSnapshotCacheTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -361,7 +369,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 21;
+				CURRENT_PROJECT_VERSION = 22;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -477,7 +485,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 21;
+				CURRENT_PROJECT_VERSION = 22;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;

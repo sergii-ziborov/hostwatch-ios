@@ -62,6 +62,9 @@ final class AppModel: ObservableObject {
     let fixtures: Bool
     private var client: APIClient
     private var liveTask: Task<Void, Never>?
+    private let storageCache = StorageSnapshotCache()
+    private var lastStorageScanAttempt: Date?
+    private var storageRequestID: UUID?
 
     init() {
 #if DEBUG
@@ -285,6 +288,7 @@ final class AppModel: ObservableObject {
 
     private func clearPrivateData() {
         liveTask?.cancel(); liveTask = nil
+        storageCache.clearAll()
         clearNodeData()
         members = []; license = nil
         nodes = []; selectedNode = ""; selectedSite = ""
@@ -293,7 +297,8 @@ final class AppModel: ObservableObject {
     private func clearNodeData() {
         overview = nil; sites = []; dataServices = []; dataFiles = []; dataServicesScannedAt = nil; dataServicesScanError = nil; dataServicesError = nil; history = []; traffic = []
         requests = []; errorEvidence = nil; errorGroups = []; importedNotes = []; importNotice = nil; paths = []; storage = nil; storageBrowse = nil
-        storageLoading = false; storageError = nil; cleanupPreview = nil; cleanupLoading = false; cleanupError = nil; cleanupNotice = nil
+        storageLoading = false; storageError = nil; storageRequestID = nil; lastStorageScanAttempt = nil
+        cleanupPreview = nil; cleanupLoading = false; cleanupError = nil; cleanupNotice = nil
         projects = []; jobs = []; environment = nil
         hybridPeers = []; hybridSettings = nil; hybridAdmission = nil; fleetLinks = []; hybridError = nil
         guardState = nil; accessRules = AccessRuleState(rules: [], managed: false, updatedAt: nil, error: nil)
@@ -317,6 +322,13 @@ final class AppModel: ObservableObject {
         if fixtures { throw APIError.server("Port inventory is unavailable in the sample preview.") }
 #endif
         return try await client.networkPorts()
+    }
+
+    func hostProcesses() async throws -> HostProcessesResponse {
+#if DEBUG
+        if fixtures { return Fixtures.hostProcesses }
+#endif
+        return try await client.hostProcesses()
     }
 
     func changeNode(_ id: String, page: SidebarPage) async {
@@ -551,17 +563,45 @@ final class AppModel: ObservableObject {
         }
     }
 
+    func prepareStorage() async {
+#if DEBUG
+        if fixtures { return }
+#endif
+        if storage == nil, let organizationID = session.organization?.id, let userID = session.user?.id, !selectedNode.isEmpty {
+            storage = storageCache.load(baseURL: baseURLText, organizationID: organizationID, userID: userID, nodeID: selectedNode)
+        }
+        let age = storage.flatMap { ChartTime.parse($0.scannedAt) }.map { Date().timeIntervalSince($0) }
+        if age.map({ $0 > 5 * 60 }) ?? true,
+           lastStorageScanAttempt.map({ Date().timeIntervalSince($0) > 5 * 60 }) ?? true {
+            await scanStorage()
+        }
+    }
+
     func scanStorage(refresh: Bool = false) async {
 #if DEBUG
         if fixtures { storage = Fixtures.storage; storageError = nil; return }
 #endif
         guard !storageLoading else { return }
+        let requestID = UUID()
+        let nodeID = selectedNode
+        storageRequestID = requestID
+        lastStorageScanAttempt = Date()
         storageLoading = true; storageError = nil
-        defer { storageLoading = false }
+        defer {
+            if storageRequestID == requestID { storageLoading = false; storageRequestID = nil }
+        }
         do {
-            storage = try await client.storage(refresh: refresh)
+            let result = try await client.storage(refresh: refresh)
+            guard storageRequestID == requestID, selectedNode == nodeID else { return }
+            storage = result
             storageBrowse = nil
-        } catch { storageError = error.localizedDescription }
+            if let organizationID = session.organization?.id, let userID = session.user?.id {
+                storageCache.save(result, baseURL: baseURLText, organizationID: organizationID, userID: userID, nodeID: nodeID)
+            }
+        } catch {
+            guard storageRequestID == requestID, !Task.isCancelled, !Self.isRequestCancellation(error) else { return }
+            storageError = error.localizedDescription
+        }
     }
 
     func browseStorage(path: String) async {

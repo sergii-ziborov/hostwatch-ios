@@ -427,6 +427,19 @@ struct SystemPoint: Codable, Identifiable {
     let time: String; let cpuPercent: Double; let memoryBytes: Double; let swapBytes: Double; let diskBytes: Double; let load1: Double
     let rxBytesPerSecond: Double; let txBytesPerSecond: Double; let rxPacketsPerSecond: Double; let txPacketsPerSecond: Double; let riskScore: Double
 }
+struct HostProcess: Codable, Identifiable {
+    var id: Int { pid }
+    let pid: Int
+    let parentPid: Int
+    let name: String
+    let residentBytes: Double
+}
+struct HostProcessesResponse: Codable {
+    let collectedAt: String
+    let platform: String
+    let totalProcesses: Int
+    let processes: [HostProcess]
+}
 struct SourceMetric: Codable, Identifiable, Hashable { var id: String { name }; let name: String; let requests: Double; let bytes: Double }
 struct InternalRoute: Codable, Identifiable {
     var id: String { "\(caller)|\(destinationHost)|\(targetService ?? "")" }

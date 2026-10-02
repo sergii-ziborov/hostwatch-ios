@@ -203,6 +203,7 @@ struct PageContainer: View {
 
     @ViewBuilder private var pageContent: some View {
         if model.fixtures, ProcessInfo.processInfo.environment["HOSTWATCH_DETAIL"] == "disk" { StorageInspectorView() }
+        else if model.fixtures, ProcessInfo.processInfo.environment["HOSTWATCH_DETAIL"] == "memory" { ResourceDetailView(kind: .memory) }
         else if model.fixtures, ProcessInfo.processInfo.environment["HOSTWATCH_DETAIL"] == "errors" { ErrorExplorerView() }
         else if model.fixtures, ProcessInfo.processInfo.environment["HOSTWATCH_DETAIL"] == "request", let request = model.requests.first { RequestDetailView(request: request) }
         else {

@@ -257,6 +257,7 @@ actor APIClient {
         try await call("/api/v1/data-rows?\(queryItems(["path": path, "table": table, "limit": String(limit), "offset": String(offset)]))")
     }
     func history(hours: Int) async throws -> [SystemPoint] { try await call("/api/v1/system-history?hours=\(hours)") }
+    func hostProcesses() async throws -> HostProcessesResponse { try await call("/api/v1/host-processes") }
     func traffic(site: String, hours: Int) async throws -> [TrafficPoint] { try await call("/api/v1/traffic?\(scope(site: site, hours: hours))") }
     func sources(site: String, hours: Int) async throws -> Sources { try await call("/api/v1/sources?\(scope(site: site, hours: hours))") }
     func requests(site: String) async throws -> [RequestSample] {

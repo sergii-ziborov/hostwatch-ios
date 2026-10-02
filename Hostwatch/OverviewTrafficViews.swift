@@ -33,6 +33,9 @@ struct ResourceDetailView: View {
     let kind: ResourceKind
     @State private var ports: NetworkPorts?
     @State private var portError: String?
+    @State private var hostProcesses: HostProcessesResponse?
+    @State private var hostProcessError: String?
+    @State private var hostProcessLoading = false
 
     var body: some View {
         ScrollView {
@@ -40,9 +43,10 @@ struct ResourceDetailView: View {
                 Eyebrow(text: "Host resource inspector")
                 Text(kind.rawValue).font(.largeTitle.bold())
                 if let overview = model.overview {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 160))], spacing: 12) {
+                    LazyVGrid(columns: [GridItem(.flexible(minimum: 0)), GridItem(.flexible(minimum: 0))], spacing: 12) {
                         ForEach(stats(overview), id: \.0) { StatCard(title: $0.0, value: $0.1, detail: $0.2, color: $0.3) }
                     }
+                    if kind == .memory { memoryAttributionCard }
                     ResourceTimelineCard(focus: kind)
                     if kind == .network { networkPortsCard }
                     detailRows(overview)
@@ -51,8 +55,77 @@ struct ResourceDetailView: View {
             .padding(20)
         }
         .background(HW.background).navigationTitle(kind.rawValue).navigationBarTitleDisplayMode(.inline)
-        .task(id: model.selectedNode) { if kind == .network { await loadPorts() } }
-        .refreshable { if kind == .network { await loadPorts() } }
+        .task(id: model.selectedNode) {
+            if kind == .network { await loadPorts() }
+            if kind == .memory { hostProcesses = nil; await loadHostProcesses() }
+        }
+        .refreshable {
+            if kind == .network { await loadPorts() }
+            if kind == .memory { await loadHostProcesses() }
+        }
+    }
+
+    private var memoryAttributionCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Eyebrow(text: "Current snapshot")
+                    Text("What uses memory").font(.title3.bold())
+                }
+                Spacer(minLength: 8)
+                Button("Refresh") { Task { await loadHostProcesses() } }
+                    .font(.footnote).disabled(hostProcessLoading)
+            }
+            Text("Top host processes by resident memory on the selected node. Shared pages can appear in more than one process, and system caches are not assigned to a process.")
+                .font(.footnote).foregroundStyle(HW.secondary)
+            if hostProcessLoading && hostProcesses == nil { ProgressView("Reading host processes…").tint(HW.amber) }
+            if let hostProcessError {
+                Label(hostProcessError, systemImage: "exclamationmark.triangle.fill")
+                    .font(.footnote).foregroundStyle(HW.red)
+            }
+            if let response = hostProcesses {
+                let maxResident = max(1, response.processes.first?.residentBytes ?? 1)
+                if response.processes.isEmpty { Text("No readable host processes were reported.").foregroundStyle(HW.secondary) }
+                ForEach(Array(response.processes.prefix(20))) { process in
+                    VStack(alignment: .leading, spacing: 5) {
+                        HStack(spacing: 8) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(process.name).font(.subheadline.weight(.semibold)).lineLimit(1)
+                                Text("PID \(process.pid)").font(.caption2).foregroundStyle(HW.secondary)
+                            }
+                            Spacer(minLength: 4)
+                            Text(Format.bytes(process.residentBytes)).font(.subheadline.monospacedDigit())
+                        }
+                        ProgressView(value: min(1, process.residentBytes / maxResident)).tint(HW.amber)
+                    }
+                    if process.pid != response.processes.prefix(20).last?.pid { Divider() }
+                }
+                if response.totalProcesses > 20 {
+                    Text("Showing 20 of \(response.totalProcesses) readable processes")
+                        .font(.caption).foregroundStyle(HW.secondary)
+                }
+                if let collected = ChartTime.parse(response.collectedAt) {
+                    Text("Collected \(collected.formatted(date: .abbreviated, time: .shortened))")
+                        .font(.caption2).foregroundStyle(HW.secondary)
+                }
+            }
+            if !model.sites.isEmpty {
+                Divider()
+                Text("Project memory").font(.headline)
+                ForEach(model.sites.sorted { $0.memoryBytes > $1.memoryBytes }.prefix(10)) { site in
+                    NavigationLink { WorkloadDetailView(site: site) } label: {
+                        HStack {
+                            Text(site.name).lineLimit(1)
+                            Spacer()
+                            Text(Format.bytes(site.memoryBytes)).monospacedDigit()
+                            Image(systemName: "chevron.right").foregroundStyle(HW.secondary)
+                        }.font(.subheadline)
+                    }.buttonStyle(.plain)
+                }
+                Text("Project values come from reported workloads and are separate from host process RSS.")
+                    .font(.caption2).foregroundStyle(HW.secondary)
+            }
+        }.padding(18).frame(maxWidth: .infinity, alignment: .leading).panel()
     }
 
     private var networkPortsCard: some View {
@@ -91,6 +164,20 @@ struct ResourceDetailView: View {
     private func loadPorts() async {
         do { ports = try await model.networkPorts(); portError = nil }
         catch { portError = error.localizedDescription }
+    }
+
+    private func loadHostProcesses() async {
+        hostProcessLoading = true
+        hostProcessError = nil
+        defer { hostProcessLoading = false }
+        do {
+            let response = try await model.hostProcesses()
+            guard !Task.isCancelled else { return }
+            hostProcesses = response
+        } catch {
+            guard !Task.isCancelled else { return }
+            hostProcessError = error.localizedDescription
+        }
     }
 
     private func stats(_ value: Overview) -> [(String, String, String, Color)] {
@@ -187,27 +274,75 @@ struct StorageInspectorView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 6) { Eyebrow(text: "Host resource inspector"); Text("Disk").font(.largeTitle.bold()); Text("Space by project, data type and exact path").foregroundStyle(HW.secondary) }
-                    Spacer(); Button("Rescan", systemImage: "arrow.clockwise") { Task { await model.scanStorage(refresh: true) } }.buttonStyle(.bordered).disabled(model.storageLoading)
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Eyebrow(text: "Host resource inspector")
+                        Text("Disk").font(.largeTitle.bold())
+                    }
+                    Spacer(minLength: 8)
+                    Button("Rescan", systemImage: "arrow.clockwise") { Task { await model.scanStorage(refresh: true) } }
+                        .buttonStyle(.bordered).disabled(model.storageLoading)
                 }
-                if model.storageLoading { ProgressView("Scanning host storage… this can take up to a minute").tint(HW.teal).frame(maxWidth: .infinity, alignment: .leading) }
+                Text("Space by project, data type and exact path").foregroundStyle(HW.secondary)
+
+                if let disk = model.overview?.disk ?? model.storage?.disk {
+                    let ratio = disk.total > 0 ? disk.used / disk.total : 0
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack(alignment: .firstTextBaseline) {
+                            Text(Format.bytes(disk.used)).font(.largeTitle.bold())
+                            Text("used").foregroundStyle(HW.secondary)
+                            Spacer(minLength: 8)
+                        }
+                        ProgressView(value: min(1, max(0, ratio)))
+                            .tint(ratio > 0.9 ? HW.red : ratio > 0.75 ? HW.amber : HW.teal)
+                        Text("\(Format.bytes(disk.free)) free of \(Format.bytes(disk.total)) · current host reading")
+                            .font(.footnote).foregroundStyle(HW.secondary)
+                    }.padding(18).panel()
+                }
+
+                DiskTimelineCard()
+
+                if let memory = model.overview?.memory {
+                    NavigationLink { ResourceDetailView(kind: .memory) } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "memorychip").foregroundStyle(HW.amber)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Memory").font(.headline)
+                                Text("\(Format.bytes(memory.used)) used · \(Format.bytes(memory.available)) available")
+                                    .font(.footnote).foregroundStyle(HW.secondary)
+                            }
+                            Spacer(minLength: 4)
+                            Image(systemName: "chevron.right").foregroundStyle(HW.secondary)
+                        }.padding(16).panel()
+                    }.buttonStyle(.plain)
+                }
+
+                if model.storageLoading {
+                    HStack(spacing: 12) {
+                        ProgressView().tint(HW.teal)
+                        Text(model.storage == nil ? "Scanning storage breakdown… this can take up to a minute." : "Updating storage breakdown. The last completed scan remains below.")
+                            .font(.footnote).foregroundStyle(HW.secondary)
+                    }.padding(16).frame(maxWidth: .infinity, alignment: .leading).panel()
+                }
                 if let error = model.storageError {
                     VStack(alignment: .leading, spacing: 9) {
                         Label("Disk scan failed", systemImage: "exclamationmark.triangle.fill").font(.headline).foregroundStyle(HW.red)
                         Text(error).font(.footnote).foregroundStyle(HW.secondary).textSelection(.enabled)
-                        Button("Retry scan") { Task { await model.scanStorage() } }.buttonStyle(.bordered)
+                        Button("Retry scan") { Task { await model.scanStorage(refresh: true) } }.buttonStyle(.bordered)
                     }.padding(16).frame(maxWidth: .infinity, alignment: .leading).panel()
                 }
                 if let storage = model.storage {
-                    let ratio = storage.disk.total > 0 ? storage.disk.used / storage.disk.total : 0
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack(alignment: .firstTextBaseline) { Text(Format.bytes(storage.disk.used)).font(.largeTitle.bold()); Text("used").foregroundStyle(HW.secondary); Spacer(); Text("\(Format.bytes(storage.disk.free)) free").foregroundStyle(HW.secondary) }
-                        ProgressView(value: ratio).tint(ratio > 0.9 ? HW.red : ratio > 0.75 ? HW.amber : HW.teal)
-                        Text(ratio > 0.9 ? "Critical · less than 10% free" : ratio > 0.75 ? "Watch · disk is over 75% full" : "Healthy · capacity available")
-                            .font(.footnote.weight(.semibold)).foregroundStyle(ratio > 0.9 ? HW.red : ratio > 0.75 ? HW.amber : HW.teal)
-                    }.padding(18).panel()
-
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Storage breakdown").font(.title3.bold())
+                        if let scannedAt = ChartTime.parse(storage.scannedAt) {
+                            Text("Last updated: \(scannedAt.formatted(date: .abbreviated, time: .shortened)) · saved on this device")
+                                .font(.caption).foregroundStyle(HW.secondary)
+                        }
+                        if storage.entries.count == 1, storage.entries.first?.kind.contains("directory attribution unavailable") == true {
+                            Text("This host reports volume totals and history. Directory attribution is unavailable on this node.")
+                                .font(.footnote).foregroundStyle(HW.secondary)
+                        }
+                    }
                     Picker("Breakdown", selection: $tab) { Text("Sites").tag("Sites"); Text("Types").tag("Types"); Text("Paths").tag("Paths"); Text("Reclaim").tag("Reclaim") }.pickerStyle(.segmented)
                     if tab == "Sites" { groupList(storage.sites, hostBytes: storage.unattributedBytes) }
                     else if tab == "Types" { groupList(storage.categories, hostBytes: 0) }
@@ -224,7 +359,7 @@ struct StorageInspectorView: View {
             }.padding(20)
         }
         .background(HW.background).navigationTitle("Disk").navigationBarTitleDisplayMode(.inline)
-        .task { if model.storage == nil { await model.scanStorage() } }
+        .task(id: model.selectedNode) { await model.prepareStorage() }
     }
 
     private func groupList(_ groups: [StorageGroup], hostBytes: Double) -> some View {
@@ -250,6 +385,39 @@ struct StorageInspectorView: View {
                 }
             }
         }
+    }
+}
+
+private struct DiskTimelineCard: View {
+    @EnvironmentObject private var model: AppModel
+
+    private var samples: [(date: Date, point: SystemPoint)] {
+        model.history.compactMap { point in ChartTime.parse(point.time).map { (date: $0, point: point) } }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Eyebrow(text: "Last \(model.hours) hours")
+                    Text("Disk history").font(.title3.bold())
+                }
+                Spacer()
+                Text("Host samples").font(.caption).foregroundStyle(HW.secondary)
+            }
+            if samples.isEmpty {
+                EmptyState(icon: "chart.xyaxis.line", title: "No disk history yet", detail: "The current disk reading above remains available while samples load.")
+            } else {
+                let total = max(1, model.overview?.disk.total ?? model.storage?.disk.total ?? 1)
+                HWLineChart(dates: samples.map(\.date), series: [
+                    HWSeries(id: "Disk used", color: HW.teal, values: samples.map { min(100, $0.point.diskBytes / total * 100) }, filled: true)
+                ], yMax: 100, height: 190)
+                Label("Disk used · % of total capacity", systemImage: "line.diagonal")
+                    .font(.caption).foregroundStyle(HW.teal)
+                Text("Historical host samples load independently of the directory scan.")
+                    .font(.caption2).foregroundStyle(HW.secondary)
+            }
+        }.padding(18).panel()
     }
 }
 

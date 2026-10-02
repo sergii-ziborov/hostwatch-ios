@@ -70,6 +70,15 @@ enum Fixtures {
                      rxPacketsPerSecond: 30 + Double(index % 21), txPacketsPerSecond: 20 + Double(index % 13), riskScore: Double(index % 18))
     }
 
+    static let hostProcesses = HostProcessesResponse(
+        collectedAt: ISO8601DateFormatter().string(from: .now), platform: "darwin", totalProcesses: 4,
+        processes: [
+            .init(pid: 101, parentPid: 1, name: "WindowServer", residentBytes: 850_000_000),
+            .init(pid: 202, parentPid: 1, name: "Safari", residentBytes: 620_000_000),
+            .init(pid: 303, parentPid: 1, name: "hostwatch-agent", residentBytes: 90_000_000),
+            .init(pid: 404, parentPid: 1, name: "Finder", residentBytes: 75_000_000)
+        ])
+
     static let dataServices: [DataService] = [
         .init(type: "PostgreSQL", role: "Relational database", siteId: "applydjinn", siteName: "ApplyDjinn",
               container: .init(id: "postgres-fixture", name: "applydjinn-postgres-1", project: "applydjinn", state: "running", status: "Up 3 days", image: "postgres:16", imageId: "sha256:fixture", cpuPercent: 4.6, memoryBytes: 417_000_000, memoryLimit: 1_073_741_824, networkRxBytes: 42_000_000, networkTxBytes: 18_000_000, pids: 18)),
