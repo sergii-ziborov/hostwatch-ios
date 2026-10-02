@@ -2,7 +2,7 @@
 
 Native SwiftUI control-plane client for Hostwatch. The iPhone and iPad app is intended for **public App Store distribution**, while access to a control plane is provisioned by an organization. It uses the same signed-in session and REST API as the web application. There is no public demo or registration flow.
 
-**Version 1.0.9 (21):** available to the **Hostwatch Internal** TestFlight group. Tapping a topology layer now opens that layer's own details first; the tower overview is a separate action. Focused label lists use the same screen height for tall and short towers, with bent connector lines. See [submission materials and release checklist](docs/APP_STORE.md) for the current status.
+**Version 1.0.9 (22):** available to the **Hostwatch Internal** TestFlight group. Disk displays current capacity and history while its detailed scan loads; the last completed result stays available. Memory now lists the largest processes on the selected node, including Mac and Linux, and shows the collection time in device format. See [submission materials and release checklist](docs/APP_STORE.md) for the current status.
 
 ## Install and first setup
 
@@ -18,6 +18,7 @@ If Overview says **No host snapshot**, confirm the selected node has data on the
 ## Product structure
 
 - **Overview** — host resources and capacity with resource drilldowns. Pull down to refresh with the system indicator; the page's own loading indicator is reserved for other reloads. A loader stays on the page while the first snapshot arrives instead of fading the whole interface.
+- **Disk and Memory details** — Disk shows current volume use and a history graph immediately, while directory attribution loads separately and the last completed result remains available on the same device. Host-only Mac and Windows nodes report volume totals without claiming a directory scan. Memory shows used, available and swap, then the largest host processes by resident RAM with their PIDs; shared pages mean those process values cannot simply be added together.
 - **Database** — its own tab for running data-service containers and observed files. SQLite files can list tables and preview rows; PostgreSQL stays at container evidence; Redis/Valkey also shows native INFO counters. File size is disk evidence; SQL query rates require a dedicated exporter.
 - **Cleanup** — preview and explicitly remove only old APT downloads, generated manual-page caches, and unused Docker build records and opted-in Podman intermediate-image cache per runtime. The scan shows a single aligned loading panel; the description stays readable at iPhone width. The disk inspector links to the same section. Actual filesystem space freed by container cache cleanup may be lower than its virtual cache size.
 - **Network** — the host Network card shows all interface ingress and egress and a live local/remote port socket snapshot. Port counts are not per-port byte totals.
@@ -63,6 +64,7 @@ Version 1.0.9 (18) followed the same stable-Xcode archive and signing process on
 Version 1.0.9 (19) was archived with stable Xcode, signed, validated and assigned to internal TestFlight on 2026-10-01. Code health and Cleanup layouts were inspected on an iPhone simulator with explicit Debug sample data, including a long coverage message and the Cleanup loading state. Physical-device verification remains pending.
 Version 1.0.9 (20) separates the PUBLIC edge from site towers and keeps dense-scene labels near their nodes. A nine-site Debug scene was inspected on an iPhone 17 Pro simulator in both Traffic and Towers; 44 simulator tests passed and one optional test was skipped. The stable-Xcode archive passed Apple validation and upload on 2026-10-01; Apple reports `VALID` and `IN_BETA_TESTING`, and assignment to Hostwatch Internal was verified. Physical-device verification remains pending.
 Version 1.0.9 (21) brings per-layer topology details and equal-height label lists across tower sizes. The Debug simulator checks opened a runtime layer and a Weavatrix community layer as distinct sheets; 47 tests passed and one optional live sign-in test was skipped. The IPA passed Apple validation, was uploaded on 2026-10-02, and is `VALID` and `IN_BETA_TESTING` in the Hostwatch Internal group. Physical-device verification remains pending.
+Version 1.0.9 (22) adds immediate disk capacity and history, keeps the last directory scan on the device for the selected account and node, and shows the largest host processes in Memory. The Mac and primary Linux agents were updated and their authenticated process endpoints verified. The simulator suite passed 50 tests with one optional live sign-in test skipped; the signed IPA passed Apple validation and was uploaded on 2026-10-02. Apple reports `VALID` and `IN_BETA_TESTING` for **Hostwatch Internal**. Physical-device verification remains pending.
 
 For local UI development only, a Debug build may be launched with `HOSTWATCH_FIXTURES=1`. These values are fabricated test fixtures and display a prominent **SAMPLE DATA · DEBUG BUILD** notice instead of a Live status. A Release build ignores the flag and requires a real, authenticated control plane. No fixture screenshot is used as an App Store asset.
 
@@ -82,7 +84,9 @@ For App Store review and users, see the [privacy policy](PRIVACY.md) and [suppor
 
 <img src="docs/screenshots/iphone-sign-in.png" width="275" alt="Hostwatch 1.0.7 sign-in with Password and Scan website QR options" /> <img src="docs/screenshots/iphone-overview-sample.png" width="275" alt="Hostwatch 1.0.7 Overview with an explicit SAMPLE DATA banner" /> <img src="docs/screenshots/ipad-sign-in.png" width="390" alt="Hostwatch 1.0.7 sign-in on iPad" />
 
-Simulator captures of the version 1.0.7 code. The Overview image contains fabricated development fixtures and visibly says **SAMPLE DATA · DEBUG BUILD**. The sign-in images contain no credentials.
+<img src="docs/screenshots/iphone-disk-sample.png" width="275" alt="Hostwatch 1.0.9 Disk detail showing current volume use and history with a SAMPLE DATA banner" /> <img src="docs/screenshots/iphone-memory-sample.png" width="275" alt="Hostwatch 1.0.9 Memory detail with compact counters and a SAMPLE DATA banner" />
+
+Simulator captures from versions 1.0.7 and 1.0.9. The Overview, Disk and Memory images contain fabricated development fixtures and visibly say **SAMPLE DATA · DEBUG BUILD**. The sign-in images contain no credentials.
 
 Only captures from an authenticated shipping build should be uploaded to App Store Connect. Development fixture images under `docs/screenshots/` explicitly show SAMPLE DATA and are not current server telemetry or Store assets. See [capture checklist](docs/APP_STORE.md#screenshots); the listing must include both supported device families.
 
