@@ -1,9 +1,10 @@
-# App Store submission — Hostwatch 1.0.9 (22)
+# App Store submission — Hostwatch 1.0.9 (23)
 
-Updated 2026-10-02. Build 22 is in the internal TestFlight group. Apple has not approved or published a public App Store release.
+Updated 2026-10-02. Build 23 is the next internal TestFlight candidate; build 22 remains in the internal group. Apple has not approved or published a public App Store release.
 
 ## Internal TestFlight status
 
+- Version **1.0.9 (23)** adds Mac physical RAM accounting that balances wired, compressed and other in-use pages against the displayed used estimate, and free plus inactive/speculative pages against available. Memory also totals RSS across every readable process and groups them by process name, including processes omitted from the largest-process list. RSS can exceed physical RAM use because shared pages are counted in multiple processes. The Mac and primary Linux agents return the complete process inventory totals and groups; the Mac returns physical page accounting. Go tests and cross-platform builds passed; 50 iOS simulator tests passed with one optional live sign-in test skipped. TestFlight upload and physical-device verification are pending.
 - Version **1.0.9 (22)** shows current disk use and history before directory details finish loading, saves the last completed scan per account and node, and adds the largest host processes to Memory. The Mac and primary Linux Go agents were updated and their authenticated process endpoints verified; Mac volume totals return without a directory scan. Debug fixture screens for Disk and Memory were inspected in the iPhone simulator; 50 tests passed and one optional live sign-in test was skipped. The stable-Xcode archive was signed with Associated Domains, passed Apple validation and was uploaded on 2026-10-02. Apple reports `VALID` and `IN_BETA_TESTING`; assignment to **Hostwatch Internal** and the “What to Test” note were verified. Physical-device verification remains pending.
 - Version **1.0.9 (21)** makes each selected Runtime topology layer's title, kind, evidence and available container data the first content in its details sheet. The status-bar action is labeled **Tower** for the whole-tower overview. Short towers use the same screen-space label-list height as tall towers, and connector lines bend toward their labels. The iPhone 17 Pro Debug fixture was inspected with a one-layer tower and with two distinct ApplyDjinn layers; 47 simulator tests passed and one optional live sign-in test was skipped. The signed IPA passed Apple validation and was uploaded on 2026-10-02. Apple reports `VALID` and `IN_BETA_TESTING`; assignment to **Hostwatch Internal** was verified. The “What to Test” note asks testers to inspect per-layer details, short-tower labels, connector lines, rotation and zoom. Physical-device verification remains pending.
 - Version **1.0.9 (20)** reserves a separate row for the PUBLIC edge in Runtime topology, preventing it from merging with Weavatrix when the site grid grows. Traffic labels now use free space near each tower instead of cascading to the bottom of the scene. The nine-site Debug fixture was inspected in both scene modes on an iPhone 17 Pro simulator; 44 tests passed, one optional test was skipped. The stable-Xcode archive was signed, validated and uploaded on 2026-10-01. Apple reports `VALID` and `IN_BETA_TESTING`; assignment to **Hostwatch Internal** was verified. A “What to Test” note asks testers to inspect Towers and Traffic, rotate and zoom, and report overlaps. Physical-device verification remains pending.
@@ -42,7 +43,7 @@ Requires access to a Hostwatch control plane. No public account registration, em
 
 What's new:
 
-Runtime topology now opens details for the selected tower layer, gives short and tall towers equal room for callouts, and bends connector lines to the labels.
+Memory now distinguishes physical RAM from process RSS, includes every readable process in totals and groups processes by name. On Mac, it shows wired, compressed and other used memory separately.
 
 ## Reviewer instructions
 
@@ -83,6 +84,7 @@ Suggested captures: Overview with time axis, Traffic and request destination, Er
 - [x] Build 20 assigned to the internal TestFlight group. Apple reports `VALID` and `IN_BETA_TESTING`; nine-site iPhone simulator inspection passed, physical-device verification remains pending.
 - [x] Build 21 signed, uploaded and assigned to the internal TestFlight group. Apple reports `VALID` and `IN_BETA_TESTING`; physical-device verification remains pending.
 - [x] Build 22 signed, uploaded and assigned to the internal TestFlight group. Apple reports `VALID` and `IN_BETA_TESTING`; Disk and Memory still need physical-device verification.
+- [ ] Build 23 signed, uploaded and assigned to the internal TestFlight group; physical-device verification remains pending.
 - [ ] Authenticated iPhone/iPad screenshots and dedicated reviewer account.
 - [ ] Store privacy, age rating and export-compliance forms completed and verified.
 - [ ] App Review submission and approval; public release remains manual.

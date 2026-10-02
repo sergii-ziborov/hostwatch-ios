@@ -2,7 +2,7 @@
 
 Native SwiftUI control-plane client for Hostwatch. The iPhone and iPad app is intended for **public App Store distribution**, while access to a control plane is provisioned by an organization. It uses the same signed-in session and REST API as the web application. There is no public demo or registration flow.
 
-**Version 1.0.9 (22):** available to the **Hostwatch Internal** TestFlight group. Disk displays current capacity and history while its detailed scan loads; the last completed result stays available. Memory now lists the largest processes on the selected node, including Mac and Linux, and shows the collection time in device format. See [submission materials and release checklist](docs/APP_STORE.md) for the current status.
+**Version 1.0.9 (23):** release candidate for **Hostwatch Internal** TestFlight. Memory separates physical RAM accounting from process RSS, includes all readable processes in totals and groups them by name. See [submission materials and release checklist](docs/APP_STORE.md) for the current status.
 
 ## Install and first setup
 
@@ -18,7 +18,7 @@ If Overview says **No host snapshot**, confirm the selected node has data on the
 ## Product structure
 
 - **Overview** — host resources and capacity with resource drilldowns. Pull down to refresh with the system indicator; the page's own loading indicator is reserved for other reloads. A loader stays on the page while the first snapshot arrives instead of fading the whole interface.
-- **Disk and Memory details** — Disk shows current volume use and a history graph immediately, while directory attribution loads separately and the last completed result remains available on the same device. Host-only Mac and Windows nodes report volume totals without claiming a directory scan. Memory shows used, available and swap, then the largest host processes by resident RAM with their PIDs; shared pages mean those process values cannot simply be added together.
+- **Disk and Memory details** — Disk shows current volume use and a history graph immediately, while directory attribution loads separately and the last completed result remains available on the same device. Host-only Mac and Windows nodes report volume totals without claiming a directory scan. Memory shows a physical RAM estimate, swap, RSS for all readable processes, groups by process name and the largest individual processes. On Mac, the physical estimate separates wired, compressed, other in-use, inactive/speculative and free pages. Shared pages mean RSS totals do not equal physical RAM use.
 - **Database** — its own tab for running data-service containers and observed files. SQLite files can list tables and preview rows; PostgreSQL stays at container evidence; Redis/Valkey also shows native INFO counters. File size is disk evidence; SQL query rates require a dedicated exporter.
 - **Cleanup** — preview and explicitly remove only old APT downloads, generated manual-page caches, and unused Docker build records and opted-in Podman intermediate-image cache per runtime. The scan shows a single aligned loading panel; the description stays readable at iPhone width. The disk inspector links to the same section. Actual filesystem space freed by container cache cleanup may be lower than its virtual cache size.
 - **Network** — the host Network card shows all interface ingress and egress and a live local/remote port socket snapshot. Port counts are not per-port byte totals.

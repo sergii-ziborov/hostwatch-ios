@@ -434,11 +434,30 @@ struct HostProcess: Codable, Identifiable {
     let name: String
     let residentBytes: Double
 }
+struct HostProcessGroup: Codable, Identifiable {
+    var id: String { name }
+    let name: String
+    let count: Int
+    let residentBytes: Double
+}
 struct HostProcessesResponse: Codable {
     let collectedAt: String
     let platform: String
     let totalProcesses: Int
     let processes: [HostProcess]
+    let allResidentBytes: Double?
+    let groups: [HostProcessGroup]?
+    let memoryAccounting: MemoryAccounting?
+}
+struct MemoryAccounting: Codable {
+    let totalBytes: Double
+    let usedBytes: Double
+    let availableBytes: Double
+    let wiredBytes: Double
+    let compressedBytes: Double
+    let otherUsedBytes: Double
+    let cachedBytes: Double
+    let freeBytes: Double
 }
 struct SourceMetric: Codable, Identifiable, Hashable { var id: String { name }; let name: String; let requests: Double; let bytes: Double }
 struct InternalRoute: Codable, Identifiable {

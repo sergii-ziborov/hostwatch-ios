@@ -71,13 +71,24 @@ enum Fixtures {
     }
 
     static let hostProcesses = HostProcessesResponse(
-        collectedAt: ISO8601DateFormatter().string(from: .now), platform: "darwin", totalProcesses: 4,
+        collectedAt: ISO8601DateFormatter().string(from: .now), platform: "darwin", totalProcesses: 414,
         processes: [
             .init(pid: 101, parentPid: 1, name: "WindowServer", residentBytes: 850_000_000),
             .init(pid: 202, parentPid: 1, name: "Safari", residentBytes: 620_000_000),
             .init(pid: 303, parentPid: 1, name: "hostwatch-agent", residentBytes: 90_000_000),
             .init(pid: 404, parentPid: 1, name: "Finder", residentBytes: 75_000_000)
-        ])
+        ], allResidentBytes: 18_000_000_000,
+        groups: [
+            .init(name: "VirtualMac", count: 1, residentBytes: 3_800_000_000),
+            .init(name: "Claude Renderer", count: 9, residentBytes: 2_900_000_000),
+            .init(name: "node", count: 17, residentBytes: 2_100_000_000),
+            .init(name: "Safari", count: 20, residentBytes: 1_800_000_000),
+            .init(name: "Other", count: 367, residentBytes: 7_400_000_000)
+        ],
+        memoryAccounting: .init(totalBytes: 24_000_000_000, usedBytes: 17_000_000_000,
+                                availableBytes: 7_000_000_000, wiredBytes: 4_200_000_000,
+                                compressedBytes: 1_500_000_000, otherUsedBytes: 11_300_000_000,
+                                cachedBytes: 5_000_000_000, freeBytes: 2_000_000_000))
 
     static let dataServices: [DataService] = [
         .init(type: "PostgreSQL", role: "Relational database", siteId: "applydjinn", siteName: "ApplyDjinn",

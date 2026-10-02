@@ -36,6 +36,7 @@ struct ResourceDetailView: View {
     @State private var hostProcesses: HostProcessesResponse?
     @State private var hostProcessError: String?
     @State private var hostProcessLoading = false
+    @State private var showAllProcessGroups = false
 
     var body: some View {
         ScrollView {
@@ -57,7 +58,7 @@ struct ResourceDetailView: View {
         .background(HW.background).navigationTitle(kind.rawValue).navigationBarTitleDisplayMode(.inline)
         .task(id: model.selectedNode) {
             if kind == .network { await loadPorts() }
-            if kind == .memory { hostProcesses = nil; await loadHostProcesses() }
+            if kind == .memory { hostProcesses = nil; showAllProcessGroups = false; await loadHostProcesses() }
         }
         .refreshable {
             if kind == .network { await loadPorts() }
@@ -76,7 +77,7 @@ struct ResourceDetailView: View {
                 Button("Refresh") { Task { await loadHostProcesses() } }
                     .font(.footnote).disabled(hostProcessLoading)
             }
-            Text("Top host processes by resident memory on the selected node. Shared pages can appear in more than one process, and system caches are not assigned to a process.")
+            Text("Physical RAM and process RSS are different measurements. Process RSS can count shared pages more than once.")
                 .font(.footnote).foregroundStyle(HW.secondary)
             if hostProcessLoading && hostProcesses == nil { ProgressView("Reading host processes…").tint(HW.amber) }
             if let hostProcessError {
@@ -84,6 +85,17 @@ struct ResourceDetailView: View {
                     .font(.footnote).foregroundStyle(HW.red)
             }
             if let response = hostProcesses {
+                if let accounting = response.memoryAccounting {
+                    memoryAccountingRows(accounting)
+                    Divider()
+                }
+                processSummaryRows(response)
+                if let groups = response.groups, !groups.isEmpty {
+                    processGroupRows(groups)
+                }
+                Divider()
+                Text("Largest processes by resident memory")
+                    .font(.headline)
                 let maxResident = max(1, response.processes.first?.residentBytes ?? 1)
                 if response.processes.isEmpty { Text("No readable host processes were reported.").foregroundStyle(HW.secondary) }
                 ForEach(Array(response.processes.prefix(20))) { process in
@@ -100,8 +112,8 @@ struct ResourceDetailView: View {
                     }
                     if process.pid != response.processes.prefix(20).last?.pid { Divider() }
                 }
-                if response.totalProcesses > 20 {
-                    Text("Showing 20 of \(response.totalProcesses) readable processes")
+                if response.totalProcesses > response.processes.prefix(20).count {
+                    Text("Showing \(response.processes.prefix(20).count) of \(response.totalProcesses) readable processes")
                         .font(.caption).foregroundStyle(HW.secondary)
                 }
                 if let collected = ChartTime.parse(response.collectedAt) {
@@ -126,6 +138,74 @@ struct ResourceDetailView: View {
                     .font(.caption2).foregroundStyle(HW.secondary)
             }
         }.padding(18).frame(maxWidth: .infinity, alignment: .leading).panel()
+    }
+
+    private func memoryAccountingRows(_ accounting: MemoryAccounting) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Physical RAM estimate").font(.headline)
+            attributionRow("In use", accounting.usedBytes, emphasized: true)
+            attributionRow("Wired", accounting.wiredBytes)
+            attributionRow("Compressed", accounting.compressedBytes)
+            attributionRow("Other in use", accounting.otherUsedBytes)
+            Divider()
+            attributionRow("Available", accounting.availableBytes, emphasized: true)
+            attributionRow("Inactive / speculative", accounting.cachedBytes)
+            attributionRow("Free", accounting.freeBytes)
+            Text("Wired + compressed + other = in use. Inactive / speculative + free = available. Swap is disk space and is not added to RAM.")
+                .font(.caption).foregroundStyle(HW.secondary)
+        }
+    }
+
+    private func processSummaryRows(_ response: HostProcessesResponse) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Process RSS inventory").font(.headline)
+            let shown = Array(response.processes.prefix(20))
+            let shownResident = shown.reduce(0) { $0 + $1.residentBytes }
+            if let allResident = response.allResidentBytes {
+                attributionRow("All \(response.totalProcesses) processes", allResident, emphasized: true)
+                attributionRow("Listed \(shown.count)", shownResident)
+                attributionRow("Other \(max(0, response.totalProcesses - shown.count))", max(0, allResident - shownResident))
+                Text("RSS includes shared memory in each process, so its total does not have to equal physical RAM in use.")
+                    .font(.caption).foregroundStyle(HW.secondary)
+            } else {
+                Text("This node does not yet report the all-process total.")
+                    .font(.caption).foregroundStyle(HW.secondary)
+            }
+        }
+    }
+
+    private func processGroupRows(_ groups: [HostProcessGroup]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("By process name").font(.headline)
+            LazyVStack(alignment: .leading, spacing: 8) {
+                ForEach(Array(groups.prefix(showAllProcessGroups ? groups.count : 12))) { group in
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text(group.name).lineLimit(1)
+                        Text("×\(group.count)").foregroundStyle(HW.secondary)
+                        Spacer(minLength: 4)
+                        Text(Format.bytes(group.residentBytes)).monospacedDigit()
+                    }
+                    .font(.subheadline)
+                }
+            }
+            if groups.count > 12 {
+                Button(showAllProcessGroups ? "Show fewer groups" : "Show all \(groups.count) groups") {
+                    showAllProcessGroups.toggle()
+                }
+                .font(.footnote)
+            }
+            Text("Groups sum RSS for every readable process, including those outside the largest-process list.")
+                .font(.caption).foregroundStyle(HW.secondary)
+        }
+    }
+
+    private func attributionRow(_ label: String, _ bytes: Double, emphasized: Bool = false) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(label).foregroundStyle(emphasized ? Color.primary : HW.secondary)
+            Spacer(minLength: 4)
+            Text(Format.bytes(bytes)).monospacedDigit().fontWeight(emphasized ? .semibold : .regular)
+        }
+        .font(.subheadline)
     }
 
     private var networkPortsCard: some View {
@@ -185,7 +265,7 @@ struct ResourceDetailView: View {
         case .cpu:
             [("Current", Format.percent(value.cpuPercent), "Across all cores", HW.teal), ("Load 1m", value.load1.formatted(.number.precision(.fractionLength(2))), "5m \(value.load5.formatted())", HW.amber), ("Health", value.cpuPercent > 85 ? "Critical" : "Healthy", "Alert threshold 85%", value.cpuPercent > 85 ? HW.red : HW.teal)]
         case .memory:
-            [("Used", Format.bytes(value.memory.used), "of \(Format.bytes(value.memory.total))", HW.amber), ("Available", Format.bytes(value.memory.available), "Immediately reclaimable", HW.teal), ("Swap", Format.bytes(value.memory.swapUsed), "of \(Format.bytes(value.memory.swapTotal))", value.memory.swapUsed > 0 ? HW.amber : HW.teal)]
+            [("In use estimate", Format.bytes(value.memory.used), "of \(Format.bytes(value.memory.total))", HW.amber), ("Available estimate", Format.bytes(value.memory.available), "Free + reclaimable pages", HW.teal), ("Swap", Format.bytes(value.memory.swapUsed), "Disk, not additional RAM", value.memory.swapUsed > 0 ? HW.amber : HW.teal)]
         case .network:
             [("Egress", Format.rate(value.network.txBytesPerSecond), "\(value.network.txPacketsPerSecond.formatted()) packets/s", HW.teal), ("Ingress", Format.rate(value.network.rxBytesPerSecond), "\(value.network.rxPacketsPerSecond.formatted()) packets/s", HW.teal), ("Sent counter", Format.bytes(value.network.txBytes), "Since interface reset or host boot", HW.amber), ("Received counter", Format.bytes(value.network.rxBytes), "Since interface reset or host boot", HW.amber)]
         }
