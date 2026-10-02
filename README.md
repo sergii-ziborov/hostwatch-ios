@@ -2,7 +2,7 @@
 
 Native SwiftUI control-plane client for Hostwatch. The iPhone and iPad app is intended for **public App Store distribution**, while access to a control plane is provisioned by an organization. It uses the same signed-in session and REST API as the web application. There is no public demo or registration flow.
 
-**Version 1.0.9 (21):** release candidate for internal TestFlight. Tapping a topology layer now opens that layer's own details first; the tower overview is a separate action. Focused label lists use the same screen height for tall and short towers, with bent connector lines. Build 20 remains available in the **Hostwatch Internal** TestFlight group until build 21 is uploaded. See [submission materials and release checklist](docs/APP_STORE.md) for the current status.
+**Version 1.0.9 (21):** available to the **Hostwatch Internal** TestFlight group. Tapping a topology layer now opens that layer's own details first; the tower overview is a separate action. Focused label lists use the same screen height for tall and short towers, with bent connector lines. See [submission materials and release checklist](docs/APP_STORE.md) for the current status.
 
 ## Install and first setup
 
@@ -62,7 +62,7 @@ Those results describe the earlier runtime update. Version 1.0.9 (17) was archiv
 Version 1.0.9 (18) followed the same stable-Xcode archive and signing process on 2026-10-01. Apple accepted and processed it, and the internal TestFlight group has access. Its pull-to-refresh change built successfully with the local simulator SDK; physical-device verification is still needed.
 Version 1.0.9 (19) was archived with stable Xcode, signed, validated and assigned to internal TestFlight on 2026-10-01. Code health and Cleanup layouts were inspected on an iPhone simulator with explicit Debug sample data, including a long coverage message and the Cleanup loading state. Physical-device verification remains pending.
 Version 1.0.9 (20) separates the PUBLIC edge from site towers and keeps dense-scene labels near their nodes. A nine-site Debug scene was inspected on an iPhone 17 Pro simulator in both Traffic and Towers; 44 simulator tests passed and one optional test was skipped. The stable-Xcode archive passed Apple validation and upload on 2026-10-01; Apple reports `VALID` and `IN_BETA_TESTING`, and assignment to Hostwatch Internal was verified. Physical-device verification remains pending.
-Version 1.0.9 (21) is a TestFlight candidate for per-layer topology details and equal-height label lists across tower sizes. The Debug simulator checks opened a runtime layer and a Weavatrix community layer as distinct sheets; 47 tests passed and one optional live sign-in test was skipped. Upload and physical-device verification remain pending.
+Version 1.0.9 (21) brings per-layer topology details and equal-height label lists across tower sizes. The Debug simulator checks opened a runtime layer and a Weavatrix community layer as distinct sheets; 47 tests passed and one optional live sign-in test was skipped. The IPA passed Apple validation, was uploaded on 2026-10-02, and is `VALID` and `IN_BETA_TESTING` in the Hostwatch Internal group. Physical-device verification remains pending.
 
 For local UI development only, a Debug build may be launched with `HOSTWATCH_FIXTURES=1`. These values are fabricated test fixtures and display a prominent **SAMPLE DATA · DEBUG BUILD** notice instead of a Live status. A Release build ignores the flag and requires a real, authenticated control plane. No fixture screenshot is used as an App Store asset.
 

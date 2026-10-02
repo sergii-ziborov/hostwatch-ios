@@ -1,21 +1,23 @@
-# App Store submission — Hostwatch 1.0.9 (21 candidate)
+# App Store submission — Hostwatch 1.0.9 (21)
 
-Updated 2026-10-02. Build 20 is in the internal TestFlight group; build 21 is a release candidate pending upload. Apple has not approved or published a public App Store release.
+Updated 2026-10-02. Build 21 is in the internal TestFlight group. Apple has not approved or published a public App Store release.
 
 ## Internal TestFlight status
 
-- Version **1.0.9 (21 candidate)** makes each selected Runtime topology layer's title, kind, evidence and available container data the first content in its details sheet. The status-bar action is labeled **Tower** for the whole-tower overview. Short towers use the same screen-space label-list height as tall towers, and connector lines bend toward their labels. The iPhone 17 Pro Debug fixture was inspected with a one-layer tower and with two distinct ApplyDjinn layers; 47 simulator tests passed and one optional live sign-in test was skipped. Upload to internal TestFlight is pending.
+- Version **1.0.9 (21)** makes each selected Runtime topology layer's title, kind, evidence and available container data the first content in its details sheet. The status-bar action is labeled **Tower** for the whole-tower overview. Short towers use the same screen-space label-list height as tall towers, and connector lines bend toward their labels. The iPhone 17 Pro Debug fixture was inspected with a one-layer tower and with two distinct ApplyDjinn layers; 47 simulator tests passed and one optional live sign-in test was skipped. The signed IPA passed Apple validation and was uploaded on 2026-10-02. Apple reports `VALID` and `IN_BETA_TESTING`; assignment to **Hostwatch Internal** was verified. The “What to Test” note asks testers to inspect per-layer details, short-tower labels, connector lines, rotation and zoom. Physical-device verification remains pending.
 - Version **1.0.9 (20)** reserves a separate row for the PUBLIC edge in Runtime topology, preventing it from merging with Weavatrix when the site grid grows. Traffic labels now use free space near each tower instead of cascading to the bottom of the scene. The nine-site Debug fixture was inspected in both scene modes on an iPhone 17 Pro simulator; 44 tests passed, one optional test was skipped. The stable-Xcode archive was signed, validated and uploaded on 2026-10-01. Apple reports `VALID` and `IN_BETA_TESTING`; assignment to **Hostwatch Internal** was verified. A “What to Test” note asks testers to inspect Towers and Traffic, rotate and zoom, and report overlaps. Physical-device verification remains pending.
 - Version **1.0.9 (19)** reflows Code health and Cleanup on iPhone: titles and descriptions use the available width, long coverage text sits below the project name, Markdown actions do not split, and Cleanup's scan message stays in one panel. The release archive was built on stable Xcode, signed, validated and uploaded on 2026-10-01. Apple reports `VALID` and `IN_BETA_TESTING`; assignment to **Hostwatch Internal** was verified. Physical-device verification remains pending.
 - Version **1.0.9 (18)** removes the duplicate custom `Updating…` indicator during pull-to-refresh, prevents a second manual reload while one is running, and clears an earlier error when the user retries. It was archived on stable Xcode, signed, validated and uploaded on 2026-10-01. Apple reports `VALID` processing and `IN_BETA_TESTING`; assignment to **Hostwatch Internal** was verified through App Store Connect. Physical-device verification of this build remains pending.
 - Version **1.0.9 (17)** was archived by GitHub Actions with stable **Xcode 26.6**, signed for App Store distribution, validated and uploaded on 2026-10-01. The exported IPA's signed entitlements include `applinks:gethostwatch.com`.
 - Apple reports processing state `VALID`, internal state `IN_BETA_TESTING` and `USES-NON-EXEMPT-ENCRYPTION: false`.
 - Build 17 is assigned to the **Hostwatch Internal** group. Its “What to Test” note asks testers to inspect a site's normal and peak memory limits, overflow warning, and persisted edits while checking that other resource limits remain intact.
-- TestFlight should offer build 20 as an update to internal testers. Its behavior on a physical device still needs confirmation.
+- TestFlight should offer build 21 as an update to internal testers. Its behavior on a physical device still needs confirmation.
 - The label placement was inspected in simulator Debug fixture captures in both modes. These images are development evidence, not App Store screenshots.
 - The primary node now includes the `weavatrix-hosted` project and scheduled code-health scan. The first report contains 11 modules, 10 communities and 5,504 graph nodes. Its status is `PARTIAL` because the deployed repository has no measured coverage report.
 
 The GitHub Actions archive is intentionally unsigned. Before exporting it locally, sign the archived app with the distribution profile and expanded entitlements: the profile's app/team identifiers plus `applinks:gethostwatch.com` from `Hostwatch.entitlements`. Exporting an unsigned archive directly omits Associated Domains from the IPA. Verify the final IPA's signature includes the domain before Apple validation. Keep the signing certificate, profile and API key outside Git.
+
+For build 21, a new App Store profile was created for the installed local distribution certificate because Xcode's automatic cloud signing was unavailable to the API key. The unsigned archive was exported with manual signing; the exported app was then re-signed with the Associated Domains entitlement and repackaged. Apple validated the resulting IPA with no errors.
 
 ## Listing
 
@@ -78,7 +80,7 @@ Suggested captures: Overview with time axis, Traffic and request destination, Er
 - [x] Build 18 assigned to the internal TestFlight group. Apple reports `VALID` and `IN_BETA_TESTING`; physical-device verification remains pending.
 - [x] Build 19 assigned to the internal TestFlight group. Apple reports `VALID` and `IN_BETA_TESTING`; iPhone simulator layout inspection passed, physical-device verification remains pending.
 - [x] Build 20 assigned to the internal TestFlight group. Apple reports `VALID` and `IN_BETA_TESTING`; nine-site iPhone simulator inspection passed, physical-device verification remains pending.
-- [ ] Build 21 signed, uploaded and assigned to the internal TestFlight group.
+- [x] Build 21 signed, uploaded and assigned to the internal TestFlight group. Apple reports `VALID` and `IN_BETA_TESTING`; physical-device verification remains pending.
 - [ ] Authenticated iPhone/iPad screenshots and dedicated reviewer account.
 - [ ] Store privacy, age rating and export-compliance forms completed and verified.
 - [ ] App Review submission and approval; public release remains manual.
